@@ -12,7 +12,8 @@ struct TransactionsView: View {
     @State private var accountsById: [Int64: Account] = [:]
 
     /// Currently keyboard-selected row. The List shows it highlighted; arrow
-    /// keys move it; Return opens the editor for the selected row.
+    /// keys move it; Return opens the editor for the selected row. In
+    /// landscape mode this also drives the split-view detail column.
     @State private var selectedId: Int64?
 
     /// Drives whether arrow keys land on the row list or on the search field.
@@ -25,6 +26,83 @@ struct TransactionsView: View {
     @FocusState private var searchFocused: Bool
 
     var body: some View {
+        // GeometryReader gives us width/height to detect landscape on iPad.
+        // Both orientations are `.regular` size class on iPad, so we can't use
+        // `horizontalSizeClass` to discriminate. Width > height is the
+        // canonical landscape check.
+        GeometryReader { geo in
+            let isLandscape = geo.size.width > geo.size.height
+            Group {
+                if isLandscape {
+                    landscapeBody
+                } else {
+                    portraitBody
+                }
+            }
+        }
+    }
+
+    /// Single-column layout (portrait). Tapping a row opens the editor sheet,
+    /// matching the original behavior.
+    @ViewBuilder
+    private var portraitBody: some View {
+        listSurface(isLandscape: false)
+            .sheet(isPresented: $showingNew) {
+                TransactionEditor(transaction: nil)
+            }
+            .sheet(item: $editing) { tx in
+                TransactionEditor(transaction: tx)
+            }
+    }
+
+    /// Two-column layout (landscape). Left: list. Right: an inline
+    /// `TransactionEntryView` that mirrors the current selection, or a
+    /// quick-entry form when nothing is selected.
+    @ViewBuilder
+    private var landscapeBody: some View {
+        HStack(spacing: 0) {
+            listSurface(isLandscape: true)
+                .frame(maxWidth: .infinity)
+            Divider()
+            NavigationStack {
+                detailColumn
+            }
+            .frame(maxWidth: .infinity)
+        }
+        // The "+" toolbar button still presents a sheet in landscape; that
+        // matches the existing keyboard shortcut (⌘N) and gives the user an
+        // explicit way to start a new entry without losing the currently
+        // selected row in the detail pane.
+        .sheet(isPresented: $showingNew) {
+            TransactionEditor(transaction: nil)
+        }
+    }
+
+    /// Detail column for the landscape split view. Re-mounts via `.id` when
+    /// the selected row changes so `@State` inside the entry view re-primes
+    /// from the new transaction.
+    @ViewBuilder
+    private var detailColumn: some View {
+        if let id = selectedId, let tx = rows.first(where: { $0.id == id }) {
+            TransactionEntryView(
+                transaction: tx,
+                onSaveCompletion: nil,
+                onEscape: { selectedId = nil; listFocused = true }
+            )
+            .id(id)
+        } else {
+            TransactionEntryView(
+                transaction: nil,
+                onSaveCompletion: nil,
+                onEscape: { listFocused = true }
+            )
+            .id("new-quick-entry")
+        }
+    }
+
+    /// The list, search, and toolbar — shared between portrait and landscape.
+    @ViewBuilder
+    private func listSurface(isLandscape: Bool) -> some View {
         // The hidden ⌘F button has to live somewhere in the hierarchy so its
         // .keyboardShortcut is registered, but we don't want it visible. A
         // .background(EmptyView() …) or 0×0 frame keeps layout untouched.
@@ -33,7 +111,13 @@ struct TransactionsView: View {
                 rowView(tx)
                     .tag(tx.id)
                     .contentShape(Rectangle())
-                    .onTapGesture { editing = tx }
+                    .onTapGesture {
+                        if isLandscape {
+                            selectedId = tx.id
+                        } else {
+                            editing = tx
+                        }
+                    }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button(role: .destructive) {
                             try? app.deleteTransaction(id: tx.id)
@@ -80,12 +164,6 @@ struct TransactionsView: View {
                 .accessibilityLabel("New transaction")
             }
         }
-        .sheet(isPresented: $showingNew) {
-            TransactionEditor(transaction: nil)
-        }
-        .sheet(item: $editing) { tx in
-            TransactionEditor(transaction: tx)
-        }
         .task(id: app.dataVersion) { reload() }
         .onChange(of: search) { _, _ in reload() }
         .onChange(of: kindFilter) { _, _ in reload() }
@@ -94,21 +172,35 @@ struct TransactionsView: View {
             // rows instead of falling into the search field. .searchable
             // tends to be the first focusable thing otherwise.
             listFocused = true
-            // Default selection so the first arrow key has somewhere to land.
-            if selectedId == nil { selectedId = rows.first?.id }
+            // In portrait we leave selectedId nil by default to avoid an
+            // accidental highlight; in landscape we'd rather show *something*
+            // in the detail column, but the quick-entry form covers that
+            // case fine, so we still leave selection nil.
+            if selectedId == nil { selectedId = nil }
         }
         .onChange(of: rows) { _, newRows in
             // Keep selectedId pointing at a real row after reloads.
             if let id = selectedId, !newRows.contains(where: { $0.id == id }) {
-                selectedId = newRows.first?.id
-            } else if selectedId == nil {
-                selectedId = newRows.first?.id
+                selectedId = nil
             }
         }
         .onKeyPress(.return) {
-            // If a row is selected via keyboard, Return opens the editor.
+            // If a row is selected via keyboard, Return opens the editor
+            // (portrait) or just confirms selection (landscape — the detail
+            // is already showing the same row).
             if let id = selectedId, let tx = rows.first(where: { $0.id == id }) {
-                editing = tx
+                if !isLandscape {
+                    editing = tx
+                }
+                return .handled
+            }
+            return .ignored
+        }
+        .onKeyPress(.escape) {
+            // Esc clears the row selection. In landscape this swaps the
+            // detail column back to the quick-entry form.
+            if selectedId != nil {
+                selectedId = nil
                 return .handled
             }
             return .ignored
