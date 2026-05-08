@@ -416,7 +416,7 @@ struct AccountTransactionsView: View {
                     .font(.body.weight(.medium))
                     .foregroundStyle(tint(for: tx.kind))
                     .monospacedDigit()
-                Text(Formatters.mediumDate.string(from: tx.occurredOn))
+                Text("\(Formatters.mediumDate.string(from: tx.occurredOn)) · \(Formatters.shortTime.string(from: tx.occurredOn))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

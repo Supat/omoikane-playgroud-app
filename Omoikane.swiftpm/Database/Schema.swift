@@ -19,7 +19,7 @@ import Foundation
 /// "spending by category in May 2026 for the credit card account" is a small index
 /// range scan over the summary table.
 enum Schema {
-    static let latestVersion = 3
+    static let latestVersion = 4
 
     static func migrate(_ db: Database) throws {
         try db.exec("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY);")
@@ -49,6 +49,12 @@ enum Schema {
             try db.transaction {
                 try migrateToV3(db)
                 try db.exec("INSERT INTO schema_version(version) VALUES (3);")
+            }
+        }
+        if current < 4 {
+            try db.transaction {
+                try migrateToV4(db)
+                try db.exec("INSERT INTO schema_version(version) VALUES (4);")
             }
         }
     }
@@ -404,6 +410,22 @@ enum Schema {
                     transaction_count  = transaction_count  + 1;
             END;
         """)
+    }
+
+    /// V4: minute-precision timestamps on transactions. Adds `occurred_at`
+    /// (Unix epoch seconds) so the UI can record and display time-of-day.
+    /// `occurred_on` (day key) is preserved unchanged because every
+    /// existing query and index already keys off it; `occurred_at` is
+    /// purely additive. Backfilled from `occurred_on` (midnight UTC of
+    /// the recorded day), so existing rows continue to sort consistently.
+    private static func migrateToV4(_ db: Database) throws {
+        try db.exec("ALTER TABLE transactions ADD COLUMN occurred_at INTEGER NOT NULL DEFAULT 0;")
+        // 86400 seconds per day. Day key * 86400 gives the UTC midnight
+        // of that day, which is the right "no time of day known" baseline.
+        try db.exec("UPDATE transactions SET occurred_at = occurred_on * 86400 WHERE occurred_at = 0;")
+        // Index for ORDER BY within a day (rows sharing occurred_on now
+        // get a stable sub-day ordering).
+        try db.exec("CREATE INDEX idx_tx_occurred_at ON transactions(occurred_at);")
     }
 
     /// Recompute monthly_summaries from scratch. Useful after bulk imports that

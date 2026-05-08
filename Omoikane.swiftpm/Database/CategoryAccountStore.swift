@@ -223,6 +223,48 @@ final class AccountStore {
         try s.step()
     }
 
+    /// Sets `is_archived = 1` via the regular update path so the
+    /// open-statement guard runs. Throws
+    /// `AccountUpdateError.archiveBlockedByOpenStatement` when blocked.
+    func archive(id: Int64) throws {
+        guard var a = try get(id: id) else { return }
+        a.isArchived = true
+        try update(a)
+    }
+
+    /// Count rows that would be broken by hard-deleting this account.
+    /// Used by the UI to (a) decide whether deletion is even possible and
+    /// (b) explain the impact to the user. We split transaction references
+    /// into the two legs so the message can name them precisely.
+    func referenceCount(for id: Int64) throws -> (fromLeg: Int, toLeg: Int, statements: Int) {
+        let fromStmt = try db.prepare("SELECT COUNT(*) FROM transactions WHERE account_id = ?;")
+        fromStmt.bind(id, at: 1)
+        _ = try fromStmt.step()
+        let fromCount = fromStmt.int(0)
+
+        let toStmt = try db.prepare("SELECT COUNT(*) FROM transactions WHERE counterparty_account_id = ?;")
+        toStmt.bind(id, at: 1)
+        _ = try toStmt.step()
+        let toCount = toStmt.int(0)
+
+        let stmtStmt = try db.prepare("SELECT COUNT(*) FROM statements WHERE account_id = ?;")
+        stmtStmt.bind(id, at: 1)
+        _ = try stmtStmt.step()
+        let statementCount = stmtStmt.int(0)
+
+        return (fromLeg: fromCount, toLeg: toCount, statements: statementCount)
+    }
+
+    /// Hard delete. SQLite FK enforcement (`PRAGMA foreign_keys = ON`) will
+    /// reject this if any transaction or statement still references it,
+    /// so callers should check `referenceCount(for:)` first to give the
+    /// user a useful message.
+    func delete(id: Int64) throws {
+        let s = try db.prepare("DELETE FROM accounts WHERE id = ?;")
+        s.bind(id, at: 1)
+        try s.step()
+    }
+
     /// Net balance to date in the account's own currency.
     /// = initial_balance
     ///   + sum of incomes posted to this account

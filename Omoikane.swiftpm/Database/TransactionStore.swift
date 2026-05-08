@@ -9,12 +9,12 @@ final class TransactionStore {
         let now = Int64(Date().timeIntervalSince1970)
         let s = try db.prepare("""
             INSERT INTO transactions
-                (occurred_on, year_month, amount_minor, currency, kind,
+                (occurred_on, year_month, occurred_at, amount_minor, currency, kind,
                  category_id, account_id, counterparty_account_id,
                  counterparty_amount_minor, note, tags, created_at, updated_at,
                  cleared_at, statement_id,
                  counterparty_cleared_at, counterparty_statement_id)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
         """)
         bindInsert(s, tx, now: now)
         try s.step()
@@ -46,7 +46,8 @@ final class TransactionStore {
         let now = Int64(Date().timeIntervalSince1970)
         let s = try db.prepare("""
             UPDATE transactions
-               SET occurred_on = ?, year_month = ?, amount_minor = ?, currency = ?,
+               SET occurred_on = ?, year_month = ?, occurred_at = ?,
+                   amount_minor = ?, currency = ?,
                    kind = ?, category_id = ?, account_id = ?,
                    counterparty_account_id = ?, counterparty_amount_minor = ?,
                    note = ?, tags = ?, updated_at = ?,
@@ -54,23 +55,24 @@ final class TransactionStore {
                    counterparty_cleared_at = ?, counterparty_statement_id = ?
              WHERE id = ?;
         """)
-        s.bind(Int64(tx.occurredOn.dayKey),       at: 1)
-        s.bind(Int64(tx.occurredOn.yearMonthKey), at: 2)
-        s.bind(tx.amountMinor,                    at: 3)
-        s.bind(tx.currency,                       at: 4)
-        s.bind(tx.kind.rawValue,                  at: 5)
-        s.bind(tx.categoryId,                     at: 6)
-        s.bind(tx.accountId,                      at: 7)
-        s.bind(tx.counterpartyAccountId,          at: 8)
-        s.bind(tx.counterpartyAmountMinor,        at: 9)
-        s.bind(tx.note,                           at: 10)
-        s.bind(Self.encodeTags(tx.tags),          at: 11)
-        s.bind(now,                               at: 12)
-        s.bind(tx.clearedAt.map { Int64($0.timeIntervalSince1970) }, at: 13)
-        s.bind(tx.statementId,                    at: 14)
-        s.bind(tx.counterpartyClearedAt.map { Int64($0.timeIntervalSince1970) }, at: 15)
-        s.bind(tx.counterpartyStatementId,        at: 16)
-        s.bind(tx.id,                             at: 17)
+        s.bind(Int64(tx.occurredOn.dayKey),                   at: 1)
+        s.bind(Int64(tx.occurredOn.yearMonthKey),             at: 2)
+        s.bind(Int64(tx.occurredOn.timeIntervalSince1970),    at: 3)
+        s.bind(tx.amountMinor,                                at: 4)
+        s.bind(tx.currency,                                   at: 5)
+        s.bind(tx.kind.rawValue,                              at: 6)
+        s.bind(tx.categoryId,                                 at: 7)
+        s.bind(tx.accountId,                                  at: 8)
+        s.bind(tx.counterpartyAccountId,                      at: 9)
+        s.bind(tx.counterpartyAmountMinor,                    at: 10)
+        s.bind(tx.note,                                       at: 11)
+        s.bind(Self.encodeTags(tx.tags),                      at: 12)
+        s.bind(now,                                           at: 13)
+        s.bind(tx.clearedAt.map { Int64($0.timeIntervalSince1970) }, at: 14)
+        s.bind(tx.statementId,                                at: 15)
+        s.bind(tx.counterpartyClearedAt.map { Int64($0.timeIntervalSince1970) }, at: 16)
+        s.bind(tx.counterpartyStatementId,                    at: 17)
+        s.bind(tx.id,                                         at: 18)
         try s.step()
     }
 
@@ -197,7 +199,9 @@ final class TransactionStore {
 
         var sql = Self.selectColumns + " FROM transactions"
         if !conds.isEmpty { sql += " WHERE " + conds.joined(separator: " AND ") }
-        sql += " ORDER BY occurred_on DESC, id DESC"
+        // occurred_at is the precise timestamp; occurred_on remains in the
+        // tiebreaker for rows written before v4 (where occurred_at = 0).
+        sql += " ORDER BY occurred_at DESC, occurred_on DESC, id DESC"
         if let lim = filter.limit { sql += " LIMIT \(lim)" }
         if let off = filter.offset { sql += " OFFSET \(off)" }
 
@@ -219,7 +223,8 @@ final class TransactionStore {
     // MARK: - Internals
 
     private static let selectColumns = """
-        SELECT id, occurred_on, amount_minor, currency, kind, category_id, account_id,
+        SELECT id, occurred_on, occurred_at, amount_minor, currency, kind,
+               category_id, account_id,
                counterparty_account_id, counterparty_amount_minor,
                note, tags, created_at, updated_at,
                cleared_at, statement_id,
@@ -227,44 +232,54 @@ final class TransactionStore {
     """
 
     private func bindInsert(_ s: Statement, _ tx: Transaction, now: Int64) {
-        s.bind(Int64(tx.occurredOn.dayKey),       at: 1)
-        s.bind(Int64(tx.occurredOn.yearMonthKey), at: 2)
-        s.bind(tx.amountMinor,                    at: 3)
-        s.bind(tx.currency,                       at: 4)
-        s.bind(tx.kind.rawValue,                  at: 5)
-        s.bind(tx.categoryId,                     at: 6)
-        s.bind(tx.accountId,                      at: 7)
-        s.bind(tx.counterpartyAccountId,          at: 8)
-        s.bind(tx.counterpartyAmountMinor,        at: 9)
-        s.bind(tx.note,                           at: 10)
-        s.bind(Self.encodeTags(tx.tags),          at: 11)
-        s.bind(now,                               at: 12)
-        s.bind(now,                               at: 13)
-        s.bind(tx.clearedAt.map { Int64($0.timeIntervalSince1970) }, at: 14)
-        s.bind(tx.statementId,                    at: 15)
-        s.bind(tx.counterpartyClearedAt.map { Int64($0.timeIntervalSince1970) }, at: 16)
-        s.bind(tx.counterpartyStatementId,        at: 17)
+        s.bind(Int64(tx.occurredOn.dayKey),                   at: 1)
+        s.bind(Int64(tx.occurredOn.yearMonthKey),             at: 2)
+        s.bind(Int64(tx.occurredOn.timeIntervalSince1970),    at: 3)
+        s.bind(tx.amountMinor,                                at: 4)
+        s.bind(tx.currency,                                   at: 5)
+        s.bind(tx.kind.rawValue,                              at: 6)
+        s.bind(tx.categoryId,                                 at: 7)
+        s.bind(tx.accountId,                                  at: 8)
+        s.bind(tx.counterpartyAccountId,                      at: 9)
+        s.bind(tx.counterpartyAmountMinor,                    at: 10)
+        s.bind(tx.note,                                       at: 11)
+        s.bind(Self.encodeTags(tx.tags),                      at: 12)
+        s.bind(now,                                           at: 13)
+        s.bind(now,                                           at: 14)
+        s.bind(tx.clearedAt.map { Int64($0.timeIntervalSince1970) }, at: 15)
+        s.bind(tx.statementId,                                at: 16)
+        s.bind(tx.counterpartyClearedAt.map { Int64($0.timeIntervalSince1970) }, at: 17)
+        s.bind(tx.counterpartyStatementId,                    at: 18)
     }
 
     private static func read(_ s: Statement) -> Transaction {
-        Transaction(
+        // Prefer the full Unix timestamp; fall back to the day-key midnight
+        // for rows written before the v4 backfill (occurred_at = 0 means
+        // never set). The fallback stays consistent with the migration's
+        // backfill formula (`occurred_on * 86400`).
+        let occurredAtSeconds = s.int64(2)
+        let occurredOn: Date = occurredAtSeconds > 0
+            ? Date(timeIntervalSince1970: TimeInterval(occurredAtSeconds))
+            : Date.from(dayKey: s.int(1))
+
+        return Transaction(
             id: s.int64(0),
-            occurredOn: Date.from(dayKey: s.int(1)),
-            amountMinor: s.int64(2),
-            currency: s.string(3),
-            kind: TransactionKind(rawValue: s.string(4)) ?? .expense,
-            categoryId: s.int64(5),
-            accountId: s.int64(6),
-            counterpartyAccountId: s.optionalInt64(7),
-            counterpartyAmountMinor: s.optionalInt64(8),
-            note: s.optionalString(9),
-            tags: decodeTags(s.optionalString(10)),
-            createdAt: Date(timeIntervalSince1970: TimeInterval(s.int64(11))),
-            updatedAt: Date(timeIntervalSince1970: TimeInterval(s.int64(12))),
-            clearedAt: s.optionalInt64(13).map { Date(timeIntervalSince1970: TimeInterval($0)) },
-            statementId: s.optionalInt64(14),
-            counterpartyClearedAt: s.optionalInt64(15).map { Date(timeIntervalSince1970: TimeInterval($0)) },
-            counterpartyStatementId: s.optionalInt64(16)
+            occurredOn: occurredOn,
+            amountMinor: s.int64(3),
+            currency: s.string(4),
+            kind: TransactionKind(rawValue: s.string(5)) ?? .expense,
+            categoryId: s.int64(6),
+            accountId: s.int64(7),
+            counterpartyAccountId: s.optionalInt64(8),
+            counterpartyAmountMinor: s.optionalInt64(9),
+            note: s.optionalString(10),
+            tags: decodeTags(s.optionalString(11)),
+            createdAt: Date(timeIntervalSince1970: TimeInterval(s.int64(12))),
+            updatedAt: Date(timeIntervalSince1970: TimeInterval(s.int64(13))),
+            clearedAt: s.optionalInt64(14).map { Date(timeIntervalSince1970: TimeInterval($0)) },
+            statementId: s.optionalInt64(15),
+            counterpartyClearedAt: s.optionalInt64(16).map { Date(timeIntervalSince1970: TimeInterval($0)) },
+            counterpartyStatementId: s.optionalInt64(17)
         )
     }
 

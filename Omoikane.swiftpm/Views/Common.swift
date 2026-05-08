@@ -73,6 +73,15 @@ enum Formatters {
         return f
     }()
 
+    /// Short hour-minute time only (no date). Honors the user's locale,
+    /// so it's 24-hour where the system is set that way.
+    static let shortTime: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .none
+        f.timeStyle = .short
+        return f
+    }()
+
     static let monthLabel: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "MMM yyyy"

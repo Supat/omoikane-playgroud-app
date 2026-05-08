@@ -175,6 +175,16 @@ final class AppState {
         bump()
     }
 
+    func archiveAccount(id: Int64) throws {
+        try db.sync { try accounts.archive(id: id) }
+        bump()
+    }
+
+    func deleteAccount(id: Int64) throws {
+        try db.sync { try accounts.delete(id: id) }
+        bump()
+    }
+
     func setRate(currency: String, rateToHome: Double) throws {
         try db.sync { try currencyRates.upsert(currency: currency, rateToHome: rateToHome) }
         try refreshRates()

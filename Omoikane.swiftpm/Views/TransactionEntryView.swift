@@ -115,7 +115,7 @@ struct TransactionEntryView: View {
             }
 
             Section("Details") {
-                DatePicker("Date", selection: $occurredOn, displayedComponents: .date)
+                DatePicker("Date", selection: $occurredOn, displayedComponents: [.date, .hourAndMinute])
 
                 Picker("Account", selection: Binding(
                     get: { accountId ?? accounts.first?.id ?? 0 },

@@ -9,6 +9,11 @@ struct AccountsView: View {
     @State private var accounts: [Account] = []
     @State private var balanceByAccount: [Int64: Int64] = [:]
     @State private var addingAccount = false
+    /// When non-nil, drives the delete-confirmation alert. Same pattern
+    /// as `CategoriesView` — fresh reference count so the message can
+    /// refuse hard delete and offer Archive when the account is in use.
+    @State private var deletePrompt: AccountDeletePrompt? = nil
+    @State private var actionError: String? = nil
 
     var body: some View {
         List {
@@ -19,12 +24,22 @@ struct AccountsView: View {
                 let groups = accounts.splitForDisplay()
                 if !groups.payment.isEmpty {
                     Section("Payment Accounts") {
-                        ForEach(groups.payment) { a in row(for: a) }
+                        ForEach(groups.payment) { a in
+                            row(for: a)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                    rowActions(for: a)
+                                }
+                        }
                     }
                 }
                 if !groups.credit.isEmpty {
                     Section("Credit Cards") {
-                        ForEach(groups.credit) { a in row(for: a) }
+                        ForEach(groups.credit) { a in
+                            row(for: a)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                    rowActions(for: a)
+                                }
+                        }
                     }
                 }
             }
@@ -39,6 +54,74 @@ struct AccountsView: View {
         }
         .sheet(isPresented: $addingAccount) { AddAccountSheet() }
         .task(id: app.dataVersion) { reload() }
+        .alert(
+            "Delete '\(deletePrompt?.account.name ?? "")'?",
+            isPresented: Binding(
+                get: { deletePrompt != nil },
+                set: { if !$0 { deletePrompt = nil } }
+            ),
+            presenting: deletePrompt
+        ) { prompt in
+            if prompt.isBlocked {
+                // FK enforcement (transactions, statements) would refuse
+                // the delete. Offer Archive instead so the user has a
+                // useful next step without a dead-end alert.
+                Button("Archive instead") {
+                    do { try app.archiveAccount(id: prompt.account.id) }
+                    catch { actionError = "\(error)" }
+                }
+                Button("Cancel", role: .cancel) {}
+            } else {
+                Button("Delete", role: .destructive) {
+                    do { try app.deleteAccount(id: prompt.account.id) }
+                    catch { actionError = "\(error)" }
+                }
+                Button("Cancel", role: .cancel) {}
+            }
+        } message: { prompt in
+            Text(prompt.message)
+        }
+        .alert(
+            "Action failed",
+            isPresented: Binding(
+                get: { actionError != nil },
+                set: { if !$0 { actionError = nil } }
+            ),
+            presenting: actionError
+        ) { _ in
+            Button("OK", role: .cancel) {}
+        } message: { msg in
+            Text(msg)
+        }
+    }
+
+    /// Trailing-swipe actions shared by both account groups. Delete is
+    /// destructive and routes through the alert so the user is told
+    /// (a) what's still referencing this account and (b) whether the
+    /// operation will succeed at all.
+    @ViewBuilder
+    private func rowActions(for a: Account) -> some View {
+        Button(role: .destructive) {
+            startDelete(a)
+        } label: {
+            Label("Delete", systemImage: "trash")
+        }
+        Button {
+            do { try app.archiveAccount(id: a.id) }
+            catch { actionError = "\(error)" }
+        } label: {
+            Label("Archive", systemImage: "archivebox")
+        }
+        .tint(.orange)
+    }
+
+    private func startDelete(_ a: Account) {
+        do {
+            let refs = try app.accounts.referenceCount(for: a.id)
+            deletePrompt = AccountDeletePrompt(account: a, refs: refs)
+        } catch {
+            actionError = "Couldn't check references: \(error)"
+        }
     }
 
     @ViewBuilder
@@ -72,6 +155,28 @@ struct AccountsView: View {
             balanceByAccount = balances
         } catch {
             print("AccountsView reload error: \(error)")
+        }
+    }
+}
+
+/// Bundled state for the account-delete confirmation alert. Holds the
+/// account and a snapshot of how many transactions / statements still
+/// reference it so the alert text can adapt to the situation.
+private struct AccountDeletePrompt: Identifiable {
+    let account: Account
+    let refs: (fromLeg: Int, toLeg: Int, statements: Int)
+    var id: Int64 { account.id }
+
+    var totalTxRefs: Int { refs.fromLeg + refs.toLeg }
+    var isBlocked: Bool { totalTxRefs > 0 || refs.statements > 0 }
+
+    var message: String {
+        if isBlocked {
+            let tx = "\(totalTxRefs) transaction\(totalTxRefs == 1 ? "" : "s")"
+            let st = "\(refs.statements) reconciliation statement\(refs.statements == 1 ? "" : "s")"
+            return "Still referenced by \(tx) and \(st). Hard delete would break referential integrity, so archive instead — it hides the account from pickers without touching history."
+        } else {
+            return "No transactions or statements reference this account, so it's safe to delete. This cannot be undone."
         }
     }
 }
