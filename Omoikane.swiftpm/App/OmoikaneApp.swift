@@ -3,6 +3,12 @@ import SwiftUI
 @main
 struct OmoikaneApp: App {
     @State private var bootstrap: Bootstrap = .loading
+    /// Selected tab is owned at Scene level so `.commands { ... }` can mutate
+    /// it from keyboard shortcuts. Putting selection inside ContentView and
+    /// hanging shortcut buttons in the view hierarchy does not work for
+    /// "switch to non-active tab" — those tabs are lazy and their attached
+    /// shortcuts never register.
+    @State private var tab: AppTab = .dashboard
 
     enum Bootstrap {
         case loading
@@ -17,7 +23,7 @@ struct OmoikaneApp: App {
                 ProgressView("Opening database…")
                     .task { await boot() }
             case .ready(let state):
-                ContentView()
+                ContentView(selection: $tab)
                     .environment(state)
             case .failed(let msg):
                 VStack(spacing: 12) {
@@ -34,6 +40,30 @@ struct OmoikaneApp: App {
                 }
             }
         }
+        .commands {
+            // CommandMenu items show up in the iPadOS ⌘-hold shortcut overlay
+            // (and in a macOS app's menu bar). Each Button's keyboardShortcut
+            // is registered at Scene scope, so it works regardless of which
+            // tab is currently visible.
+            CommandMenu("AppTabs") {
+                ForEach(Array(AppTab.allCases.enumerated()), id: \.element) { idx, t in
+                    Button(t.title) { tab = t }
+                        .keyboardShortcut(KeyEquivalent(Character("\(idx + 1)")),
+                                          modifiers: .command)
+                }
+                Divider()
+                Button("Next AppTab") { cycleAppTab(by: 1) }
+                    .keyboardShortcut(.tab, modifiers: .control)
+                Button("Previous AppTab") { cycleAppTab(by: -1) }
+                    .keyboardShortcut(.tab, modifiers: [.control, .shift])
+            }
+        }
+    }
+
+    private func cycleAppTab(by delta: Int) {
+        let all = AppTab.allCases
+        guard let i = all.firstIndex(of: tab) else { return }
+        tab = all[(i + delta + all.count) % all.count]
     }
 
     private func boot() async {

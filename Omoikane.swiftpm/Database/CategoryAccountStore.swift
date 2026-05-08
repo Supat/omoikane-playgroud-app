@@ -1,5 +1,16 @@
 import Foundation
 
+enum AccountUpdateError: Error, CustomStringConvertible {
+    case archiveBlockedByOpenStatement(count: Int)
+
+    var description: String {
+        switch self {
+        case .archiveBlockedByOpenStatement(let n):
+            return "Can't archive: \(n) reconciliation statement\(n == 1 ? "" : "s") still open."
+        }
+    }
+}
+
 final class CategoryStore {
     private let db: Database
     init(db: Database) { self.db = db }
@@ -73,7 +84,8 @@ final class AccountStore {
 
     func list(includeArchived: Bool = false) throws -> [Account] {
         let sql = """
-            SELECT id, name, kind, currency, initial_balance_minor, is_archived, sort_order
+            SELECT id, name, kind, currency, initial_balance_minor, is_archived, sort_order,
+                   clears_entries_by_default, statement_closing_day
               FROM accounts
               \(includeArchived ? "" : "WHERE is_archived = 0")
              ORDER BY sort_order, name;
@@ -88,40 +100,99 @@ final class AccountStore {
                 currency: s.string(3),
                 initialBalanceMinor: s.int64(4),
                 isArchived: s.int(5) != 0,
-                sortOrder: s.int(6)
+                sortOrder: s.int(6),
+                clearsEntriesByDefault: s.int(7) != 0,
+                statementClosingDay: s.optionalInt64(8).map(Int.init)
             ))
         }
         return out
     }
 
-    @discardableResult
-    func insert(name: String, kind: AccountKind, currency: String = "JPY", initialBalanceMinor: Int64 = 0) throws -> Int64 {
+    func get(id: Int64) throws -> Account? {
         let s = try db.prepare("""
-            INSERT INTO accounts (name, kind, currency, initial_balance_minor, is_archived, sort_order)
-            VALUES (?, ?, ?, ?, 0, COALESCE((SELECT MAX(sort_order)+1 FROM accounts), 0));
+            SELECT id, name, kind, currency, initial_balance_minor, is_archived, sort_order,
+                   clears_entries_by_default, statement_closing_day
+              FROM accounts WHERE id = ?;
+        """)
+        s.bind(id, at: 1)
+        if try s.step() {
+            return Account(
+                id: s.int64(0),
+                name: s.string(1),
+                kind: AccountKind(rawValue: s.string(2)) ?? .other,
+                currency: s.string(3),
+                initialBalanceMinor: s.int64(4),
+                isArchived: s.int(5) != 0,
+                sortOrder: s.int(6),
+                clearsEntriesByDefault: s.int(7) != 0,
+                statementClosingDay: s.optionalInt64(8).map(Int.init)
+            )
+        }
+        return nil
+    }
+
+    @discardableResult
+    func insert(
+        name: String,
+        kind: AccountKind,
+        currency: String = "JPY",
+        initialBalanceMinor: Int64 = 0,
+        clearsEntriesByDefault: Bool = false,
+        statementClosingDay: Int? = nil
+    ) throws -> Int64 {
+        let s = try db.prepare("""
+            INSERT INTO accounts (name, kind, currency, initial_balance_minor,
+                                  is_archived, sort_order,
+                                  clears_entries_by_default, statement_closing_day)
+            VALUES (?, ?, ?, ?, 0,
+                    COALESCE((SELECT MAX(sort_order)+1 FROM accounts), 0),
+                    ?, ?);
         """)
         s.bind(name, at: 1)
-            .bind(kind.rawValue, at: 2)
-            .bind(currency, at: 3)
-            .bind(initialBalanceMinor, at: 4)
+        s.bind(kind.rawValue, at: 2)
+        s.bind(currency, at: 3)
+        s.bind(initialBalanceMinor, at: 4)
+        s.bind(clearsEntriesByDefault ? 1 : 0, at: 5)
+        s.bind(statementClosingDay.map { Int64($0) }, at: 6)
         try s.step()
         return db.lastInsertId
     }
 
+    /// Update an account. Throws `AccountUpdateError.archiveBlockedByOpenStatement`
+    /// if the caller is trying to archive an account that still has open
+    /// reconciliation statements.
     func update(_ a: Account) throws {
+        if a.isArchived {
+            // Going (or staying) archived — refuse if there are open statements.
+            let s = try db.prepare("""
+                SELECT COUNT(*) FROM statements
+                 WHERE account_id = ? AND status = 'open';
+            """)
+            s.bind(a.id, at: 1)
+            var openCount = 0
+            if try s.step() { openCount = s.int(0) }
+            s.reset()
+            if openCount > 0 {
+                throw AccountUpdateError.archiveBlockedByOpenStatement(count: openCount)
+            }
+        }
+
         let s = try db.prepare("""
             UPDATE accounts
                SET name = ?, kind = ?, currency = ?, initial_balance_minor = ?,
-                   is_archived = ?, sort_order = ?
+                   is_archived = ?, sort_order = ?,
+                   clears_entries_by_default = ?, statement_closing_day = ?
              WHERE id = ?;
         """)
         s.bind(a.name, at: 1)
-            .bind(a.kind.rawValue, at: 2)
-            .bind(a.currency, at: 3)
-            .bind(a.initialBalanceMinor, at: 4)
-            .bind(a.isArchived ? 1 : 0, at: 5)
-            .bind(a.sortOrder, at: 6)
-            .bind(a.id, at: 7)
+        s.bind(a.kind.rawValue, at: 2)
+        s.bind(a.currency, at: 3)
+        s.bind(a.initialBalanceMinor, at: 4)
+        s.bind(a.isArchived ? 1 : 0, at: 5)
+        s.bind(a.sortOrder, at: 6)
+        s.bind(a.clearsEntriesByDefault ? 1 : 0, at: 7)
+        s.bind(a.statementClosingDay.map { Int64($0) }, at: 8)
+        s.bind(a.id, at: 9)
         try s.step()
     }
 

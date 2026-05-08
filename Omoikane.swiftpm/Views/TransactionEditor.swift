@@ -17,16 +17,40 @@ struct TransactionEditor: View {
     @State private var counterpartyAccountId: Int64? = nil
     @State private var note: String = ""
     @State private var tagsText: String = ""
+    @State private var clearedNow: Bool = false
+    @State private var counterpartyClearedNow: Bool = false
 
     @State private var categories: [LedgerCategory] = []
     @State private var accounts: [Account] = []
     @State private var loadError: String?
+
+    /// Focusable text fields. Drives Tab / Return / next-button traversal:
+    /// amount → (counterpartyAmount if cross-currency transfer) → note → tags.
+    @FocusState private var focusedField: FormField?
+    enum FormField: Hashable { case amount, counterpartyAmount, note, tags }
 
     private var isEditing: Bool { transaction != nil }
 
     var body: some View {
         NavigationStack {
             Form {
+                if let tx = transaction, tx.isClearedAny {
+                    Section {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("This entry is on a reconciled statement.")
+                                    .font(.subheadline.weight(.medium))
+                                Text("Editing or deleting will leave the statement's snapshot total unchanged but the underlying total will drift. Reopen the statement first if you want a clean re-reconciliation.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .listRowBackground(Color.orange.opacity(0.1))
+                }
+
                 Section {
                     Picker("Kind", selection: $kind) {
                         ForEach(TransactionKind.allCases) { k in
@@ -42,6 +66,9 @@ struct TransactionEditor: View {
                             .keyboardType(.decimalPad)
                             .font(.title.monospacedDigit())
                             .multilineTextAlignment(.trailing)
+                            .focused($focusedField, equals: .amount)
+                            .submitLabel(.next)
+                            .onSubmit { advanceFocus(from: .amount) }
                         Text(fromCurrency)
                             .foregroundStyle(.secondary)
                     }
@@ -75,6 +102,9 @@ struct TransactionEditor: View {
                                 Spacer()
                                 TextField("0", text: $counterpartyAmountText)
                                     .keyboardType(.decimalPad)
+                                    .focused($focusedField, equals: .counterpartyAmount)
+                                    .submitLabel(.next)
+                                    .onSubmit { advanceFocus(from: .counterpartyAmount) }
                                     .font(.body.monospacedDigit())
                                     .multilineTextAlignment(.trailing)
                                 Text(toCurrency)
@@ -100,7 +130,29 @@ struct TransactionEditor: View {
                 Section("Note") {
                     TextField("Optional note", text: $note, axis: .vertical)
                         .lineLimit(1...4)
+                        .focused($focusedField, equals: .note)
+                        .submitLabel(.next)
+                        .onSubmit { advanceFocus(from: .note) }
                     TextField("Tags (comma separated)", text: $tagsText)
+                        .focused($focusedField, equals: .tags)
+                        .submitLabel(.done)
+                        .onSubmit {
+                            focusedField = nil
+                            if canSave { save() }
+                        }
+                }
+
+                Section {
+                    Toggle(kind == .transfer ? "From-side cleared" : "Cleared",
+                           isOn: $clearedNow)
+                    if kind == .transfer {
+                        Toggle("To-side cleared", isOn: $counterpartyClearedNow)
+                    }
+                } header: {
+                    Text("Status")
+                } footer: {
+                    Text("Cleared entries are marked with a check in the list and count toward an account's cleared balance. Toggling off here detaches this entry from any reconciled statement it was on.")
+                        .font(.footnote)
                 }
 
                 if let loadError {
@@ -114,12 +166,20 @@ struct TransactionEditor: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .keyboardShortcut(.cancelAction)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }.disabled(!canSave)
+                    Button("Save") { save() }
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(!canSave)
                 }
             }
-            .onAppear { primeFromExisting() }
+            .onAppear {
+                primeFromExisting()
+                // For new entries, drop focus straight into the amount field
+                // so the user can start typing immediately.
+                if transaction == nil { focusedField = .amount }
+            }
             .task { loadReferences() }
             .onChange(of: kind) { _, _ in
                 if kind != .transfer {
@@ -176,6 +236,12 @@ struct TransactionEditor: View {
             accounts = try app.accounts.list()
             if accountId == nil { accountId = accounts.first?.id }
             if categoryId == nil { categoryId = availableCategories.first?.id }
+            // For a brand-new entry, prime the Cleared toggle to the
+            // from-account's `clearsEntriesByDefault` flag. Visible in the
+            // editor; user can flip it off if needed.
+            if transaction == nil, let acct = fromAccount {
+                clearedNow = acct.clearsEntriesByDefault
+            }
         } catch {
             loadError = "Failed to load: \(error)"
         }
@@ -195,6 +261,8 @@ struct TransactionEditor: View {
         counterpartyAccountId = tx.counterpartyAccountId
         note = tx.note ?? ""
         tagsText = tx.tags.joined(separator: ", ")
+        clearedNow = (tx.clearedAt != nil)
+        counterpartyClearedNow = (tx.counterpartyClearedAt != nil)
     }
 
     private func save() {
@@ -230,9 +298,10 @@ struct TransactionEditor: View {
                 updated.note = note.isEmpty ? nil : note
                 updated.tags = tags
                 updated.updatedAt = now
+                applyClearingToggles(to: &updated, now: now)
                 try app.updateTransaction(updated)
             } else {
-                let tx = Transaction(
+                var tx = Transaction(
                     id: 0,
                     occurredOn: occurredOn,
                     amountMinor: amt,
@@ -247,11 +316,52 @@ struct TransactionEditor: View {
                     createdAt: now,
                     updatedAt: now
                 )
+                applyClearingToggles(to: &tx, now: now)
                 try app.addTransaction(tx)
             }
             dismiss()
         } catch {
             loadError = "Save failed: \(error)"
+        }
+    }
+
+    /// Push the toggle state into the Transaction's clearing columns. Toggling
+    /// off detaches from any reconciled statement (sets statement_id to nil).
+    /// Toggling on leaves an existing statement_id alone if already set —
+    /// otherwise stamps `clearedAt = now` as an ad-hoc clearing.
+    private func applyClearingToggles(to tx: inout Transaction, now: Date) {
+        if clearedNow {
+            if tx.clearedAt == nil { tx.clearedAt = now }
+        } else {
+            tx.clearedAt = nil
+            tx.statementId = nil
+        }
+
+        if kind == .transfer {
+            if counterpartyClearedNow {
+                if tx.counterpartyClearedAt == nil { tx.counterpartyClearedAt = now }
+            } else {
+                tx.counterpartyClearedAt = nil
+                tx.counterpartyStatementId = nil
+            }
+        } else {
+            tx.counterpartyClearedAt = nil
+            tx.counterpartyStatementId = nil
+        }
+    }
+
+    /// Move keyboard focus to the next logical field. Skips
+    /// `.counterpartyAmount` for non-cross-currency rows.
+    private func advanceFocus(from field: FormField) {
+        switch field {
+        case .amount:
+            focusedField = isCrossCurrencyTransfer ? .counterpartyAmount : .note
+        case .counterpartyAmount:
+            focusedField = .note
+        case .note:
+            focusedField = .tags
+        case .tags:
+            focusedField = nil
         }
     }
 

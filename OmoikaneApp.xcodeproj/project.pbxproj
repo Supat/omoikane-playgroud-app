@@ -13,7 +13,8 @@
 		B100000000000000000004 /* TransactionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000004 /* TransactionsView.swift */; };
 		B100000000000000000005 /* TransactionEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000005 /* TransactionEditor.swift */; };
 		B100000000000000000006 /* ReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000006 /* ReportsView.swift */; };
-		B100000000000000000007 /* ManageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000007 /* ManageView.swift */; };
+		B100000000000000000007 /* AccountsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000007 /* AccountsView.swift */; };
+		B100000000000000000024 /* CategoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000024 /* CategoriesView.swift */; };
 		B100000000000000000008 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000008 /* SettingsView.swift */; };
 		B100000000000000000009 /* Common.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000009 /* Common.swift */; };
 		B10000000000000000000A /* Database.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000A /* Database.swift */; };
@@ -23,6 +24,9 @@
 		B10000000000000000000E /* SummaryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000E /* SummaryStore.swift */; };
 		B10000000000000000000F /* SeedData.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000F /* SeedData.swift */; };
 		B100000000000000000020 /* CurrencyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000020 /* CurrencyStore.swift */; };
+		B100000000000000000021 /* StatementStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000021 /* StatementStore.swift */; };
+		B100000000000000000022 /* AccountDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000022 /* AccountDetailView.swift */; };
+		B100000000000000000023 /* ReconciliationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000023 /* ReconciliationSheet.swift */; };
 		B100000000000000000010 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000010 /* Models.swift */; };
 		B100000000000000000011 /* Money.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000011 /* Money.swift */; };
 		B100000000000000000012 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000012 /* AppState.swift */; };
@@ -36,7 +40,8 @@
 		F100000000000000000004 /* TransactionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TransactionsView.swift; path = Omoikane.swiftpm/Views/TransactionsView.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000005 /* TransactionEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TransactionEditor.swift; path = Omoikane.swiftpm/Views/TransactionEditor.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000006 /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ReportsView.swift; path = Omoikane.swiftpm/Views/ReportsView.swift; sourceTree = SOURCE_ROOT; };
-		F100000000000000000007 /* ManageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ManageView.swift; path = Omoikane.swiftpm/Views/ManageView.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000007 /* AccountsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AccountsView.swift; path = Omoikane.swiftpm/Views/AccountsView.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000024 /* CategoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CategoriesView.swift; path = Omoikane.swiftpm/Views/CategoriesView.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000008 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SettingsView.swift; path = Omoikane.swiftpm/Views/SettingsView.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000009 /* Common.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Common.swift; path = Omoikane.swiftpm/Views/Common.swift; sourceTree = SOURCE_ROOT; };
 		F10000000000000000000A /* Database.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Database.swift; path = Omoikane.swiftpm/Database/Database.swift; sourceTree = SOURCE_ROOT; };
@@ -46,6 +51,9 @@
 		F10000000000000000000E /* SummaryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SummaryStore.swift; path = Omoikane.swiftpm/Database/SummaryStore.swift; sourceTree = SOURCE_ROOT; };
 		F10000000000000000000F /* SeedData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SeedData.swift; path = Omoikane.swiftpm/Database/SeedData.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000020 /* CurrencyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CurrencyStore.swift; path = Omoikane.swiftpm/Database/CurrencyStore.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000021 /* StatementStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = StatementStore.swift; path = Omoikane.swiftpm/Database/StatementStore.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000022 /* AccountDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AccountDetailView.swift; path = Omoikane.swiftpm/Views/AccountDetailView.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000023 /* ReconciliationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ReconciliationSheet.swift; path = Omoikane.swiftpm/Views/ReconciliationSheet.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000010 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Models.swift; path = Omoikane.swiftpm/Models/Models.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000011 /* Money.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Money.swift; path = Omoikane.swiftpm/Models/Money.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000012 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppState.swift; path = Omoikane.swiftpm/State/AppState.swift; sourceTree = SOURCE_ROOT; };
@@ -101,9 +109,12 @@
 				F100000000000000000004 /* TransactionsView.swift */,
 				F100000000000000000005 /* TransactionEditor.swift */,
 				F100000000000000000006 /* ReportsView.swift */,
-				F100000000000000000007 /* ManageView.swift */,
+				F100000000000000000007 /* AccountsView.swift */,
+				F100000000000000000024 /* CategoriesView.swift */,
 				F100000000000000000008 /* SettingsView.swift */,
 				F100000000000000000009 /* Common.swift */,
+				F100000000000000000022 /* AccountDetailView.swift */,
+				F100000000000000000023 /* ReconciliationSheet.swift */,
 			);
 			name = Views;
 			sourceTree = "<group>";
@@ -118,6 +129,7 @@
 				F10000000000000000000E /* SummaryStore.swift */,
 				F10000000000000000000F /* SeedData.swift */,
 				F100000000000000000020 /* CurrencyStore.swift */,
+				F100000000000000000021 /* StatementStore.swift */,
 			);
 			name = Database;
 			sourceTree = "<group>";
@@ -230,7 +242,8 @@
 				B100000000000000000004 /* TransactionsView.swift in Sources */,
 				B100000000000000000005 /* TransactionEditor.swift in Sources */,
 				B100000000000000000006 /* ReportsView.swift in Sources */,
-				B100000000000000000007 /* ManageView.swift in Sources */,
+				B100000000000000000007 /* AccountsView.swift in Sources */,
+				B100000000000000000024 /* CategoriesView.swift in Sources */,
 				B100000000000000000008 /* SettingsView.swift in Sources */,
 				B100000000000000000009 /* Common.swift in Sources */,
 				B10000000000000000000A /* Database.swift in Sources */,
@@ -240,6 +253,9 @@
 				B10000000000000000000E /* SummaryStore.swift in Sources */,
 				B10000000000000000000F /* SeedData.swift in Sources */,
 				B100000000000000000020 /* CurrencyStore.swift in Sources */,
+				B100000000000000000021 /* StatementStore.swift in Sources */,
+				B100000000000000000022 /* AccountDetailView.swift in Sources */,
+				B100000000000000000023 /* ReconciliationSheet.swift in Sources */,
 				B100000000000000000010 /* Models.swift in Sources */,
 				B100000000000000000011 /* Money.swift in Sources */,
 				B100000000000000000012 /* AppState.swift in Sources */,

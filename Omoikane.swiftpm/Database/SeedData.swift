@@ -36,10 +36,13 @@ enum SeedData {
 
             // Default accounts — JPY trio plus a USD bank account so the
             // multi-currency UI has something to show on day one.
-            let cash       = try accounts.insert(name: "Cash",        kind: .cash,   currency: "JPY", initialBalanceMinor:  30_000)
+            // Cash defaults to auto-clearing entries (you don't reconcile cash);
+            // Credit Card has a statement closing day (the 25th) so a fresh
+            // user landing in the reconcile sheet sees a sensible default date.
+            let cash       = try accounts.insert(name: "Cash",        kind: .cash,   currency: "JPY", initialBalanceMinor:  30_000, clearsEntriesByDefault: true)
             let bank       = try accounts.insert(name: "Bank",        kind: .bank,   currency: "JPY", initialBalanceMinor: 500_000)
-            let credit     = try accounts.insert(name: "Credit Card", kind: .credit, currency: "JPY", initialBalanceMinor:       0)
-            let usdBank    = try accounts.insert(name: "USD Savings", kind: .bank,   currency: "USD", initialBalanceMinor: 200_000) // $2,000.00
+            let credit     = try accounts.insert(name: "Credit Card", kind: .credit, currency: "JPY", initialBalanceMinor:       0, statementClosingDay: 25)
+            let usdBank    = try accounts.insert(name: "USD Savings", kind: .bank,   currency: "USD", initialBalanceMinor: 200_000, statementClosingDay: 25) // $2,000.00
 
             // Seed a JPY↔USD rate against the user's home currency so the
             // dashboard rollup works on first run. We only know two

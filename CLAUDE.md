@@ -16,6 +16,8 @@ There is **no** `OmoikaneApp/<sources>/` directory; the Xcode project does not d
 
 Strictly conform to native API in the implementation, especially in UI implementation. If custom implementation is truly unavoidable, explicitly confirm with the user.
 
+Keyboard navigation support is top priority, consider it for all implementation.
+
 ## Common commands
 
 iPad simulator UDID is needed for `-destination`. List with:

@@ -15,6 +15,7 @@ final class AppState {
     let accounts: AccountStore
     let summaries: SummaryStore
     let currencyRates: CurrencyStore
+    let statements: StatementStore
 
     private(set) var dataVersion: Int = 0
     private(set) var rateVersion: Int = 0
@@ -37,11 +38,13 @@ final class AppState {
         let db = try Database(url: url)
         try Schema.migrate(db)
         self.db = db
-        self.transactions = TransactionStore(db: db)
+        let txStore = TransactionStore(db: db)
+        self.transactions = txStore
         self.categories = CategoryStore(db: db)
         self.accounts = AccountStore(db: db)
         self.summaries = SummaryStore(db: db)
         self.currencyRates = CurrencyStore(db: db)
+        self.statements = StatementStore(db: db, transactions: txStore)
 
         // Home currency: persisted preference > device locale > JPY.
         let stored = UserDefaults.standard.string(forKey: Self.homeCurrencyKey)
@@ -103,6 +106,10 @@ final class AppState {
 
     // MARK: - Mutation helpers (bump dataVersion + serialize)
 
+    /// Plain insert wrapper. The auto-clear *default* (per-account
+    /// `clearsEntriesByDefault`) is applied at the UI layer in
+    /// TransactionEditor where the user can see and override it via the
+    /// Cleared toggle, rather than silently overriding their choice here.
     @discardableResult
     func addTransaction(_ tx: Transaction) throws -> Int64 {
         let id = try db.sync { try transactions.insert(tx) }
@@ -138,9 +145,21 @@ final class AppState {
     }
 
     @discardableResult
-    func addAccount(name: String, kind: AccountKind, currency: String, initialBalanceMinor: Int64) throws -> Int64 {
+    func addAccount(
+        name: String,
+        kind: AccountKind,
+        currency: String,
+        initialBalanceMinor: Int64,
+        clearsEntriesByDefault: Bool = false,
+        statementClosingDay: Int? = nil
+    ) throws -> Int64 {
         let id = try db.sync {
-            try accounts.insert(name: name, kind: kind, currency: currency, initialBalanceMinor: initialBalanceMinor)
+            try accounts.insert(
+                name: name, kind: kind, currency: currency,
+                initialBalanceMinor: initialBalanceMinor,
+                clearsEntriesByDefault: clearsEntriesByDefault,
+                statementClosingDay: statementClosingDay
+            )
         }
         bump()
         return id
@@ -159,5 +178,51 @@ final class AppState {
     func clearRate(currency: String) throws {
         try db.sync { try currencyRates.delete(currency: currency) }
         try refreshRates()
+    }
+
+    // MARK: - Reconciliation
+
+    @discardableResult
+    func openReconciliation(
+        accountId: Int64,
+        date: Date,
+        balanceMinor: Int64,
+        currency: String,
+        note: String? = nil
+    ) throws -> Int64 {
+        let id = try db.sync {
+            try statements.open(
+                accountId: accountId,
+                statementDate: date,
+                balanceMinor: balanceMinor,
+                currency: currency,
+                note: note
+            )
+        }
+        bump()
+        return id
+    }
+
+    func updateStatement(_ st: LedgerStatement) throws {
+        try db.sync { try statements.update(st) }
+        bump()
+    }
+
+    func finalizeReconciliation(
+        statementId: Int64,
+        clearings: [(txId: Int64, leg: TransactionLeg)]
+    ) throws {
+        try db.sync { try statements.finalize(statementId: statementId, clearings: clearings) }
+        bump()
+    }
+
+    func reopenStatement(id: Int64) throws {
+        try db.sync { try statements.reopen(statementId: id) }
+        bump()
+    }
+
+    func deleteStatement(id: Int64) throws {
+        try db.sync { try statements.delete(statementId: id) }
+        bump()
     }
 }

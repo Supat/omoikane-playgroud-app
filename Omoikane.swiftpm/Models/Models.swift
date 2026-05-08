@@ -70,7 +70,18 @@ struct Account: Identifiable, Hashable {
     var initialBalanceMinor: Int64
     var isArchived: Bool
     var sortOrder: Int
+    /// New entries posted to this account are auto-marked cleared on insert.
+    /// Used so cash accounts (which you don't reconcile) skip the ceremony.
+    var clearsEntriesByDefault: Bool = false
+    /// Day-of-month (1...28) when the account's statement closes. Drives the
+    /// default statement date in `ReconciliationSheet`. nil = no preference.
+    var statementClosingDay: Int? = nil
 }
+
+/// Which leg of a transaction is being cleared. For non-transfers there is
+/// only the `.account` leg. Transfers are a single row that touches two
+/// accounts; each side gets its own clearing slot.
+enum TransactionLeg: String, Hashable, Codable { case account, counterparty }
 
 struct Transaction: Identifiable, Hashable {
     var id: Int64
@@ -90,6 +101,15 @@ struct Transaction: Identifiable, Hashable {
     var tags: [String]
     var createdAt: Date
     var updatedAt: Date
+    /// When the from-account leg was marked cleared (against a statement, or
+    /// auto-cleared at insert time for accounts with `clearsEntriesByDefault`).
+    var clearedAt: Date? = nil
+    /// Statement that cleared the from-account leg, if any.
+    var statementId: Int64? = nil
+    /// Cleared timestamp for the to-account leg (transfers only).
+    var counterpartyClearedAt: Date? = nil
+    /// Statement that cleared the to-account leg (transfers only).
+    var counterpartyStatementId: Int64? = nil
 
     /// Amount with sign — useful for net-flow math (income positive, expense negative).
     var signedAmountMinor: Int64 {
@@ -99,6 +119,9 @@ struct Transaction: Identifiable, Hashable {
         case .transfer: return 0
         }
     }
+
+    /// Did either leg clear? Cheap UI check.
+    var isClearedAny: Bool { clearedAt != nil || counterpartyClearedAt != nil }
 }
 
 /// Filter object used by TransactionStore.list and SummaryStore queries.
@@ -112,6 +135,15 @@ struct TransactionFilter {
     var searchText: String?
     var limit: Int?
     var offset: Int?
+    /// Match `account_id = X OR (kind = 'transfer' AND counterparty_account_id = X)`.
+    /// Used by ReconciliationSheet which needs to see both legs of transfers.
+    var accountIdAnyLeg: Int64?
+    /// Cap rows by occurred_on (day key). Inclusive. Used by ReconciliationSheet
+    /// so future-dated transactions don't clutter a statement-period view.
+    var occurredOnAtMost: Int?
+    /// Filter by clearing state (on the leg referenced by `accountIdAnyLeg`,
+    /// if set; otherwise on the from-account leg).
+    var clearedOnly: Bool?
 
     static let allTime = TransactionFilter()
     static func month(_ ym: Int) -> TransactionFilter {
@@ -120,6 +152,29 @@ struct TransactionFilter {
         f.toYearMonth = ym
         return f
     }
+}
+
+enum StatementStatus: String, Codable, Hashable { case open, reconciled }
+
+/// One reconciliation cycle for one account. Renamed from `Statement` to
+/// avoid clash with the SQLite-prepared-statement wrapper class in
+/// `Database.swift`. `statementBalanceMinor` follows the same signed
+/// convention as `AccountStore.balanceMinor` (debt is negative). The UI
+/// flips the sign for `.credit` accounts on display.
+struct LedgerStatement: Identifiable, Hashable {
+    var id: Int64
+    var accountId: Int64
+    var statementDate: Date
+    var statementBalanceMinor: Int64
+    var currency: String
+    var status: StatementStatus
+    /// Snapshot at finalize, for audit. Stays accurate even if a cleared
+    /// transaction is later edited. nil while the statement is still open.
+    var clearedTotalMinor: Int64?
+    var clearedCount: Int?
+    var note: String?
+    var openedAt: Date
+    var reconciledAt: Date?
 }
 
 /// A row in the materialized aggregate. Returned by SummaryStore.

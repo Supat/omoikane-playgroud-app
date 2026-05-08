@@ -11,25 +11,41 @@ struct TransactionsView: View {
     @State private var categoriesById: [Int64: LedgerCategory] = [:]
     @State private var accountsById: [Int64: Account] = [:]
 
+    /// Currently keyboard-selected row. The List shows it highlighted; arrow
+    /// keys move it; Return opens the editor for the selected row.
+    @State private var selectedId: Int64?
+
+    /// Drives whether arrow keys land on the row list or on the search field.
+    /// We claim list focus on appear so search doesn't auto-grab the keyboard;
+    /// users invoke search deliberately via ⌘F.
+    @FocusState private var listFocused: Bool
+    /// `.searchable(text:isPresented:)` uses this to toggle the search field
+    /// active. iOS 18+ has `.searchFocused` which is cleaner; this is the
+    /// iOS 17 equivalent.
+    @State private var searchPresented: Bool = false
+
     var body: some View {
-        List {
+        // The hidden ⌘F button has to live somewhere in the hierarchy so its
+        // .keyboardShortcut is registered, but we don't want it visible. A
+        // .background(EmptyView() …) or 0×0 frame keeps layout untouched.
+        List(selection: $selectedId) {
             ForEach(rows) { tx in
-                Button {
-                    editing = tx
-                } label: {
-                    rowView(tx)
-                }
-                .buttonStyle(.plain)
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    Button(role: .destructive) {
-                        try? app.deleteTransaction(id: tx.id)
-                    } label: {
-                        Label("Delete", systemImage: "trash")
+                rowView(tx)
+                    .tag(tx.id)
+                    .contentShape(Rectangle())
+                    .onTapGesture { editing = tx }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            try? app.deleteTransaction(id: tx.id)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
-                }
             }
         }
         .listStyle(.insetGrouped)
+        .focused($listFocused)
+        .background(searchShortcut)
         .overlay {
             if rows.isEmpty {
                 EmptyStateView(
@@ -40,7 +56,9 @@ struct TransactionsView: View {
             }
         }
         .navigationTitle("Transactions")
-        .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always))
+        .searchable(text: $search,
+                    isPresented: $searchPresented,
+                    placement: .navigationBarDrawer(displayMode: .always))
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Menu {
@@ -58,6 +76,8 @@ struct TransactionsView: View {
                 } label: {
                     Image(systemName: "plus")
                 }
+                .keyboardShortcut("n", modifiers: .command)
+                .accessibilityLabel("New transaction")
             }
         }
         .sheet(isPresented: $showingNew) {
@@ -69,6 +89,54 @@ struct TransactionsView: View {
         .task(id: app.dataVersion) { reload() }
         .onChange(of: search) { _, _ in reload() }
         .onChange(of: kindFilter) { _, _ in reload() }
+        .onAppear {
+            // Claim keyboard focus for the list so arrow keys move through
+            // rows instead of falling into the search field. .searchable
+            // tends to be the first focusable thing otherwise.
+            listFocused = true
+            // Default selection so the first arrow key has somewhere to land.
+            if selectedId == nil { selectedId = rows.first?.id }
+        }
+        .onChange(of: rows) { _, newRows in
+            // Keep selectedId pointing at a real row after reloads.
+            if let id = selectedId, !newRows.contains(where: { $0.id == id }) {
+                selectedId = newRows.first?.id
+            } else if selectedId == nil {
+                selectedId = newRows.first?.id
+            }
+        }
+        .onKeyPress(.return) {
+            // If a row is selected via keyboard, Return opens the editor.
+            if let id = selectedId, let tx = rows.first(where: { $0.id == id }) {
+                editing = tx
+                return .handled
+            }
+            return .ignored
+        }
+        .onKeyPress(.tab) {
+            // iPadOS's default Tab-to-cycle-controls drifts focus into the
+            // search field, which is jarring while keyboard-navigating the
+            // row list. Swallow it here. Users move tabs with ⌃Tab and
+            // focus search deliberately with ⌘F.
+            return .handled
+        }
+    }
+
+    /// Hidden ⌘F binding. Lives in `.background(...)` so it's mounted but
+    /// occupies no layout space. SwiftUI's `.searchable` does not surface
+    /// a built-in keyboard shortcut on iPad, so we add one explicitly.
+    private var searchShortcut: some View {
+        Button {
+            listFocused = false
+            searchPresented = true
+        } label: {
+            EmptyView()
+        }
+        .keyboardShortcut("f", modifiers: .command)
+        .frame(width: 1, height: 1)
+        .opacity(0)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     @ViewBuilder
@@ -82,7 +150,15 @@ struct TransactionsView: View {
                     .foregroundStyle(tint(for: tx.kind))
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(cat?.name ?? "—").font(.body)
+                HStack(spacing: 6) {
+                    if tx.isClearedAny {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .font(.caption)
+                            .accessibilityLabel("Cleared")
+                    }
+                    Text(cat?.name ?? "—").font(.body)
+                }
                 HStack(spacing: 6) {
                     if let acc {
                         Text(acc.name)

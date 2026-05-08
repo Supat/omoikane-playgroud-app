@@ -11,8 +11,10 @@ final class TransactionStore {
             INSERT INTO transactions
                 (occurred_on, year_month, amount_minor, currency, kind,
                  category_id, account_id, counterparty_account_id,
-                 counterparty_amount_minor, note, tags, created_at, updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);
+                 counterparty_amount_minor, note, tags, created_at, updated_at,
+                 cleared_at, statement_id,
+                 counterparty_cleared_at, counterparty_statement_id)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
         """)
         bindInsert(s, tx, now: now)
         try s.step()
@@ -27,8 +29,10 @@ final class TransactionStore {
                 INSERT INTO transactions
                     (occurred_on, year_month, amount_minor, currency, kind,
                      category_id, account_id, counterparty_account_id,
-                     counterparty_amount_minor, note, tags, created_at, updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);
+                     counterparty_amount_minor, note, tags, created_at, updated_at,
+                     cleared_at, statement_id,
+                     counterparty_cleared_at, counterparty_statement_id)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
             """)
             for tx in items {
                 s.reset()
@@ -45,7 +49,9 @@ final class TransactionStore {
                SET occurred_on = ?, year_month = ?, amount_minor = ?, currency = ?,
                    kind = ?, category_id = ?, account_id = ?,
                    counterparty_account_id = ?, counterparty_amount_minor = ?,
-                   note = ?, tags = ?, updated_at = ?
+                   note = ?, tags = ?, updated_at = ?,
+                   cleared_at = ?, statement_id = ?,
+                   counterparty_cleared_at = ?, counterparty_statement_id = ?
              WHERE id = ?;
         """)
         s.bind(Int64(tx.occurredOn.dayKey),       at: 1)
@@ -60,8 +66,49 @@ final class TransactionStore {
         s.bind(tx.note,                           at: 10)
         s.bind(Self.encodeTags(tx.tags),          at: 11)
         s.bind(now,                               at: 12)
-        s.bind(tx.id,                             at: 13)
+        s.bind(tx.clearedAt.map { Int64($0.timeIntervalSince1970) }, at: 13)
+        s.bind(tx.statementId,                    at: 14)
+        s.bind(tx.counterpartyClearedAt.map { Int64($0.timeIntervalSince1970) }, at: 15)
+        s.bind(tx.counterpartyStatementId,        at: 16)
+        s.bind(tx.id,                             at: 17)
         try s.step()
+    }
+
+    /// Mark one leg of a transaction cleared against a statement.
+    /// Used by `StatementStore.finalize`. Idempotent — re-clearing with the
+    /// same statement is a no-op.
+    func markCleared(id: Int64, leg: TransactionLeg, statementId: Int64, clearedAt: Date) throws {
+        let ts = Int64(clearedAt.timeIntervalSince1970)
+        let sql: String
+        switch leg {
+        case .account:
+            sql = "UPDATE transactions SET cleared_at = ?, statement_id = ? WHERE id = ?;"
+        case .counterparty:
+            sql = "UPDATE transactions SET counterparty_cleared_at = ?, counterparty_statement_id = ? WHERE id = ?;"
+        }
+        let s = try db.prepare(sql)
+        s.bind(ts,          at: 1)
+        s.bind(statementId, at: 2)
+        s.bind(id,          at: 3)
+        try s.step()
+    }
+
+    /// Reverse `markCleared` for a leg. Used by `StatementStore.delete` so
+    /// deleting an open statement doesn't leave orphan clearings pointing at it.
+    func unmarkClearings(forStatementId stmtId: Int64) throws {
+        let s1 = try db.prepare("""
+            UPDATE transactions SET cleared_at = NULL, statement_id = NULL
+             WHERE statement_id = ?;
+        """)
+        s1.bind(stmtId, at: 1)
+        try s1.step()
+        let s2 = try db.prepare("""
+            UPDATE transactions
+               SET counterparty_cleared_at = NULL, counterparty_statement_id = NULL
+             WHERE counterparty_statement_id = ?;
+        """)
+        s2.bind(stmtId, at: 1)
+        try s2.step()
     }
 
     func delete(id: Int64) throws {
@@ -117,6 +164,30 @@ final class TransactionStore {
                 binds.append { s, i in s.bind(c, at: i) }
             }
         }
+        if let anyLeg = filter.accountIdAnyLeg {
+            conds.append("(account_id = ? OR (kind = 'transfer' AND counterparty_account_id = ?))")
+            binds.append { s, i in s.bind(anyLeg, at: i) }
+            binds.append { s, i in s.bind(anyLeg, at: i) }
+        }
+        if let cap = filter.occurredOnAtMost {
+            conds.append("occurred_on <= ?")
+            binds.append { s, i in s.bind(Int64(cap), at: i) }
+        }
+        if let cleared = filter.clearedOnly {
+            // If anyLeg is set, the cleared check follows the same leg.
+            // Otherwise it's about the from-account leg.
+            if let anyLeg = filter.accountIdAnyLeg {
+                if cleared {
+                    conds.append("((account_id = ? AND cleared_at IS NOT NULL) OR (counterparty_account_id = ? AND counterparty_cleared_at IS NOT NULL))")
+                } else {
+                    conds.append("((account_id = ? AND cleared_at IS NULL) OR (counterparty_account_id = ? AND counterparty_cleared_at IS NULL))")
+                }
+                binds.append { s, i in s.bind(anyLeg, at: i) }
+                binds.append { s, i in s.bind(anyLeg, at: i) }
+            } else {
+                conds.append(cleared ? "cleared_at IS NOT NULL" : "cleared_at IS NULL")
+            }
+        }
         if let q = filter.searchText, !q.isEmpty {
             conds.append("(note LIKE ? OR tags LIKE ?)")
             let like = "%\(q)%"
@@ -150,7 +221,9 @@ final class TransactionStore {
     private static let selectColumns = """
         SELECT id, occurred_on, amount_minor, currency, kind, category_id, account_id,
                counterparty_account_id, counterparty_amount_minor,
-               note, tags, created_at, updated_at
+               note, tags, created_at, updated_at,
+               cleared_at, statement_id,
+               counterparty_cleared_at, counterparty_statement_id
     """
 
     private func bindInsert(_ s: Statement, _ tx: Transaction, now: Int64) {
@@ -167,6 +240,10 @@ final class TransactionStore {
         s.bind(Self.encodeTags(tx.tags),          at: 11)
         s.bind(now,                               at: 12)
         s.bind(now,                               at: 13)
+        s.bind(tx.clearedAt.map { Int64($0.timeIntervalSince1970) }, at: 14)
+        s.bind(tx.statementId,                    at: 15)
+        s.bind(tx.counterpartyClearedAt.map { Int64($0.timeIntervalSince1970) }, at: 16)
+        s.bind(tx.counterpartyStatementId,        at: 17)
     }
 
     private static func read(_ s: Statement) -> Transaction {
@@ -183,7 +260,11 @@ final class TransactionStore {
             note: s.optionalString(9),
             tags: decodeTags(s.optionalString(10)),
             createdAt: Date(timeIntervalSince1970: TimeInterval(s.int64(11))),
-            updatedAt: Date(timeIntervalSince1970: TimeInterval(s.int64(12)))
+            updatedAt: Date(timeIntervalSince1970: TimeInterval(s.int64(12))),
+            clearedAt: s.optionalInt64(13).map { Date(timeIntervalSince1970: TimeInterval($0)) },
+            statementId: s.optionalInt64(14),
+            counterpartyClearedAt: s.optionalInt64(15).map { Date(timeIntervalSince1970: TimeInterval($0)) },
+            counterpartyStatementId: s.optionalInt64(16)
         )
     }
 

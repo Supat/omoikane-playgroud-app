@@ -19,7 +19,7 @@ import Foundation
 /// "spending by category in May 2026 for the credit card account" is a small index
 /// range scan over the summary table.
 enum Schema {
-    static let latestVersion = 2
+    static let latestVersion = 3
 
     static func migrate(_ db: Database) throws {
         try db.exec("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY);")
@@ -43,6 +43,12 @@ enum Schema {
             try db.transaction {
                 try migrateToV2(db)
                 try db.exec("INSERT INTO schema_version(version) VALUES (2);")
+            }
+        }
+        if current < 3 {
+            try db.transaction {
+                try migrateToV3(db)
+                try db.exec("INSERT INTO schema_version(version) VALUES (3);")
             }
         }
     }
@@ -310,6 +316,93 @@ enum Schema {
                 rate_to_home REAL NOT NULL,
                 updated_at   INTEGER NOT NULL
             );
+        """)
+    }
+
+    /// V3: reconciliation. Adds a `statements` table, per-leg clearing columns
+    /// on `transactions`, two policy columns on `accounts`, and tightens the
+    /// `tx_au` trigger so checkbox-tick UPDATEs that change only the clearing
+    /// columns don't churn `monthly_summaries`.
+    private static func migrateToV3(_ db: Database) throws {
+        // 1. Statements table — must exist before adding the FK column on
+        //    transactions. statement_balance_minor is signed (matches the
+        //    convention used by AccountStore.balanceMinor).
+        try db.exec("""
+            CREATE TABLE statements (
+                id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_id               INTEGER NOT NULL REFERENCES accounts(id),
+                statement_date           INTEGER NOT NULL,
+                statement_balance_minor  INTEGER NOT NULL,
+                currency                 TEXT    NOT NULL,
+                status                   TEXT    NOT NULL DEFAULT 'open' CHECK(status IN ('open','reconciled')),
+                cleared_total_minor      INTEGER,
+                cleared_count            INTEGER,
+                note                     TEXT,
+                opened_at                INTEGER NOT NULL,
+                reconciled_at            INTEGER
+            );
+        """)
+        try db.exec("CREATE INDEX idx_stmt_account_date ON statements(account_id, statement_date DESC);")
+
+        // 2. Account policy columns.
+        try db.exec("ALTER TABLE accounts ADD COLUMN clears_entries_by_default INTEGER NOT NULL DEFAULT 0;")
+        try db.exec("ALTER TABLE accounts ADD COLUMN statement_closing_day INTEGER;")
+
+        // Cash accounts default to auto-cleared entries (you don't reconcile cash).
+        try db.exec("UPDATE accounts SET clears_entries_by_default = 1 WHERE kind = 'cash';")
+
+        // 3. Per-leg clearing on transactions.
+        // - cleared_at / statement_id are the from-account leg
+        //   (the row's account_id side; used by every kind).
+        // - counterparty_cleared_at / counterparty_statement_id are the
+        //   transfer-only to-account leg.
+        try db.exec("ALTER TABLE transactions ADD COLUMN cleared_at INTEGER;")
+        try db.exec("ALTER TABLE transactions ADD COLUMN statement_id INTEGER REFERENCES statements(id);")
+        try db.exec("ALTER TABLE transactions ADD COLUMN counterparty_cleared_at INTEGER;")
+        try db.exec("ALTER TABLE transactions ADD COLUMN counterparty_statement_id INTEGER REFERENCES statements(id);")
+
+        try db.exec("CREATE INDEX idx_tx_account_cleared ON transactions(account_id, cleared_at);")
+        try db.exec("CREATE INDEX idx_tx_cp_cleared      ON transactions(counterparty_account_id, counterparty_cleared_at);")
+        try db.exec("CREATE INDEX idx_tx_statement       ON transactions(statement_id, occurred_on);")
+
+        // 4. Tighten tx_au: only do the (subtract OLD, re-insert NEW) shuffle
+        //    when one of the dimensions monthly_summaries cares about actually
+        //    changed. A reconciliation tick changes cleared_at/statement_id
+        //    only — those don't appear in the aggregate.
+        try db.exec("DROP TRIGGER IF EXISTS tx_au;")
+        try db.exec("""
+            CREATE TRIGGER tx_au AFTER UPDATE ON transactions
+            WHEN OLD.amount_minor != NEW.amount_minor
+              OR OLD.year_month   != NEW.year_month
+              OR OLD.category_id  != NEW.category_id
+              OR OLD.account_id   != NEW.account_id
+              OR OLD.currency     != NEW.currency
+              OR OLD.kind         != NEW.kind
+            BEGIN
+                UPDATE monthly_summaries
+                   SET total_amount_minor = total_amount_minor - OLD.amount_minor,
+                       transaction_count  = transaction_count  - 1
+                 WHERE year_month  = OLD.year_month
+                   AND category_id = OLD.category_id
+                   AND account_id  = OLD.account_id
+                   AND currency    = OLD.currency
+                   AND kind        = OLD.kind;
+                DELETE FROM monthly_summaries
+                 WHERE year_month  = OLD.year_month
+                   AND category_id = OLD.category_id
+                   AND account_id  = OLD.account_id
+                   AND currency    = OLD.currency
+                   AND kind        = OLD.kind
+                   AND transaction_count <= 0;
+                INSERT INTO monthly_summaries
+                    (year_month, category_id, account_id, currency, kind, total_amount_minor, transaction_count)
+                VALUES
+                    (NEW.year_month, NEW.category_id, NEW.account_id, NEW.currency, NEW.kind,
+                     NEW.amount_minor, 1)
+                ON CONFLICT(year_month, category_id, account_id, currency, kind) DO UPDATE SET
+                    total_amount_minor = total_amount_minor + NEW.amount_minor,
+                    transaction_count  = transaction_count  + 1;
+            END;
         """)
     }
 
