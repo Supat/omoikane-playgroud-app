@@ -86,10 +86,11 @@ struct AddAccountSheet: View {
                 }
                 CurrencyPicker(title: "Currency", selection: $currency)
                 LabeledContent("Initial balance") {
-                    TextField("0", text: $initialBalanceText)
-                        .keyboardType(.numbersAndPunctuation)
-                        .numericInputOnly($initialBalanceText)
-                        .multilineTextAlignment(.trailing)
+                    NumberPadField(
+                        text: $initialBalanceText,
+                        placeholder: "0",
+                        alignment: .right
+                    )
                 }
 
                 Section {

@@ -12,29 +12,38 @@ struct TransactionsView: View {
 
     var body: some View {
         List {
-            if accounts.isEmpty {
-                Text("No accounts yet. Add one from the Accounts tab.")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(accounts) { a in
-                    NavigationLink {
-                        AccountTransactionsView(account: a)
-                    } label: {
-                        HStack {
-                            Image(systemName: a.kind.sfSymbol).foregroundStyle(.tint)
-                            VStack(alignment: .leading) {
-                                Text(a.name)
-                                Text("\(a.kind.displayName) · \(a.currency)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+            // Section header makes the screen self-explanatory: the rows
+            // are accounts, even though the tab is "Transactions". The
+            // footer hints at the drill-down behavior.
+            Section {
+                if accounts.isEmpty {
+                    Text("No accounts yet. Add one from the Accounts tab.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(accounts) { a in
+                        NavigationLink {
+                            AccountTransactionsView(account: a)
+                        } label: {
+                            HStack {
+                                Image(systemName: a.kind.sfSymbol).foregroundStyle(.tint)
+                                VStack(alignment: .leading) {
+                                    Text(a.name)
+                                    Text("\(a.kind.displayName) · \(a.currency)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Text(Formatters.money(balanceByAccount[a.id] ?? 0, currency: a.currency))
+                                    .monospacedDigit()
+                                    .foregroundStyle((balanceByAccount[a.id] ?? 0) >= 0 ? Color.primary : .red)
                             }
-                            Spacer()
-                            Text(Formatters.money(balanceByAccount[a.id] ?? 0, currency: a.currency))
-                                .monospacedDigit()
-                                .foregroundStyle((balanceByAccount[a.id] ?? 0) >= 0 ? Color.primary : .red)
                         }
                     }
                 }
+            } header: {
+                Text("Accounts")
+            } footer: {
+                Text("Tap an account to view its transactions.")
             }
         }
         .navigationTitle("Transactions")
@@ -218,24 +227,28 @@ struct AccountTransactionsView: View {
         // .keyboardShortcut is registered, but we don't want it visible. A
         // .background(EmptyView() …) or 0×0 frame keeps layout untouched.
         List(selection: $selectedId) {
-            ForEach(rows) { tx in
-                rowView(tx)
-                    .tag(tx.id)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        if isLandscape {
-                            selectedId = tx.id
-                        } else {
-                            editing = tx
+            // Period header doubles as a status line — the user can see
+            // which window is active without opening the toolbar menu.
+            Section(periodFilter.displayName) {
+                ForEach(rows) { tx in
+                    rowView(tx)
+                        .tag(tx.id)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            if isLandscape {
+                                selectedId = tx.id
+                            } else {
+                                editing = tx
+                            }
                         }
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            try? app.deleteTransaction(id: tx.id)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                try? app.deleteTransaction(id: tx.id)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
                         }
-                    }
+                }
             }
         }
         .listStyle(.insetGrouped)

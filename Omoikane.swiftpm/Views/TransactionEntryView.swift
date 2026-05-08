@@ -102,14 +102,13 @@ struct TransactionEntryView: View {
 
             Section(kind == .transfer ? "From amount" : "Amount") {
                 HStack {
-                    TextField("0", text: $amountText)
-                        .keyboardType(.numbersAndPunctuation)
-                        .numericInputOnly($amountText)
-                        .font(.title.monospacedDigit())
-                        .multilineTextAlignment(.trailing)
-                        .focused($focusedField, equals: .amount)
-                        .submitLabel(.next)
-                        .onSubmit { advanceFocus(from: .amount) }
+                    NumberPadField(
+                        text: $amountText,
+                        placeholder: "0",
+                        font: .monospacedDigitSystemFont(ofSize: 28, weight: .regular),
+                        alignment: .right,
+                        onSubmit: { advanceFocus(from: .amount) }
+                    )
                     Text(fromCurrency)
                         .foregroundStyle(.secondary)
                 }
@@ -141,14 +140,13 @@ struct TransactionEntryView: View {
                         HStack {
                             Text("To amount")
                             Spacer()
-                            TextField("0", text: $counterpartyAmountText)
-                                .keyboardType(.numbersAndPunctuation)
-                                .numericInputOnly($counterpartyAmountText)
-                                .focused($focusedField, equals: .counterpartyAmount)
-                                .submitLabel(.next)
-                                .onSubmit { advanceFocus(from: .counterpartyAmount) }
-                                .font(.body.monospacedDigit())
-                                .multilineTextAlignment(.trailing)
+                            NumberPadField(
+                                text: $counterpartyAmountText,
+                                placeholder: "0",
+                                font: .monospacedDigitSystemFont(ofSize: 17, weight: .regular),
+                                alignment: .right,
+                                onSubmit: { advanceFocus(from: .counterpartyAmount) }
+                            )
                             Text(toCurrency)
                                 .foregroundStyle(.secondary)
                         }
