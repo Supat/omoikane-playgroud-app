@@ -9,9 +9,22 @@ struct TransactionsView: View {
 
     @State private var accounts: [Account] = []
     @State private var balanceByAccount: [Int64: Int64] = [:]
+    /// Drives the drill-down via `.navigationDestination(item:)`. We avoid
+    /// `NavigationLink` here because on iPadOS with a hardware keyboard,
+    /// arrow / Tab focusing a `NavigationLink` inside a `List` was firing
+    /// it without a deliberate Return — a `Button` only navigates when
+    /// activated, so focus alone is harmless.
+    @State private var pushedAccountId: Int64? = nil
+    /// Keyboard-driven row highlight. Arrow keys move it; Return navigates
+    /// to the highlighted account. Decoupled from `pushedAccountId` so a
+    /// drill-down doesn't lose the highlight when the user navigates back.
+    @State private var highlightedAccountId: Int64? = nil
+    /// Claim focus on appear so arrow keys land on this list rather than
+    /// drifting to a sibling control.
+    @FocusState private var listFocused: Bool
 
     var body: some View {
-        List {
+        List(selection: $highlightedAccountId) {
             if accounts.isEmpty {
                 Section {
                     Text("No accounts yet. Add one from the Accounts tab.")
@@ -35,14 +48,48 @@ struct TransactionsView: View {
                 }
             }
         }
+        .focused($listFocused)
         .navigationTitle("Transactions")
+        .navigationDestination(item: $pushedAccountId) { id in
+            if let a = accounts.first(where: { $0.id == id }) {
+                AccountTransactionsView(account: a)
+            }
+        }
         .task(id: app.dataVersion) { reload() }
+        .onAppear { listFocused = true }
+        .onChange(of: accounts) { _, newAccounts in
+            // Don't carry stale highlights across reloads (e.g. after the
+            // user archives an account from the Accounts tab and switches
+            // back here).
+            if let id = highlightedAccountId,
+               !newAccounts.contains(where: { $0.id == id }) {
+                highlightedAccountId = nil
+            }
+        }
+        .onKeyPress(.return) {
+            // Return navigates to the keyboard-highlighted account.
+            if let id = highlightedAccountId {
+                pushedAccountId = id
+                return .handled
+            }
+            return .ignored
+        }
+        .onKeyPress(.escape) {
+            // Esc drops the highlight and resigns list focus, matching
+            // the dismissal pattern used in AccountTransactionsView.
+            if highlightedAccountId != nil || listFocused {
+                highlightedAccountId = nil
+                listFocused = false
+                return .handled
+            }
+            return .ignored
+        }
     }
 
     @ViewBuilder
     private func row(for a: Account) -> some View {
-        NavigationLink {
-            AccountTransactionsView(account: a)
+        Button {
+            pushedAccountId = a.id
         } label: {
             HStack {
                 Image(systemName: a.kind.sfSymbol).foregroundStyle(.tint)
@@ -56,8 +103,18 @@ struct TransactionsView: View {
                 Text(Formatters.money(balanceByAccount[a.id] ?? 0, currency: a.currency))
                     .monospacedDigit()
                     .foregroundStyle((balanceByAccount[a.id] ?? 0) >= 0 ? Color.primary : .red)
+                // Manual chevron — Button(.plain) doesn't draw the
+                // disclosure indicator that NavigationLink would.
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
             }
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        // Tag drives the List's keyboard selection — arrow keys move
+        // the highlight onto this row when its tag matches selection.
+        .tag(a.id)
     }
 
     private func reload() {
