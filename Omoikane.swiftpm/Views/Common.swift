@@ -18,6 +18,25 @@ extension View {
     }
 }
 
+extension Array where Element == Account {
+    /// Splits accounts into the two display groups used across the app:
+    /// **Payment Accounts** (cash / bank / investment / other) and
+    /// **Credit Cards** (kind == `.credit`). Order within each group is
+    /// preserved so call sites don't need to re-sort after grouping.
+    func splitForDisplay() -> (payment: [Account], credit: [Account]) {
+        var payment: [Account] = []
+        var credit: [Account] = []
+        for a in self {
+            if a.kind == .credit {
+                credit.append(a)
+            } else {
+                payment.append(a)
+            }
+        }
+        return (payment, credit)
+    }
+}
+
 enum NumericInput {
     /// Keep digits and the first decimal point; drop everything else.
     /// Commas (thousands separators) are kept because the existing
@@ -84,7 +103,7 @@ struct StatCard: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .glassEffect(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 

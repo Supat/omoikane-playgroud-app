@@ -87,11 +87,12 @@ struct ReconciliationSheet: View {
             HStack {
                 Text(account.kind == .credit ? "Balance owed" : "Statement balance")
                 Spacer()
-                TextField(account.kind == .credit ? "0" : "0", text: $balanceText)
-                    .keyboardType(.numbersAndPunctuation)
-                    .numericInputOnly($balanceText)
-                    .multilineTextAlignment(.trailing)
-                    .frame(maxWidth: 160)
+                NumberPadField(
+                    text: $balanceText,
+                    placeholder: "0",
+                    alignment: .right
+                )
+                .frame(maxWidth: 160)
                 Text(account.currency).foregroundStyle(.secondary)
             }
             if account.kind == .credit {

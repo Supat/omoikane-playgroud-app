@@ -16,23 +16,15 @@ struct AccountsView: View {
                 Text("No accounts yet. Tap + to create one.")
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(accounts) { a in
-                    NavigationLink {
-                        AccountDetailView(accountId: a.id)
-                    } label: {
-                        HStack {
-                            Image(systemName: a.kind.sfSymbol).foregroundStyle(.tint)
-                            VStack(alignment: .leading) {
-                                Text(a.name)
-                                Text("\(a.kind.displayName) · \(a.currency)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Text(Formatters.money(balanceByAccount[a.id] ?? 0, currency: a.currency))
-                                .monospacedDigit()
-                                .foregroundStyle((balanceByAccount[a.id] ?? 0) >= 0 ? Color.primary : .red)
-                        }
+                let groups = accounts.splitForDisplay()
+                if !groups.payment.isEmpty {
+                    Section("Payment Accounts") {
+                        ForEach(groups.payment) { a in row(for: a) }
+                    }
+                }
+                if !groups.credit.isEmpty {
+                    Section("Credit Cards") {
+                        ForEach(groups.credit) { a in row(for: a) }
                     }
                 }
             }
@@ -47,6 +39,27 @@ struct AccountsView: View {
         }
         .sheet(isPresented: $addingAccount) { AddAccountSheet() }
         .task(id: app.dataVersion) { reload() }
+    }
+
+    @ViewBuilder
+    private func row(for a: Account) -> some View {
+        NavigationLink {
+            AccountDetailView(accountId: a.id)
+        } label: {
+            HStack {
+                Image(systemName: a.kind.sfSymbol).foregroundStyle(.tint)
+                VStack(alignment: .leading) {
+                    Text(a.name)
+                    Text("\(a.kind.displayName) · \(a.currency)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text(Formatters.money(balanceByAccount[a.id] ?? 0, currency: a.currency))
+                    .monospacedDigit()
+                    .foregroundStyle((balanceByAccount[a.id] ?? 0) >= 0 ? Color.primary : .red)
+            }
+        }
     }
 
     private func reload() {
@@ -86,10 +99,11 @@ struct AddAccountSheet: View {
                 }
                 CurrencyPicker(title: "Currency", selection: $currency)
                 LabeledContent("Initial balance") {
-                    TextField("0", text: $initialBalanceText)
-                        .keyboardType(.numbersAndPunctuation)
-                        .numericInputOnly($initialBalanceText)
-                        .multilineTextAlignment(.trailing)
+                    NumberPadField(
+                        text: $initialBalanceText,
+                        placeholder: "0",
+                        alignment: .right
+                    )
                 }
 
                 Section {
