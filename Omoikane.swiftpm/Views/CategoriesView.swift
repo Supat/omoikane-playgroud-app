@@ -7,6 +7,7 @@ struct CategoriesView: View {
     @Environment(AppState.self) private var app
 
     @State private var categories: [LedgerCategory] = []
+    @State private var archivedCategories: [LedgerCategory] = []
     @State private var editingCategory: LedgerCategory? = nil
     @State private var addingTopLevelKind: CategoryKind? = nil
     @State private var addingChildOf: LedgerCategory? = nil
@@ -20,6 +21,7 @@ struct CategoriesView: View {
         List {
             section(for: .expense)
             section(for: .income)
+            archivedSection
         }
         .navigationTitle("Categories")
         .toolbar {
@@ -167,6 +169,62 @@ struct CategoriesView: View {
         categories.filter { $0.parentId == parent.id }
     }
 
+    /// Flat "Archived" section, only rendered when there's something to
+    /// show. Rows are kind-tinted so the user can still tell expense from
+    /// income at a glance, but the parent / child hierarchy is collapsed
+    /// — archived items are not meant to be browsed deeply, just brought
+    /// back or cleared out.
+    @ViewBuilder
+    private var archivedSection: some View {
+        if !archivedCategories.isEmpty {
+            Section("Archived") {
+                ForEach(archivedCategories) { c in
+                    archivedRow(c)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            archivedRowActions(for: c)
+                        }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func archivedRow(_ c: LedgerCategory) -> some View {
+        Button { editingCategory = c } label: {
+            HStack {
+                Image(systemName: c.icon ?? "tag")
+                    .foregroundStyle(c.kind == .income ? .green : .red)
+                Text(c.name)
+                Spacer()
+                Text(c.kind == .income ? "Income" : "Expense")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Edit archived category")
+    }
+
+    /// Trailing-swipe actions for an archived row. Unarchive is the
+    /// primary action; delete is still available so a clean (no
+    /// references) archived item can be cleared out for good.
+    @ViewBuilder
+    private func archivedRowActions(for c: LedgerCategory) -> some View {
+        Button(role: .destructive) {
+            startDelete(c)
+        } label: {
+            Label("Delete", systemImage: "trash")
+        }
+        Button {
+            do { try app.unarchiveCategory(id: c.id) }
+            catch { actionError = "\(error)" }
+        } label: {
+            Label("Unarchive", systemImage: "tray.and.arrow.up")
+        }
+        .tint(.green)
+    }
+
     /// Trailing-swipe actions shared by parent and child rows. Delete is
     /// destructive but always routes through the alert — the user is told
     /// (a) what's still referencing this category and (b) whether the
@@ -198,7 +256,11 @@ struct CategoriesView: View {
 
     private func reload() {
         do {
-            categories = try app.categories.list(includeArchived: false)
+            // One round trip; partition in memory so the existing
+            // section(for:) helpers keep operating on the active list.
+            let all = try app.categories.list(includeArchived: true)
+            categories = all.filter { !$0.isArchived }
+            archivedCategories = all.filter(\.isArchived)
         } catch {
             print("CategoriesView reload error: \(error)")
         }

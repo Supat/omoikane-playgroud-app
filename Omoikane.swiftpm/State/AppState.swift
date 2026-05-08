@@ -144,6 +144,11 @@ final class AppState {
         bump()
     }
 
+    func unarchiveCategory(id: Int64) throws {
+        try db.sync { try categories.unarchive(id: id) }
+        bump()
+    }
+
     func deleteCategory(id: Int64) throws {
         try db.sync { try categories.delete(id: id) }
         bump()
@@ -177,6 +182,11 @@ final class AppState {
 
     func archiveAccount(id: Int64) throws {
         try db.sync { try accounts.archive(id: id) }
+        bump()
+    }
+
+    func unarchiveAccount(id: Int64) throws {
+        try db.sync { try accounts.unarchive(id: id) }
         bump()
     }
 

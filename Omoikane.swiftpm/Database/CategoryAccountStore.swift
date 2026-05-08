@@ -77,6 +77,12 @@ final class CategoryStore {
         try s.step()
     }
 
+    func unarchive(id: Int64) throws {
+        let s = try db.prepare("UPDATE categories SET is_archived = 0 WHERE id = ?;")
+        s.bind(id, at: 1)
+        try s.step()
+    }
+
     /// Count rows that would be broken by hard-deleting this category. Used
     /// by the UI to (a) decide whether deletion is even possible and
     /// (b) explain the impact to the user.
@@ -229,6 +235,15 @@ final class AccountStore {
     func archive(id: Int64) throws {
         guard var a = try get(id: id) else { return }
         a.isArchived = true
+        try update(a)
+    }
+
+    /// Reverses `archive(id:)`. The open-statement guard in `update`
+    /// only triggers on the archive direction, so unarchiving never
+    /// fails on policy.
+    func unarchive(id: Int64) throws {
+        guard var a = try get(id: id) else { return }
+        a.isArchived = false
         try update(a)
     }
 

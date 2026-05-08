@@ -7,6 +7,7 @@ struct AccountsView: View {
     @Environment(AppState.self) private var app
 
     @State private var accounts: [Account] = []
+    @State private var archivedAccounts: [Account] = []
     @State private var balanceByAccount: [Int64: Int64] = [:]
     @State private var addingAccount = false
     /// When non-nil, drives the delete-confirmation alert. Same pattern
@@ -17,7 +18,7 @@ struct AccountsView: View {
 
     var body: some View {
         List {
-            if accounts.isEmpty {
+            if accounts.isEmpty && archivedAccounts.isEmpty {
                 Text("No accounts yet. Tap + to create one.")
                     .foregroundStyle(.secondary)
             } else {
@@ -38,6 +39,21 @@ struct AccountsView: View {
                             row(for: a)
                                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                     rowActions(for: a)
+                                }
+                        }
+                    }
+                }
+                if !archivedAccounts.isEmpty {
+                    // Archived accounts get their own section so they're
+                    // visible (history queries still hit them) without
+                    // crowding the active groupings. Trailing-swipe gives
+                    // back unarchive + delete; archive isn't offered
+                    // because it's already the row's state.
+                    Section("Archived") {
+                        ForEach(archivedAccounts) { a in
+                            row(for: a)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                    archivedRowActions(for: a)
                                 }
                         }
                     }
@@ -115,6 +131,25 @@ struct AccountsView: View {
         .tint(.orange)
     }
 
+    /// Trailing-swipe actions for an archived row. Unarchive is the
+    /// primary action; delete is still available because once archived
+    /// the user might want to clear it permanently if it's clean.
+    @ViewBuilder
+    private func archivedRowActions(for a: Account) -> some View {
+        Button(role: .destructive) {
+            startDelete(a)
+        } label: {
+            Label("Delete", systemImage: "trash")
+        }
+        Button {
+            do { try app.unarchiveAccount(id: a.id) }
+            catch { actionError = "\(error)" }
+        } label: {
+            Label("Unarchive", systemImage: "tray.and.arrow.up")
+        }
+        .tint(.green)
+    }
+
     private func startDelete(_ a: Account) {
         do {
             let refs = try app.accounts.referenceCount(for: a.id)
@@ -147,9 +182,12 @@ struct AccountsView: View {
 
     private func reload() {
         do {
-            accounts = try app.accounts.list(includeArchived: false)
+            // One round trip; partition in memory.
+            let all = try app.accounts.list(includeArchived: true)
+            accounts = all.filter { !$0.isArchived }
+            archivedAccounts = all.filter(\.isArchived)
             var balances: [Int64: Int64] = [:]
-            for a in accounts {
+            for a in all {
                 balances[a.id] = try app.accounts.balanceMinor(accountId: a.id)
             }
             balanceByAccount = balances
