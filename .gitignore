@@ -1,0 +1,23 @@
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+
+# Swift PM
+.build/
+.swiftpm/
+Package.resolved
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Local databases generated at runtime
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
