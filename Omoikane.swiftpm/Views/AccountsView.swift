@@ -131,16 +131,12 @@ struct AccountsView: View {
         .tint(.orange)
     }
 
-    /// Trailing-swipe actions for an archived row. Unarchive is the
-    /// primary action; delete is still available because once archived
-    /// the user might want to clear it permanently if it's clean.
+    /// Trailing-swipe action for an archived row. Only Unarchive is
+    /// offered here — to delete an archived item the user unarchives it
+    /// first and then deletes from the active list, where the reference-
+    /// count gate still runs.
     @ViewBuilder
     private func archivedRowActions(for a: Account) -> some View {
-        Button(role: .destructive) {
-            startDelete(a)
-        } label: {
-            Label("Delete", systemImage: "trash")
-        }
         Button {
             do { try app.unarchiveAccount(id: a.id) }
             catch { actionError = "\(error)" }

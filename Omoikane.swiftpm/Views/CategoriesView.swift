@@ -206,16 +206,12 @@ struct CategoriesView: View {
         .accessibilityHint("Edit archived category")
     }
 
-    /// Trailing-swipe actions for an archived row. Unarchive is the
-    /// primary action; delete is still available so a clean (no
-    /// references) archived item can be cleared out for good.
+    /// Trailing-swipe action for an archived row. Only Unarchive is
+    /// offered here — to delete an archived item the user unarchives it
+    /// first and then deletes from the active list, where the reference-
+    /// count gate still runs.
     @ViewBuilder
     private func archivedRowActions(for c: LedgerCategory) -> some View {
-        Button(role: .destructive) {
-            startDelete(c)
-        } label: {
-            Label("Delete", systemImage: "trash")
-        }
         Button {
             do { try app.unarchiveCategory(id: c.id) }
             catch { actionError = "\(error)" }
