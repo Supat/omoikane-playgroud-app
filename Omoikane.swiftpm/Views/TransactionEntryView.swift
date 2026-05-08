@@ -121,9 +121,7 @@ struct TransactionEntryView: View {
                     get: { accountId ?? accounts.first?.id ?? 0 },
                     set: { accountId = $0 }
                 )) {
-                    ForEach(accounts) { a in
-                        Label("\(a.name) (\(a.currency))", systemImage: a.kind.sfSymbol).tag(a.id)
-                    }
+                    accountPickerOptions(from: accounts)
                 }
 
                 if kind == .transfer {
@@ -131,9 +129,7 @@ struct TransactionEntryView: View {
                         get: { counterpartyAccountId ?? accounts.first(where: { $0.id != accountId })?.id ?? 0 },
                         set: { counterpartyAccountId = $0 }
                     )) {
-                        ForEach(accounts.filter { $0.id != accountId }) { a in
-                            Label("\(a.name) (\(a.currency))", systemImage: a.kind.sfSymbol).tag(a.id)
-                        }
+                        accountPickerOptions(from: accounts.filter { $0.id != accountId })
                     }
 
                     if isCrossCurrencyTransfer {
@@ -257,6 +253,27 @@ struct TransactionEntryView: View {
     }
     private var isCrossCurrencyTransfer: Bool {
         kind == .transfer && fromCurrency != toCurrency
+    }
+
+    /// Picker content split into "Payment Accounts" / "Credit Cards"
+    /// sections, mirroring the grouping used elsewhere in the app.
+    @ViewBuilder
+    private func accountPickerOptions(from list: [Account]) -> some View {
+        let groups = list.splitForDisplay()
+        if !groups.payment.isEmpty {
+            Section("Payment Accounts") {
+                ForEach(groups.payment) { a in
+                    Label("\(a.name) (\(a.currency))", systemImage: a.kind.sfSymbol).tag(a.id)
+                }
+            }
+        }
+        if !groups.credit.isEmpty {
+            Section("Credit Cards") {
+                ForEach(groups.credit) { a in
+                    Label("\(a.name) (\(a.currency))", systemImage: a.kind.sfSymbol).tag(a.id)
+                }
+            }
+        }
     }
 
     private var availableCategories: [LedgerCategory] {

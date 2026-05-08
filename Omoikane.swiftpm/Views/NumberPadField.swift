@@ -14,19 +14,79 @@ enum NumberPadAction: Equatable {
     case done
 }
 
-// MARK: - The keypad input view (UIKit)
+// MARK: - The keypad's SwiftUI surface
 
-/// `UIInputView` subclass that draws a Numbers-app-style keypad. Subclassing
-/// `UIInputView` (rather than a plain `UIView`) makes UIKit treat the view
-/// as a keyboard surface — it gets the right background blur and the
-/// `UITextField` swaps its software keyboard for this when focus arrives.
-///
-/// Layout is a 4-row vertical `UIStackView` of horizontal `UIStackView`s,
-/// `fillEqually` distribution. The bottom row uses two buttons (0, Done)
-/// at 50% width each, aligning visually with the 2-of-4 cells above.
+/// Visuals for the numpad. Lives in SwiftUI so each key can adopt Liquid
+/// Glass via `.buttonStyle(.glass)` / `.glassProminent` (iOS 26+) without
+/// us hand-rolling UIVisualEffectView backgrounds. Hosted inside a
+/// `UIInputView` so UIKit treats it as a software keyboard.
+fileprivate struct NumberPadKeysView: View {
+    var onKey: (NumberPadAction) -> Void
+
+    var body: some View {
+        VStack(spacing: 8) {
+            row([("7", .digit("7")), ("8", .digit("8")), ("9", .digit("9")), ("⌫", .backspace)])
+            row([("4", .digit("4")), ("5", .digit("5")), ("6", .digit("6")), (",", .comma)])
+            row([("1", .digit("1")), ("2", .digit("2")), ("3", .digit("3")), (".", .dot)])
+            HStack(spacing: 8) {
+                key("0", action: .digit("0"))
+                key("Done", action: .done, prominent: true)
+            }
+        }
+        .padding(12)
+        // Cap width so each key stays roughly square on iPad landscape;
+        // in portrait the .infinity outer frame still fills the screen.
+        .frame(maxWidth: 520)
+        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private func row(_ cells: [(String, NumberPadAction)]) -> some View {
+        HStack(spacing: 8) {
+            ForEach(cells.indices, id: \.self) { i in
+                key(cells[i].0, action: cells[i].1)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func key(_ title: String, action: NumberPadAction, prominent: Bool = false) -> some View {
+        // Two near-identical branches because `.buttonStyle(.glass)` and
+        // `.buttonStyle(.glassProminent)` are different concrete style
+        // types — there's no `AnyButtonStyle` to ternary between them.
+        if prominent {
+            Button { onKey(action) } label: {
+                Text(title)
+                    .font(.system(size: 24, weight: .medium))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .buttonStyle(.glassProminent)
+        } else {
+            Button { onKey(action) } label: {
+                Text(title)
+                    .font(.system(size: 24, weight: .medium))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .buttonStyle(.glass)
+        }
+    }
+}
+
+// MARK: - The keypad input view (UIKit shell)
+
+/// Hosts `NumberPadKeysView` inside a `UIInputView`. Subclassing
+/// `UIInputView` (rather than a plain `UIView`) makes UIKit treat the
+/// view as a keyboard surface — it gets the right system blur and the
+/// `UITextField` swaps its software keyboard for this when focus
+/// arrives. The actual keys are drawn by SwiftUI for native Liquid
+/// Glass styling.
 final class NumberPadInputView: UIInputView {
     /// Set by the SwiftUI bridge. Each button tap fires this.
-    var onKey: ((NumberPadAction) -> Void)?
+    var onKey: ((NumberPadAction) -> Void)? {
+        didSet { rebuildHost() }
+    }
+
+    private var host: UIHostingController<NumberPadKeysView>?
 
     init() {
         // Initial frame is a starting hint; UIKit will resize via
@@ -36,84 +96,29 @@ final class NumberPadInputView: UIInputView {
             inputViewStyle: .keyboard
         )
         autoresizingMask = [.flexibleWidth]
-        buildLayout()
+        rebuildHost()
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
-    // MARK: Layout
+    /// Rebuilds the SwiftUI host so the latest `onKey` closure is captured
+    /// in the rootView. Called once at init and whenever the bridge
+    /// rebinds the action handler.
+    private func rebuildHost() {
+        host?.view.removeFromSuperview()
 
-    private func buildLayout() {
-        let row1 = makeRow([
-            ("7", .digit("7")),
-            ("8", .digit("8")),
-            ("9", .digit("9")),
-            ("⌫", .backspace),
-        ])
-        let row2 = makeRow([
-            ("4", .digit("4")),
-            ("5", .digit("5")),
-            ("6", .digit("6")),
-            (",", .comma),
-        ])
-        let row3 = makeRow([
-            ("1", .digit("1")),
-            ("2", .digit("2")),
-            ("3", .digit("3")),
-            (".", .dot),
-        ])
-        // Bottom row: 0 and Done at 50%/50%. Visually they each occupy two
-        // of the upper rows' four cells.
-        let row4 = makeRow([
-            ("0", .digit("0")),
-            ("Done", .done),
-        ])
-
-        let column = UIStackView(arrangedSubviews: [row1, row2, row3, row4])
-        column.axis = .vertical
-        column.distribution = .fillEqually
-        column.spacing = 8
-        column.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(column)
-
+        let onKey = self.onKey ?? { _ in }
+        let controller = UIHostingController(rootView: NumberPadKeysView(onKey: onKey))
+        controller.view.backgroundColor = .clear
+        controller.view.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(controller.view)
         NSLayoutConstraint.activate([
-            column.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 12),
-            column.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor, constant: -12),
-            column.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor, constant: 12),
-            column.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -12),
+            controller.view.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor),
+            controller.view.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor),
+            controller.view.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor),
+            controller.view.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor),
         ])
-    }
-
-    private func makeRow(_ cells: [(String, NumberPadAction)]) -> UIStackView {
-        let buttons = cells.map { makeButton(title: $0.0, action: $0.1) }
-        let stack = UIStackView(arrangedSubviews: buttons)
-        stack.axis = .horizontal
-        stack.distribution = .fillEqually
-        stack.spacing = 8
-        return stack
-    }
-
-    private func makeButton(title: String, action: NumberPadAction) -> UIButton {
-        // `UIButton.Configuration.gray()` gets us the standard rounded chip
-        // background — close enough to the system keyboard's visual style
-        // without us hand-rolling a background view.
-        var config = UIButton.Configuration.gray()
-        config.title = title
-        config.baseBackgroundColor = .secondarySystemBackground
-        config.background.cornerRadius = 10
-        if action == .done {
-            config.baseBackgroundColor = .tintColor
-            config.baseForegroundColor = .white
-        }
-        let btn = UIButton(
-            configuration: config,
-            primaryAction: UIAction { [weak self] _ in
-                self?.onKey?(action)
-            }
-        )
-        // Bigger glyphs than the `.gray()` default for an iPad-sized pad.
-        btn.titleLabel?.font = .systemFont(ofSize: 24, weight: .medium)
-        return btn
+        host = controller
     }
 }
 

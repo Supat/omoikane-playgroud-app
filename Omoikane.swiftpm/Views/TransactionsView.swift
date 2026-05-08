@@ -12,42 +12,52 @@ struct TransactionsView: View {
 
     var body: some View {
         List {
-            // Section header makes the screen self-explanatory: the rows
-            // are accounts, even though the tab is "Transactions". The
-            // footer hints at the drill-down behavior.
-            Section {
-                if accounts.isEmpty {
+            if accounts.isEmpty {
+                Section {
                     Text("No accounts yet. Add one from the Accounts tab.")
                         .foregroundStyle(.secondary)
-                } else {
-                    ForEach(accounts) { a in
-                        NavigationLink {
-                            AccountTransactionsView(account: a)
-                        } label: {
-                            HStack {
-                                Image(systemName: a.kind.sfSymbol).foregroundStyle(.tint)
-                                VStack(alignment: .leading) {
-                                    Text(a.name)
-                                    Text("\(a.kind.displayName) · \(a.currency)")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Text(Formatters.money(balanceByAccount[a.id] ?? 0, currency: a.currency))
-                                    .monospacedDigit()
-                                    .foregroundStyle((balanceByAccount[a.id] ?? 0) >= 0 ? Color.primary : .red)
-                            }
-                        }
+                }
+            } else {
+                let groups = accounts.splitForDisplay()
+                if !groups.payment.isEmpty {
+                    Section("Payment Accounts") {
+                        ForEach(groups.payment) { a in row(for: a) }
                     }
                 }
-            } header: {
-                Text("Accounts")
-            } footer: {
-                Text("Tap an account to view its transactions.")
+                if !groups.credit.isEmpty {
+                    Section {
+                        ForEach(groups.credit) { a in row(for: a) }
+                    } header: {
+                        Text("Credit Cards")
+                    } footer: {
+                        Text("Tap an account to view its transactions.")
+                    }
+                }
             }
         }
         .navigationTitle("Transactions")
         .task(id: app.dataVersion) { reload() }
+    }
+
+    @ViewBuilder
+    private func row(for a: Account) -> some View {
+        NavigationLink {
+            AccountTransactionsView(account: a)
+        } label: {
+            HStack {
+                Image(systemName: a.kind.sfSymbol).foregroundStyle(.tint)
+                VStack(alignment: .leading) {
+                    Text(a.name)
+                    Text("\(a.kind.displayName) · \(a.currency)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text(Formatters.money(balanceByAccount[a.id] ?? 0, currency: a.currency))
+                    .monospacedDigit()
+                    .foregroundStyle((balanceByAccount[a.id] ?? 0) >= 0 ? Color.primary : .red)
+            }
+        }
     }
 
     private func reload() {
