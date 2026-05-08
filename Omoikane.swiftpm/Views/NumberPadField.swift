@@ -159,6 +159,14 @@ struct NumberPadField: UIViewRepresentable {
             action: #selector(Coordinator.editingChanged(_:)),
             for: .editingChanged
         )
+        // Suppress iPadOS's input-assistant shortcut bar (Undo / Redo /
+        // Paste). Those buttons are positioned above the keyboard layer
+        // and were occasionally overflowing the top edge of our custom
+        // numpad. We don't need them for amount entry — the numpad has
+        // its own backspace, and undo/redo can still be invoked via
+        // ⌘Z / ⇧⌘Z on a hardware keyboard.
+        tf.inputAssistantItem.leadingBarButtonGroups = []
+        tf.inputAssistantItem.trailingBarButtonGroups = []
 
         let pad = NumberPadInputView()
         let coord = context.coordinator
