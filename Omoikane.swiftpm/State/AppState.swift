@@ -144,6 +144,11 @@ final class AppState {
         bump()
     }
 
+    func deleteCategory(id: Int64) throws {
+        try db.sync { try categories.delete(id: id) }
+        bump()
+    }
+
     @discardableResult
     func addAccount(
         name: String,

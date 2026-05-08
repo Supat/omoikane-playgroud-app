@@ -76,6 +76,33 @@ final class CategoryStore {
         s.bind(id, at: 1)
         try s.step()
     }
+
+    /// Count rows that would be broken by hard-deleting this category. Used
+    /// by the UI to (a) decide whether deletion is even possible and
+    /// (b) explain the impact to the user.
+    func referenceCount(for id: Int64) throws -> (transactions: Int, children: Int) {
+        let txStmt = try db.prepare("SELECT COUNT(*) FROM transactions WHERE category_id = ?;")
+        txStmt.bind(id, at: 1)
+        _ = try txStmt.step()
+        let txCount = txStmt.int(0)
+
+        let childStmt = try db.prepare("SELECT COUNT(*) FROM categories WHERE parent_id = ?;")
+        childStmt.bind(id, at: 1)
+        _ = try childStmt.step()
+        let childCount = childStmt.int(0)
+
+        return (transactions: txCount, children: childCount)
+    }
+
+    /// Hard delete. SQLite FK enforcement (`PRAGMA foreign_keys = ON`) will
+    /// reject this if any transaction or child category still references it,
+    /// so callers should check `referenceCount(for:)` first to give the user
+    /// a useful message.
+    func delete(id: Int64) throws {
+        let s = try db.prepare("DELETE FROM categories WHERE id = ?;")
+        s.bind(id, at: 1)
+        try s.step()
+    }
 }
 
 final class AccountStore {

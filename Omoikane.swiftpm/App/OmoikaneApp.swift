@@ -53,9 +53,9 @@ struct OmoikaneApp: App {
             // own samples use.
             CommandMenu("Tabs") {
                 Button("Dashboard")    { tab = .dashboard    }.keyboardShortcut("1", modifiers: .command)
-                Button("Transactions") { tab = .transactions }.keyboardShortcut("2", modifiers: .command)
-                Button("Reports")      { tab = .reports      }.keyboardShortcut("3", modifiers: .command)
-                Button("Accounts")     { tab = .accounts     }.keyboardShortcut("4", modifiers: .command)
+                Button("Accounts")     { tab = .accounts     }.keyboardShortcut("2", modifiers: .command)
+                Button("Transactions") { tab = .transactions }.keyboardShortcut("3", modifiers: .command)
+                Button("Reports")      { tab = .reports      }.keyboardShortcut("4", modifiers: .command)
                 Button("Categories")   { tab = .categories   }.keyboardShortcut("5", modifiers: .command)
                 Button("Settings")     { tab = .settings     }.keyboardShortcut("6", modifiers: .command)
                 Divider()

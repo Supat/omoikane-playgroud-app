@@ -8,11 +8,13 @@ struct TransactionEditor: View {
     @Environment(\.dismiss) private var dismiss
 
     let transaction: Transaction?
+    var initialAccountId: Int64? = nil
 
     var body: some View {
         NavigationStack {
             TransactionEntryView(
                 transaction: transaction,
+                initialAccountId: initialAccountId,
                 onSaveCompletion: { dismiss() }
             )
             .toolbar {

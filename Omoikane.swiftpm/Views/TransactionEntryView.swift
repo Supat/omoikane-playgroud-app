@@ -5,13 +5,23 @@ import SwiftUI
 /// when used as a modal sheet (`TransactionEditor`) and inside the detail
 /// column when used in the landscape split view (`TransactionsView`).
 ///
+/// Three operating modes, all rendered by the same body:
+/// 1. **Edit**            — `transaction != nil`. Title: "Edit".
+/// 2. **New Entry**       — `transaction == nil`, `onSaveCompletion != nil`.
+///                          Modal flow; Save dismisses. Title: "New Entry".
+/// 3. **Quick Entry View** — `transaction == nil`, `onSaveCompletion == nil`.
+///                          The split-view detail column when nothing is
+///                          selected. Confirmation button reads "Add". On
+///                          tap the row is inserted, then the form is
+///                          fully reset and focus is dropped — the user
+///                          chooses deliberately whether to start another
+///                          entry. Title: "Quick Entry".
+///
 /// Behavior is parameter-driven:
 /// - `onSaveCompletion`: called after a successful save. When set (modal
 ///   usage), the caller typically dismisses the sheet. When nil and editing
 ///   an existing row, the form quietly stays put. When nil and creating a
-///   new row (no `transaction`), the form acts as a *quick entry*: amount,
-///   note, and tags clear, account/category/kind/date remain sticky, and
-///   focus jumps back to the amount field for the next entry.
+///   new row, the form acts as the **Quick Entry View** described above.
 /// - `onEscape`: optional Esc-key handler. Wired to `.onKeyPress(.escape)`
 ///   on the form. The split-view caller uses this to drop the row selection
 ///   when the user is mid-edit.
@@ -19,6 +29,9 @@ struct TransactionEntryView: View {
     @Environment(AppState.self) private var app
 
     let transaction: Transaction?
+    /// When creating a new transaction (`transaction == nil`), pre-select
+    /// this account in the picker. Ignored when editing.
+    var initialAccountId: Int64? = nil
     var onSaveCompletion: (() -> Void)? = nil
     var onEscape: (() -> Void)? = nil
 
@@ -44,6 +57,20 @@ struct TransactionEntryView: View {
     enum FormField: Hashable { case amount, counterpartyAmount, note, tags }
 
     private var isEditing: Bool { transaction != nil }
+
+    /// "Edit" / "New Entry" / "Quick Entry" — see the operating-modes
+    /// table in the type's doc comment.
+    private var navigationTitle: String {
+        if isEditing { return "Edit" }
+        return onSaveCompletion == nil ? "Quick Entry" : "New Entry"
+    }
+
+    /// Confirmation-button label. Quick Entry uses "Add" to signal the
+    /// non-modal insert-and-clear semantics.
+    private var confirmActionLabel: String {
+        if isEditing { return "Save" }
+        return onSaveCompletion == nil ? "Add" : "Save"
+    }
 
     var body: some View {
         Form {
@@ -76,7 +103,8 @@ struct TransactionEntryView: View {
             Section(kind == .transfer ? "From amount" : "Amount") {
                 HStack {
                     TextField("0", text: $amountText)
-                        .keyboardType(.decimalPad)
+                        .keyboardType(.numbersAndPunctuation)
+                        .numericInputOnly($amountText)
                         .font(.title.monospacedDigit())
                         .multilineTextAlignment(.trailing)
                         .focused($focusedField, equals: .amount)
@@ -114,7 +142,8 @@ struct TransactionEntryView: View {
                             Text("To amount")
                             Spacer()
                             TextField("0", text: $counterpartyAmountText)
-                                .keyboardType(.decimalPad)
+                                .keyboardType(.numbersAndPunctuation)
+                                .numericInputOnly($counterpartyAmountText)
                                 .focused($focusedField, equals: .counterpartyAmount)
                                 .submitLabel(.next)
                                 .onSubmit { advanceFocus(from: .counterpartyAmount) }
@@ -174,11 +203,15 @@ struct TransactionEntryView: View {
                 }
             }
         }
-        .navigationTitle(isEditing ? "Edit" : "New Entry")
+        .navigationTitle(navigationTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Save") { save() }
+                // Quick Entry View labels the action "Add" because pressing
+                // it inserts a new row and immediately resets the form for
+                // the next entry — no modal dismiss involved. Edit / New
+                // Entry keep "Save" since they're confirming a single change.
+                Button(confirmActionLabel) { save() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(!canSave)
             }
@@ -250,7 +283,14 @@ struct TransactionEntryView: View {
         do {
             categories = try app.categories.list()
             accounts = try app.accounts.list()
-            if accountId == nil { accountId = accounts.first?.id }
+            if accountId == nil {
+                if let pre = initialAccountId,
+                   accounts.contains(where: { $0.id == pre }) {
+                    accountId = pre
+                } else {
+                    accountId = accounts.first?.id
+                }
+            }
             if categoryId == nil { categoryId = availableCategories.first?.id }
             // For a brand-new entry, prime the Cleared toggle to the
             // from-account's `clearsEntriesByDefault` flag. Visible in the
@@ -338,16 +378,22 @@ struct TransactionEntryView: View {
             if let onSaveCompletion {
                 onSaveCompletion()
             } else if transaction == nil {
-                // Quick-entry mode: clear the variable fields, keep the
-                // sticky ones (account/category/kind/date) so the user can
-                // crank through a stack of receipts without re-picking.
+                // Quick Entry View: the new row is in the list — empty the
+                // form fully and stand down focus. The user can see what
+                // landed and decide deliberately whether to start another
+                // entry.
+                kind = .expense
                 amountText = ""
                 counterpartyAmountText = ""
+                occurredOn = Date()
+                accountId = initialAccountId
+                counterpartyAccountId = nil
+                categoryId = nil
                 note = ""
                 tagsText = ""
-                clearedNow = fromAccount?.clearsEntriesByDefault ?? false
                 counterpartyClearedNow = false
-                focusedField = .amount
+                clearedNow = fromAccount?.clearsEntriesByDefault ?? false
+                focusedField = nil
             }
         } catch {
             loadError = "Save failed: \(error)"

@@ -1,11 +1,125 @@
 import SwiftUI
 
+/// "Transactions" tab. Top level lists accounts; tapping one drills into
+/// `AccountTransactionsView`, which holds the actual transaction list,
+/// search, kind filter, keyboard navigation, and landscape split-view
+/// quick-entry pane.
 struct TransactionsView: View {
     @Environment(AppState.self) private var app
+
+    @State private var accounts: [Account] = []
+    @State private var balanceByAccount: [Int64: Int64] = [:]
+
+    var body: some View {
+        List {
+            if accounts.isEmpty {
+                Text("No accounts yet. Add one from the Accounts tab.")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(accounts) { a in
+                    NavigationLink {
+                        AccountTransactionsView(account: a)
+                    } label: {
+                        HStack {
+                            Image(systemName: a.kind.sfSymbol).foregroundStyle(.tint)
+                            VStack(alignment: .leading) {
+                                Text(a.name)
+                                Text("\(a.kind.displayName) · \(a.currency)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text(Formatters.money(balanceByAccount[a.id] ?? 0, currency: a.currency))
+                                .monospacedDigit()
+                                .foregroundStyle((balanceByAccount[a.id] ?? 0) >= 0 ? Color.primary : .red)
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle("Transactions")
+        .task(id: app.dataVersion) { reload() }
+    }
+
+    private func reload() {
+        do {
+            accounts = try app.accounts.list(includeArchived: false)
+            var balances: [Int64: Int64] = [:]
+            for a in accounts {
+                balances[a.id] = try app.accounts.balanceMinor(accountId: a.id)
+            }
+            balanceByAccount = balances
+        } catch {
+            print("TransactionsView reload error: \(error)")
+        }
+    }
+}
+
+/// Period selector for the per-account transaction list. Each case maps to
+/// an inclusive (`fromYearMonth`, `toYearMonth`) range applied via
+/// `TransactionFilter`. Stored as an enum (not raw dates) so the menu UI
+/// stays terse and the range is computed against "now" at reload time —
+/// which keeps "This month" honest if the device clock crosses midnight
+/// while the view is open.
+enum PeriodFilter: String, CaseIterable, Identifiable {
+    case thisMonth, lastMonth, last3Months, thisYear
+
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .thisMonth:   return "This month"
+        case .lastMonth:   return "Last month"
+        case .last3Months: return "Last 3 months"
+        case .thisYear:    return "This year"
+        }
+    }
+
+    /// Inclusive `(from, to)` year-month bounds in YYYYMM form.
+    func yearMonthRange(now: Date = Date()) -> (Int, Int) {
+        let comps = Calendar.current.dateComponents([.year, .month], from: now)
+        let y = comps.year ?? 1970
+        let m = comps.month ?? 1
+        let curYM = y * 100 + m
+        switch self {
+        case .thisMonth:
+            return (curYM, curYM)
+        case .lastMonth:
+            let prev = subtractMonths(year: y, month: m, by: 1)
+            return (prev, prev)
+        case .last3Months:
+            // Current month plus the two preceding ones.
+            return (subtractMonths(year: y, month: m, by: 2), curYM)
+        case .thisYear:
+            return (y * 100 + 1, y * 100 + 12)
+        }
+    }
+
+    private func subtractMonths(year: Int, month: Int, by n: Int) -> Int {
+        var y = year
+        var m = month - n
+        while m <= 0 {
+            m += 12
+            y -= 1
+        }
+        return y * 100 + m
+    }
+}
+
+/// Transaction list scoped to a single account. Shows entries whose primary
+/// account matches *or* whose counterparty leg points at this account (so
+/// transfers appear in both ends' views).
+///
+/// Layout adapts to orientation — landscape splits into a list + inline
+/// `TransactionEntryView`; portrait keeps the modal sheet flow.
+struct AccountTransactionsView: View {
+    @Environment(AppState.self) private var app
+
+    let account: Account
 
     @State private var rows: [Transaction] = []
     @State private var search: String = ""
     @State private var kindFilter: TransactionKind? = nil
+    @State private var periodFilter: PeriodFilter = .thisMonth
     @State private var editing: Transaction? = nil
     @State private var showingNew = false
     @State private var categoriesById: [Int64: LedgerCategory] = [:]
@@ -48,7 +162,7 @@ struct TransactionsView: View {
     private var portraitBody: some View {
         listSurface(isLandscape: false)
             .sheet(isPresented: $showingNew) {
-                TransactionEditor(transaction: nil)
+                TransactionEditor(transaction: nil, initialAccountId: account.id)
             }
             .sheet(item: $editing) { tx in
                 TransactionEditor(transaction: tx)
@@ -56,8 +170,10 @@ struct TransactionsView: View {
     }
 
     /// Two-column layout (landscape). Left: list. Right: an inline
-    /// `TransactionEntryView` that mirrors the current selection, or a
-    /// quick-entry form when nothing is selected.
+    /// `TransactionEntryView` that mirrors the current selection, or the
+    /// **Quick Entry View** (a special case of `TransactionEntryView` —
+    /// see that type's doc comment for the operating-modes table) when
+    /// nothing is selected.
     @ViewBuilder
     private var landscapeBody: some View {
         HStack(spacing: 0) {
@@ -69,18 +185,12 @@ struct TransactionsView: View {
             }
             .frame(maxWidth: .infinity)
         }
-        // The "+" toolbar button still presents a sheet in landscape; that
-        // matches the existing keyboard shortcut (⌘N) and gives the user an
-        // explicit way to start a new entry without losing the currently
-        // selected row in the detail pane.
-        .sheet(isPresented: $showingNew) {
-            TransactionEditor(transaction: nil)
-        }
     }
 
     /// Detail column for the landscape split view. Re-mounts via `.id` when
     /// the selected row changes so `@State` inside the entry view re-primes
-    /// from the new transaction.
+    /// from the new transaction. The no-selection branch is the **Quick
+    /// Entry View**.
     @ViewBuilder
     private var detailColumn: some View {
         if let id = selectedId, let tx = rows.first(where: { $0.id == id }) {
@@ -93,6 +203,7 @@ struct TransactionsView: View {
         } else {
             TransactionEntryView(
                 transaction: nil,
+                initialAccountId: account.id,
                 onSaveCompletion: nil,
                 onEscape: { listFocused = true }
             )
@@ -134,12 +245,13 @@ struct TransactionsView: View {
             if rows.isEmpty {
                 EmptyStateView(
                     title: "No transactions",
-                    message: "Tap + to add your first entry.",
+                    message: "Tap + to add an entry to \(account.name).",
                     sfSymbol: "list.bullet.rectangle"
                 )
             }
         }
-        .navigationTitle("Transactions")
+        .navigationTitle(account.name)
+        .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $search,
                     placement: .navigationBarDrawer(displayMode: .always))
         .searchFocused($searchFocused)
@@ -154,6 +266,15 @@ struct TransactionsView: View {
                     Label(kindFilter?.displayName ?? "All", systemImage: "line.3.horizontal.decrease.circle")
                 }
             }
+            ToolbarItem(placement: .topBarLeading) {
+                Menu {
+                    ForEach(PeriodFilter.allCases) { p in
+                        Button(p.displayName) { periodFilter = p }
+                    }
+                } label: {
+                    Label(periodFilter.displayName, systemImage: "calendar")
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     showingNew = true
@@ -162,21 +283,21 @@ struct TransactionsView: View {
                 }
                 .keyboardShortcut("n", modifiers: .command)
                 .accessibilityLabel("New transaction")
+                // The landscape split view's detail column already exposes
+                // a quick-entry form whenever nothing is selected, so the
+                // modal "+" entry point would be redundant — disable it.
+                .disabled(isLandscape)
             }
         }
         .task(id: app.dataVersion) { reload() }
         .onChange(of: search) { _, _ in reload() }
         .onChange(of: kindFilter) { _, _ in reload() }
+        .onChange(of: periodFilter) { _, _ in reload() }
         .onAppear {
             // Claim keyboard focus for the list so arrow keys move through
             // rows instead of falling into the search field. .searchable
             // tends to be the first focusable thing otherwise.
             listFocused = true
-            // In portrait we leave selectedId nil by default to avoid an
-            // accidental highlight; in landscape we'd rather show *something*
-            // in the detail column, but the quick-entry form covers that
-            // case fine, so we still leave selection nil.
-            if selectedId == nil { selectedId = nil }
         }
         .onChange(of: rows) { _, newRows in
             // Keep selectedId pointing at a real row after reloads.
@@ -303,12 +424,17 @@ struct TransactionsView: View {
             var f = TransactionFilter()
             f.searchText = search.isEmpty ? nil : search
             if let kindFilter { f.kinds = [kindFilter] }
+            // any-leg so transfers show up on both endpoints' lists.
+            f.accountIdAnyLeg = account.id
+            let (fromYM, toYM) = periodFilter.yearMonthRange()
+            f.fromYearMonth = fromYM
+            f.toYearMonth = toYM
             f.limit = 500
             rows = try app.transactions.list(f)
             categoriesById = Dictionary(uniqueKeysWithValues: try app.categories.list(includeArchived: true).map { ($0.id, $0) })
             accountsById = Dictionary(uniqueKeysWithValues: try app.accounts.list(includeArchived: true).map { ($0.id, $0) })
         } catch {
-            print("Transactions reload error: \(error)")
+            print("AccountTransactionsView reload error: \(error)")
         }
     }
 }

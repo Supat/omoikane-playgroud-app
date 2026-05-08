@@ -116,6 +116,7 @@ private struct RateRow: View {
             }
             TextField("rate", text: $rateText)
                 .keyboardType(.decimalPad)
+                .numericInputOnly($rateText)
                 .multilineTextAlignment(.trailing)
                 .frame(maxWidth: 110)
                 .submitLabel(.done)

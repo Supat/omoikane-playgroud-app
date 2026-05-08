@@ -1,5 +1,46 @@
 import SwiftUI
 
+extension View {
+    /// Restricts the bound text to characters that look like a number entry
+    /// (digits, decimal point, thousands comma) by stripping anything else
+    /// on every change. `.keyboardType(.decimalPad)` already constrains the
+    /// on-screen keyboard, but a connected hardware keyboard can still emit
+    /// letters; this modifier closes that gap.
+    ///
+    /// Apply on top of `TextField` for amount / balance / rate inputs.
+    func numericInputOnly(_ binding: Binding<String>) -> some View {
+        self.onChange(of: binding.wrappedValue) { _, newValue in
+            let filtered = NumericInput.filter(newValue)
+            if filtered != newValue {
+                binding.wrappedValue = filtered
+            }
+        }
+    }
+}
+
+enum NumericInput {
+    /// Keep digits and the first decimal point; drop everything else.
+    /// Commas (thousands separators) are kept because the existing
+    /// `parseMinor` strips them at parse time.
+    static func filter(_ s: String) -> String {
+        var seenDot = false
+        var out = ""
+        out.reserveCapacity(s.count)
+        for ch in s {
+            if ch.isASCII && ch.isNumber {
+                out.append(ch)
+            } else if ch == "," {
+                out.append(ch)
+            } else if ch == "." && !seenDot {
+                seenDot = true
+                out.append(ch)
+            }
+            // anything else (letters, symbols, whitespace) is dropped
+        }
+        return out
+    }
+}
+
 /// Shared formatters and small UI helpers.
 enum Formatters {
     static func money(_ minor: Int64, currency: String = "JPY") -> String {

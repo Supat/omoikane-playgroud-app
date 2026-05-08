@@ -10,6 +10,11 @@ struct CategoriesView: View {
     @State private var editingCategory: LedgerCategory? = nil
     @State private var addingTopLevelKind: CategoryKind? = nil
     @State private var addingChildOf: LedgerCategory? = nil
+    /// When non-nil, drives the delete-confirmation alert. Holds the target
+    /// category plus a fresh reference count so the message can warn the
+    /// user (or refuse) when the category is still in use.
+    @State private var deletePrompt: DeletePrompt? = nil
+    @State private var actionError: String? = nil
 
     var body: some View {
         List {
@@ -43,6 +48,44 @@ struct CategoriesView: View {
             CategoryEditor(initialKind: parent.kind, initialParent: parent)
         }
         .task(id: app.dataVersion) { reload() }
+        .alert(
+            "Delete '\(deletePrompt?.category.name ?? "")'?",
+            isPresented: Binding(
+                get: { deletePrompt != nil },
+                set: { if !$0 { deletePrompt = nil } }
+            ),
+            presenting: deletePrompt
+        ) { prompt in
+            if prompt.isBlocked {
+                // FK enforcement would refuse this anyway; offering Archive
+                // gives the user a useful next step without a dead-end alert.
+                Button("Archive instead") {
+                    do { try app.archiveCategory(id: prompt.category.id) }
+                    catch { actionError = "\(error)" }
+                }
+                Button("Cancel", role: .cancel) {}
+            } else {
+                Button("Delete", role: .destructive) {
+                    do { try app.deleteCategory(id: prompt.category.id) }
+                    catch { actionError = "\(error)" }
+                }
+                Button("Cancel", role: .cancel) {}
+            }
+        } message: { prompt in
+            Text(prompt.message)
+        }
+        .alert(
+            "Action failed",
+            isPresented: Binding(
+                get: { actionError != nil },
+                set: { if !$0 { actionError = nil } }
+            ),
+            presenting: actionError
+        ) { _ in
+            Button("OK", role: .cancel) {}
+        } message: { msg in
+            Text(msg)
+        }
     }
 
     @ViewBuilder
@@ -55,8 +98,14 @@ struct CategoriesView: View {
             } else {
                 ForEach(topLevels) { parent in
                     parentRow(parent)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            rowActions(for: parent)
+                        }
                     ForEach(children(of: parent)) { child in
                         childRow(child)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                rowActions(for: child)
+                            }
                     }
                 }
             }
@@ -118,11 +167,63 @@ struct CategoriesView: View {
         categories.filter { $0.parentId == parent.id }
     }
 
+    /// Trailing-swipe actions shared by parent and child rows. Delete is
+    /// destructive but always routes through the alert — the user is told
+    /// (a) what's still referencing this category and (b) whether the
+    /// operation will succeed at all.
+    @ViewBuilder
+    private func rowActions(for c: LedgerCategory) -> some View {
+        Button(role: .destructive) {
+            startDelete(c)
+        } label: {
+            Label("Delete", systemImage: "trash")
+        }
+        Button {
+            do { try app.archiveCategory(id: c.id) }
+            catch { actionError = "\(error)" }
+        } label: {
+            Label("Archive", systemImage: "archivebox")
+        }
+        .tint(.orange)
+    }
+
+    private func startDelete(_ c: LedgerCategory) {
+        do {
+            let refs = try app.categories.referenceCount(for: c.id)
+            deletePrompt = DeletePrompt(category: c, refs: refs)
+        } catch {
+            actionError = "Couldn't check references: \(error)"
+        }
+    }
+
     private func reload() {
         do {
             categories = try app.categories.list(includeArchived: false)
         } catch {
             print("CategoriesView reload error: \(error)")
+        }
+    }
+}
+
+/// Bundled state for the delete-confirmation alert. Holds the category and
+/// a snapshot of how many transactions / sub-categories still reference it
+/// so the alert text can adapt to the situation.
+private struct DeletePrompt: Identifiable {
+    let category: LedgerCategory
+    let refs: (transactions: Int, children: Int)
+    var id: Int64 { category.id }
+
+    var isBlocked: Bool {
+        refs.transactions > 0 || refs.children > 0
+    }
+
+    var message: String {
+        if isBlocked {
+            let tx = "\(refs.transactions) transaction\(refs.transactions == 1 ? "" : "s")"
+            let ch = "\(refs.children) sub-categor\(refs.children == 1 ? "y" : "ies")"
+            return "Still referenced by \(tx) and \(ch). Hard delete would break referential integrity, so archive instead — it hides the category from pickers without touching history."
+        } else {
+            return "No transactions or sub-categories reference this category, so it's safe to delete. This cannot be undone."
         }
     }
 }

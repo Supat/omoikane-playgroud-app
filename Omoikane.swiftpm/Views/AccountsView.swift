@@ -87,7 +87,8 @@ struct AddAccountSheet: View {
                 CurrencyPicker(title: "Currency", selection: $currency)
                 LabeledContent("Initial balance") {
                     TextField("0", text: $initialBalanceText)
-                        .keyboardType(.decimalPad)
+                        .keyboardType(.numbersAndPunctuation)
+                        .numericInputOnly($initialBalanceText)
                         .multilineTextAlignment(.trailing)
                 }
 
