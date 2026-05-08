@@ -34,10 +34,12 @@ fileprivate struct NumberPadKeysView: View {
             }
         }
         .padding(12)
-        // Cap width so each key stays roughly square on iPad landscape;
-        // in portrait the .infinity outer frame still fills the screen.
+        // Cap width so each key stays roughly square on iPad landscape.
+        // The outer .infinity frame with .trailing alignment pushes the
+        // capped cluster against the right edge — easier to reach with
+        // the right thumb on a held iPad.
         .frame(maxWidth: 520)
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
     @ViewBuilder
