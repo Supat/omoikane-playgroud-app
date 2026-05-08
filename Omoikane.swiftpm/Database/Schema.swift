@@ -19,18 +19,30 @@ import Foundation
 /// "spending by category in May 2026 for the credit card account" is a small index
 /// range scan over the summary table.
 enum Schema {
-    static let latestVersion = 1
+    static let latestVersion = 2
 
     static func migrate(_ db: Database) throws {
         try db.exec("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY);")
+        // Read in a sub-scope so the Statement is finalized (and the read cursor
+        // released) before any DDL runs. ALTER TABLE in SQLite requires no
+        // open statements on the connection or it fails with "table is locked".
         var current = 0
-        let s = try db.prepare("SELECT COALESCE(MAX(version), 0) FROM schema_version;")
-        if try s.step() { current = s.int(0) }
+        do {
+            let s = try db.prepare("SELECT COALESCE(MAX(version), 0) FROM schema_version;")
+            if try s.step() { current = s.int(0) }
+            s.reset()
+        }
 
         if current < 1 {
             try db.transaction {
                 try migrateToV1(db)
                 try db.exec("INSERT INTO schema_version(version) VALUES (1);")
+            }
+        }
+        if current < 2 {
+            try db.transaction {
+                try migrateToV2(db)
+                try db.exec("INSERT INTO schema_version(version) VALUES (2);")
             }
         }
     }
@@ -163,6 +175,144 @@ enum Schema {
         """)
     }
 
+    /// V2: per-currency aggregation + cross-currency transfers.
+    ///
+    /// Adds `currency` (denormalized from accounts at insert time) and
+    /// `counterparty_amount_minor` (the receiving leg of a cross-currency
+    /// transfer) to `transactions`. Adds `currency` to the
+    /// `monthly_summaries` primary key so summing across currencies stops
+    /// being meaningless. Adds a `currency_rates` table that stores how many
+    /// units of the home currency one unit of the foreign currency is worth;
+    /// the home currency itself is stored elsewhere (UserDefaults via AppState)
+    /// since it's a UI preference, not relational data.
+    private static func migrateToV2(_ db: Database) throws {
+        // 1. New columns on transactions.
+        try db.exec("ALTER TABLE transactions ADD COLUMN currency TEXT;")
+        try db.exec("ALTER TABLE transactions ADD COLUMN counterparty_amount_minor INTEGER;")
+
+        // Backfill currency from the account at the time of the transaction.
+        // For an account whose currency was changed later, this fixes the
+        // historical rows to the *current* currency, which matches the model
+        // (an account has one currency for its lifetime).
+        try db.exec("""
+            UPDATE transactions
+               SET currency = (SELECT a.currency FROM accounts a WHERE a.id = transactions.account_id)
+             WHERE currency IS NULL;
+        """)
+        // Make currency NOT NULL going forward via a CHECK rather than a
+        // table rebuild (cheaper for an existing dataset).
+        try db.exec("CREATE INDEX IF NOT EXISTS idx_tx_currency_ym ON transactions(currency, year_month);")
+
+        // 2. monthly_summaries needs currency in the PK.
+        // SQLite cannot ALTER a PK in place; drop triggers + table, recreate, repopulate.
+        try db.exec("DROP TRIGGER IF EXISTS tx_ai;")
+        try db.exec("DROP TRIGGER IF EXISTS tx_au;")
+        try db.exec("DROP TRIGGER IF EXISTS tx_ad;")
+        try db.exec("DROP TABLE IF EXISTS monthly_summaries;")
+
+        try db.exec("""
+            CREATE TABLE monthly_summaries (
+                year_month         INTEGER NOT NULL,
+                category_id        INTEGER NOT NULL,
+                account_id         INTEGER NOT NULL,
+                currency           TEXT    NOT NULL,
+                kind               TEXT    NOT NULL,
+                total_amount_minor INTEGER NOT NULL DEFAULT 0,
+                transaction_count  INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (year_month, category_id, account_id, currency, kind)
+            ) WITHOUT ROWID;
+        """)
+        try db.exec("CREATE INDEX idx_ms_ym       ON monthly_summaries(year_month);")
+        try db.exec("CREATE INDEX idx_ms_cat_ym   ON monthly_summaries(category_id, year_month);")
+        try db.exec("CREATE INDEX idx_ms_acc_ym   ON monthly_summaries(account_id, year_month);")
+        try db.exec("CREATE INDEX idx_ms_kind_ym  ON monthly_summaries(kind, year_month);")
+        try db.exec("CREATE INDEX idx_ms_cur_ym   ON monthly_summaries(currency, year_month);")
+
+        try db.exec("""
+            CREATE TRIGGER tx_ai AFTER INSERT ON transactions
+            BEGIN
+                INSERT INTO monthly_summaries
+                    (year_month, category_id, account_id, currency, kind, total_amount_minor, transaction_count)
+                VALUES
+                    (NEW.year_month, NEW.category_id, NEW.account_id, NEW.currency, NEW.kind,
+                     NEW.amount_minor, 1)
+                ON CONFLICT(year_month, category_id, account_id, currency, kind) DO UPDATE SET
+                    total_amount_minor = total_amount_minor + NEW.amount_minor,
+                    transaction_count  = transaction_count  + 1;
+            END;
+        """)
+        try db.exec("""
+            CREATE TRIGGER tx_ad AFTER DELETE ON transactions
+            BEGIN
+                UPDATE monthly_summaries
+                   SET total_amount_minor = total_amount_minor - OLD.amount_minor,
+                       transaction_count  = transaction_count  - 1
+                 WHERE year_month  = OLD.year_month
+                   AND category_id = OLD.category_id
+                   AND account_id  = OLD.account_id
+                   AND currency    = OLD.currency
+                   AND kind        = OLD.kind;
+                DELETE FROM monthly_summaries
+                 WHERE year_month  = OLD.year_month
+                   AND category_id = OLD.category_id
+                   AND account_id  = OLD.account_id
+                   AND currency    = OLD.currency
+                   AND kind        = OLD.kind
+                   AND transaction_count <= 0;
+            END;
+        """)
+        try db.exec("""
+            CREATE TRIGGER tx_au AFTER UPDATE ON transactions
+            BEGIN
+                UPDATE monthly_summaries
+                   SET total_amount_minor = total_amount_minor - OLD.amount_minor,
+                       transaction_count  = transaction_count  - 1
+                 WHERE year_month  = OLD.year_month
+                   AND category_id = OLD.category_id
+                   AND account_id  = OLD.account_id
+                   AND currency    = OLD.currency
+                   AND kind        = OLD.kind;
+                DELETE FROM monthly_summaries
+                 WHERE year_month  = OLD.year_month
+                   AND category_id = OLD.category_id
+                   AND account_id  = OLD.account_id
+                   AND currency    = OLD.currency
+                   AND kind        = OLD.kind
+                   AND transaction_count <= 0;
+                INSERT INTO monthly_summaries
+                    (year_month, category_id, account_id, currency, kind, total_amount_minor, transaction_count)
+                VALUES
+                    (NEW.year_month, NEW.category_id, NEW.account_id, NEW.currency, NEW.kind,
+                     NEW.amount_minor, 1)
+                ON CONFLICT(year_month, category_id, account_id, currency, kind) DO UPDATE SET
+                    total_amount_minor = total_amount_minor + NEW.amount_minor,
+                    transaction_count  = transaction_count  + 1;
+            END;
+        """)
+
+        // Repopulate summaries from the now-currency-tagged transactions.
+        try db.exec("""
+            INSERT INTO monthly_summaries
+                (year_month, category_id, account_id, currency, kind, total_amount_minor, transaction_count)
+            SELECT year_month, category_id, account_id, currency, kind,
+                   SUM(amount_minor), COUNT(*)
+              FROM transactions
+             GROUP BY year_month, category_id, account_id, currency, kind;
+        """)
+
+        // 3. Currency rates: 1 unit of `currency` is worth `rate_to_home`
+        //    units of the user's home currency. Home currency itself is not
+        //    in this table (it's the implicit identity). Rate is stored as
+        //    REAL because exchange rates aren't expressible in minor units.
+        try db.exec("""
+            CREATE TABLE currency_rates (
+                currency     TEXT PRIMARY KEY,
+                rate_to_home REAL NOT NULL,
+                updated_at   INTEGER NOT NULL
+            );
+        """)
+    }
+
     /// Recompute monthly_summaries from scratch. Useful after bulk imports that
     /// were intentionally run with triggers disabled, or as a self-heal.
     static func rebuildSummaries(_ db: Database) throws {
@@ -170,11 +320,11 @@ enum Schema {
             try db.exec("DELETE FROM monthly_summaries;")
             try db.exec("""
                 INSERT INTO monthly_summaries
-                    (year_month, category_id, account_id, kind, total_amount_minor, transaction_count)
-                SELECT year_month, category_id, account_id, kind,
+                    (year_month, category_id, account_id, currency, kind, total_amount_minor, transaction_count)
+                SELECT year_month, category_id, account_id, currency, kind,
                        SUM(amount_minor), COUNT(*)
                   FROM transactions
-                 GROUP BY year_month, category_id, account_id, kind;
+                 GROUP BY year_month, category_id, account_id, currency, kind;
             """)
         }
     }

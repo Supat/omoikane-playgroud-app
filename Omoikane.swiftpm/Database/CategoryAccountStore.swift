@@ -125,19 +125,30 @@ final class AccountStore {
         try s.step()
     }
 
-    /// Net flow to date: initial_balance + sum(income) - sum(expense)
-    /// (transfers cancel out across accounts and don't affect net per account here
-    /// for simplicity — extend if you want directional transfer balances).
+    /// Net balance to date in the account's own currency.
+    /// = initial_balance
+    ///   + sum of incomes posted to this account
+    ///   − sum of expenses posted from this account
+    ///   − sum of transfer-out legs from this account (in this account's currency, = amount_minor)
+    ///   + sum of transfer-in legs into this account
+    ///       (counterparty_amount_minor when the transfer crossed currencies, otherwise amount_minor)
     func balanceMinor(accountId: Int64) throws -> Int64 {
         let s = try db.prepare("""
-            SELECT COALESCE(initial_balance_minor, 0) +
-                   COALESCE((SELECT SUM(CASE kind WHEN 'income' THEN amount_minor
-                                                  WHEN 'expense' THEN -amount_minor
-                                                  ELSE 0 END)
-                              FROM transactions WHERE account_id = ?), 0)
+            SELECT
+                COALESCE(initial_balance_minor, 0)
+                + COALESCE((SELECT SUM(CASE kind
+                                          WHEN 'income'   THEN amount_minor
+                                          WHEN 'expense'  THEN -amount_minor
+                                          WHEN 'transfer' THEN -amount_minor
+                                          ELSE 0 END)
+                             FROM transactions WHERE account_id = ?), 0)
+                + COALESCE((SELECT SUM(COALESCE(counterparty_amount_minor, amount_minor))
+                             FROM transactions
+                            WHERE kind = 'transfer'
+                              AND counterparty_account_id = ?), 0)
               FROM accounts WHERE id = ?;
         """)
-        s.bind(accountId, at: 1).bind(accountId, at: 2)
+        s.bind(accountId, at: 1).bind(accountId, at: 2).bind(accountId, at: 3)
         if try s.step() { return s.int64(0) }
         return 0
     }

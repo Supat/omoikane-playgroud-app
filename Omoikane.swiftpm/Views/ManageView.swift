@@ -126,8 +126,8 @@ private struct AddAccountSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var kind: AccountKind = .bank
-    @State private var currency = "JPY"
-    @State private var initialBalance: String = "0"
+    @State private var currency: String = "JPY"
+    @State private var initialBalanceText: String = "0"
 
     var body: some View {
         NavigationStack {
@@ -138,24 +138,48 @@ private struct AddAccountSheet: View {
                         Label(k.displayName, systemImage: k.sfSymbol).tag(k)
                     }
                 }
-                TextField("Currency", text: $currency)
-                TextField("Initial balance", text: $initialBalance)
-                    .keyboardType(.numberPad)
+                CurrencyPicker(title: "Currency", selection: $currency)
+                LabeledContent("Initial balance") {
+                    TextField("0", text: $initialBalanceText)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                }
             }
             .navigationTitle("New Account")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                if currency == "JPY" { currency = app.homeCurrency }
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
-                        let bal = Int64(initialBalance) ?? 0
-                        _ = try? app.addAccount(name: name, kind: kind, currency: currency, initialBalanceMinor: bal)
-                        dismiss()
-                    }.disabled(name.isEmpty)
+                        let minor = parseMinor(initialBalanceText, currency: currency) ?? 0
+                        do {
+                            _ = try app.addAccount(
+                                name: name, kind: kind,
+                                currency: currency, initialBalanceMinor: minor
+                            )
+                            dismiss()
+                        } catch {
+                            // Surfaces only as a no-op for now; the picker
+                            // restricts to valid currencies, so this path
+                            // is mostly an unreachable safety net.
+                        }
+                    }
+                    .disabled(name.isEmpty)
                 }
             }
         }
+    }
+
+    private func parseMinor(_ text: String, currency: String) -> Int64? {
+        let cleaned = text.replacingOccurrences(of: ",", with: "")
+        let digits = Money.fractionDigits(for: currency)
+        if digits == 0 { return Int64(cleaned) }
+        guard let d = Double(cleaned) else { return nil }
+        return Int64((d * pow(10.0, Double(digits))).rounded())
     }
 }

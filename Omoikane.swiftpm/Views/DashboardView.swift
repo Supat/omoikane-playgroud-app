@@ -4,7 +4,7 @@ import Charts
 struct DashboardView: View {
     @Environment(AppState.self) private var app
 
-    @State private var totals: SummaryStore.KindTotals = .init()
+    @State private var totals: SummaryStore.CurrencyTotals = .init()
     @State private var byCategory: [GroupedSummary] = []
     @State private var trend: [GroupedSummary] = []
     @State private var topAccounts: [GroupedSummary] = []
@@ -14,6 +14,7 @@ struct DashboardView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
+                if !missing.isEmpty { missingRatesBanner }
                 summaryCards
                 trendChart
                 categoryBreakdown
@@ -23,6 +24,7 @@ struct DashboardView: View {
         }
         .navigationTitle("Dashboard")
         .task(id: app.dataVersion) { reload() }
+        .task(id: app.rateVersion) { reload() }
         .onChange(of: ymKey) { _, _ in reload() }
     }
 
@@ -35,59 +37,103 @@ struct DashboardView: View {
                 Text(monthLabel(ymKey)).font(.title.weight(.semibold))
             }
             Spacer()
-            Stepper(
-                value: Binding(
-                    get: { ymKey },
-                    set: { ymKey = $0 }
-                ),
-                in: minYM ... maxYM,
-                step: 1,
-                onEditingChanged: { _ in normalizeYM() }
-            ) { EmptyView() }
+            Stepper(value: $ymKey, in: 200001 ... 209912, step: 1) {
+                EmptyView()
+            }
             .labelsHidden()
+            .onChange(of: ymKey) { _, newValue in
+                let (y, m) = YearMonth.components(newValue)
+                if m < 1  { ymKey = YearMonth.key(year: y - 1, month: 12) }
+                if m > 12 { ymKey = YearMonth.key(year: y + 1, month: 1) }
+            }
         }
     }
 
+    private var missingRatesBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Rate missing for \(missing.joined(separator: ", "))")
+                    .font(.subheadline.weight(.medium))
+                Text("Open Settings → Exchange rates to include them in the home-currency rollup.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(12)
+        .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
     private var summaryCards: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 12)], spacing: 12) {
-            StatCard(
-                title: "Income",
-                value: Formatters.money(totals.income),
-                tint: .green,
-                sfSymbol: "arrow.down.circle.fill"
-            )
-            StatCard(
-                title: "Expense",
-                value: Formatters.money(totals.expense),
-                tint: .red,
-                sfSymbol: "arrow.up.circle.fill"
-            )
-            StatCard(
-                title: "Net",
-                value: Formatters.money(totals.net),
-                tint: totals.net >= 0 ? .green : .red,
-                sfSymbol: "equal.circle.fill"
-            )
-            StatCard(
-                title: "Transactions",
-                value: "\(byCategory.reduce(0) { $0 + $1.count })",
-                tint: .blue,
-                sfSymbol: "list.number"
-            )
+        VStack(alignment: .leading, spacing: 12) {
+            Text("\(app.homeCurrency) rollup").font(.subheadline).foregroundStyle(.secondary)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 12)], spacing: 12) {
+                StatCard(
+                    title: "Income",
+                    value: Formatters.money(homeIncome, currency: app.homeCurrency),
+                    tint: .green,
+                    sfSymbol: "arrow.down.circle.fill"
+                )
+                StatCard(
+                    title: "Expense",
+                    value: Formatters.money(homeExpense, currency: app.homeCurrency),
+                    tint: .red,
+                    sfSymbol: "arrow.up.circle.fill"
+                )
+                StatCard(
+                    title: "Net",
+                    value: Formatters.money(homeIncome - homeExpense, currency: app.homeCurrency),
+                    tint: (homeIncome - homeExpense) >= 0 ? .green : .red,
+                    sfSymbol: "equal.circle.fill"
+                )
+                StatCard(
+                    title: "Transactions",
+                    value: "\(byCategory.reduce(0) { $0 + $1.count })",
+                    tint: .blue,
+                    sfSymbol: "list.number"
+                )
+            }
+
+            if perCurrencyRows.count > 1 {
+                Text("By currency").font(.subheadline).foregroundStyle(.secondary).padding(.top, 6)
+                VStack(spacing: 0) {
+                    ForEach(perCurrencyRows, id: \.currency) { row in
+                        HStack {
+                            Text(row.currency).font(.body.weight(.medium))
+                            Spacer()
+                            Text(Formatters.money(row.income, currency: row.currency))
+                                .foregroundStyle(.green)
+                                .monospacedDigit()
+                            Text("·").foregroundStyle(.secondary)
+                            Text(Formatters.money(row.expense, currency: row.currency))
+                                .foregroundStyle(.red)
+                                .monospacedDigit()
+                        }
+                        .padding(.vertical, 6)
+                        .overlay(alignment: .bottom) {
+                            Rectangle().fill(Color.secondary.opacity(0.15)).frame(height: 0.5)
+                        }
+                    }
+                }
+                .padding(.horizontal, 14).padding(.vertical, 6)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
         }
     }
 
     private var trendChart: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Last 6 months").font(.headline)
-            if trend.isEmpty {
+            Text("Last 6 months — expense (\(app.homeCurrency))").font(.headline)
+            if monthlyHomeExpense.isEmpty {
                 EmptyStateView(title: "No data", message: "Add a few entries to see trends.", sfSymbol: "chart.bar")
                     .frame(height: 180)
             } else {
-                Chart(trend) { row in
+                Chart(monthlyHomeExpense, id: \.label) { row in
                     BarMark(
-                        x: .value("Month", row.key),
-                        y: .value("Total", Double(row.totalMinor))
+                        x: .value("Month", row.label),
+                        y: .value("Total", Double(row.minor))
                     )
                     .foregroundStyle(.red.gradient)
                 }
@@ -101,15 +147,15 @@ struct DashboardView: View {
 
     private var categoryBreakdown: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Spending by category").font(.headline)
-            if byCategory.isEmpty {
+            Text("Spending by category (\(app.homeCurrency))").font(.headline)
+            if categoryRows.isEmpty {
                 EmptyStateView(title: "No expenses", message: "Add an expense to see a breakdown.", sfSymbol: "chart.pie")
             } else {
-                ForEach(byCategory.prefix(8)) { row in
+                ForEach(categoryRows.prefix(8), id: \.name) { row in
                     HStack {
-                        Text(row.key)
+                        Text(row.name)
                         Spacer()
-                        Text(Formatters.money(row.totalMinor))
+                        Text(Formatters.money(row.minor, currency: app.homeCurrency))
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
                     }
@@ -133,8 +179,9 @@ struct DashboardView: View {
                 ForEach(topAccounts) { row in
                     HStack {
                         Text(row.key)
+                        Text(row.currency).font(.caption).foregroundStyle(.secondary)
                         Spacer()
-                        Text(Formatters.money(row.totalMinor))
+                        Text(Formatters.money(row.totalMinor, currency: row.currency))
                             .foregroundStyle(row.totalMinor >= 0 ? Color.primary : .red)
                             .monospacedDigit()
                     }
@@ -144,6 +191,78 @@ struct DashboardView: View {
         }
         .padding(14)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    // MARK: - Derived data
+
+    private var missing: [String] {
+        let active = Set(
+            totals.byKind.values.flatMap(\.keys)
+            + byCategory.map(\.currency)
+            + topAccounts.map(\.currency)
+        )
+        return app.missingRates(among: Array(active))
+    }
+
+    private var homeIncome: Int64 {
+        sumToHome(totals.total(for: .income))
+    }
+    private var homeExpense: Int64 {
+        sumToHome(totals.total(for: .expense))
+    }
+
+    private func sumToHome(_ map: [String: Int64]) -> Int64 {
+        var sum: Int64 = 0
+        for (cur, minor) in map {
+            if let h = app.convertedToHome(minor, from: cur) {
+                sum += h
+            }
+        }
+        return sum
+    }
+
+    private struct PerCurrencyRow: Hashable {
+        let currency: String
+        let income: Int64
+        let expense: Int64
+    }
+
+    private var perCurrencyRows: [PerCurrencyRow] {
+        totals.currencies.map { c in
+            PerCurrencyRow(
+                currency: c,
+                income: totals.total(for: .income, currency: c),
+                expense: totals.total(for: .expense, currency: c)
+            )
+        }
+    }
+
+    private struct LabeledMinor: Hashable { let label: String; let minor: Int64 }
+
+    private var monthlyHomeExpense: [LabeledMinor] {
+        var bucket: [String: Int64] = [:]
+        for row in trend {
+            if let h = app.convertedToHome(row.totalMinor, from: row.currency) {
+                bucket[row.key, default: 0] += h
+            }
+        }
+        return bucket
+            .sorted { $0.key < $1.key }
+            .map { LabeledMinor(label: $0.key, minor: $0.value) }
+    }
+
+    private struct CategoryRow: Hashable { let name: String; let minor: Int64 }
+
+    private var categoryRows: [CategoryRow] {
+        var bucket: [String: Int64] = [:]
+        for row in byCategory {
+            if let h = app.convertedToHome(row.totalMinor, from: row.currency) {
+                bucket[row.key, default: 0] += h
+            }
+        }
+        return bucket
+            .map { CategoryRow(name: $0.key, minor: $0.value) }
+            .sorted { $0.minor > $1.minor }
     }
 
     // MARK: - Logic
@@ -168,15 +287,5 @@ struct DashboardView: View {
             return Formatters.monthLabel.string(from: d)
         }
         return String(format: "%04d-%02d", y, m)
-    }
-
-    private var minYM: Int { 200001 }
-    private var maxYM: Int { 209912 }
-
-    private func normalizeYM() {
-        // Stepper uses a strict integer step. Wrap month boundaries.
-        let (y, m) = YearMonth.components(ymKey)
-        if m < 1 { ymKey = YearMonth.key(year: y - 1, month: 12) }
-        else if m > 12 { ymKey = YearMonth.key(year: y + 1, month: 1) }
     }
 }

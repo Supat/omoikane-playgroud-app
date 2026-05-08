@@ -76,10 +76,16 @@ struct Transaction: Identifiable, Hashable {
     var id: Int64
     var occurredOn: Date
     var amountMinor: Int64
+    /// ISO 4217 currency code of the from-account. Denormalized so
+    /// `monthly_summaries` can group by currency without a join.
+    var currency: String
     var kind: TransactionKind
     var categoryId: Int64
     var accountId: Int64
     var counterpartyAccountId: Int64?
+    /// Receiving leg of a cross-currency transfer (in the counterparty
+    /// account's currency). nil for non-transfers and same-currency transfers.
+    var counterpartyAmountMinor: Int64?
     var note: String?
     var tags: [String]
     var createdAt: Date
@@ -102,6 +108,7 @@ struct TransactionFilter {
     var kinds: [TransactionKind]?
     var categoryIds: [Int64]?
     var accountIds: [Int64]?
+    var currencies: [String]?
     var searchText: String?
     var limit: Int?
     var offset: Int?
@@ -120,16 +127,29 @@ struct MonthlySummary: Hashable {
     var yearMonth: Int
     var categoryId: Int64
     var accountId: Int64
+    var currency: String
     var kind: TransactionKind
     var totalMinor: Int64
     var count: Int
 }
 
-/// A grouped summary, e.g. "by category" or "by month".
+/// A grouped summary keyed by either category, account, or year-month.
+/// Carries currency so callers can format correctly (or convert to home).
 struct GroupedSummary: Identifiable, Hashable {
-    var key: String        // category name, account name, or "YYYY-MM"
-    var keyId: Int64       // category id / account id / year_month
+    var key: String
+    var keyId: Int64
+    var currency: String
     var totalMinor: Int64
     var count: Int
-    var id: String { key }
+    var id: String { "\(key)|\(currency)" }
+}
+
+/// One row in `currency_rates`. Home currency is not stored here (it's a UI
+/// preference owned by AppState). `rateToHome` is "1 unit of this currency
+/// equals N units of the home currency".
+struct CurrencyRate: Identifiable, Hashable {
+    var currency: String
+    var rateToHome: Double
+    var updatedAt: Date
+    var id: String { currency }
 }

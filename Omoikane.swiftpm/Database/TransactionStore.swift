@@ -9,9 +9,10 @@ final class TransactionStore {
         let now = Int64(Date().timeIntervalSince1970)
         let s = try db.prepare("""
             INSERT INTO transactions
-                (occurred_on, year_month, amount_minor, kind, category_id, account_id,
-                 counterparty_account_id, note, tags, created_at, updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?);
+                (occurred_on, year_month, amount_minor, currency, kind,
+                 category_id, account_id, counterparty_account_id,
+                 counterparty_amount_minor, note, tags, created_at, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);
         """)
         bindInsert(s, tx, now: now)
         try s.step()
@@ -24,9 +25,10 @@ final class TransactionStore {
             let now = Int64(Date().timeIntervalSince1970)
             let s = try db.prepare("""
                 INSERT INTO transactions
-                    (occurred_on, year_month, amount_minor, kind, category_id, account_id,
-                     counterparty_account_id, note, tags, created_at, updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?);
+                    (occurred_on, year_month, amount_minor, currency, kind,
+                     category_id, account_id, counterparty_account_id,
+                     counterparty_amount_minor, note, tags, created_at, updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);
             """)
             for tx in items {
                 s.reset()
@@ -40,22 +42,25 @@ final class TransactionStore {
         let now = Int64(Date().timeIntervalSince1970)
         let s = try db.prepare("""
             UPDATE transactions
-               SET occurred_on = ?, year_month = ?, amount_minor = ?, kind = ?,
-                   category_id = ?, account_id = ?, counterparty_account_id = ?,
+               SET occurred_on = ?, year_month = ?, amount_minor = ?, currency = ?,
+                   kind = ?, category_id = ?, account_id = ?,
+                   counterparty_account_id = ?, counterparty_amount_minor = ?,
                    note = ?, tags = ?, updated_at = ?
              WHERE id = ?;
         """)
-        s.bind(Int64(tx.occurredOn.dayKey),    at: 1)
+        s.bind(Int64(tx.occurredOn.dayKey),       at: 1)
         s.bind(Int64(tx.occurredOn.yearMonthKey), at: 2)
-        s.bind(tx.amountMinor,                  at: 3)
-        s.bind(tx.kind.rawValue,                at: 4)
-        s.bind(tx.categoryId,                   at: 5)
-        s.bind(tx.accountId,                    at: 6)
-        s.bind(tx.counterpartyAccountId,        at: 7)
-        s.bind(tx.note,                         at: 8)
-        s.bind(Self.encodeTags(tx.tags),        at: 9)
-        s.bind(now,                             at: 10)
-        s.bind(tx.id,                           at: 11)
+        s.bind(tx.amountMinor,                    at: 3)
+        s.bind(tx.currency,                       at: 4)
+        s.bind(tx.kind.rawValue,                  at: 5)
+        s.bind(tx.categoryId,                     at: 6)
+        s.bind(tx.accountId,                      at: 7)
+        s.bind(tx.counterpartyAccountId,          at: 8)
+        s.bind(tx.counterpartyAmountMinor,        at: 9)
+        s.bind(tx.note,                           at: 10)
+        s.bind(Self.encodeTags(tx.tags),          at: 11)
+        s.bind(now,                               at: 12)
+        s.bind(tx.id,                             at: 13)
         try s.step()
     }
 
@@ -105,6 +110,13 @@ final class TransactionStore {
                 binds.append { s, i in s.bind(a, at: i) }
             }
         }
+        if let curs = filter.currencies, !curs.isEmpty {
+            let placeholders = curs.map { _ in "?" }.joined(separator: ",")
+            conds.append("currency IN (\(placeholders))")
+            for c in curs {
+                binds.append { s, i in s.bind(c, at: i) }
+            }
+        }
         if let q = filter.searchText, !q.isEmpty {
             conds.append("(note LIKE ? OR tags LIKE ?)")
             let like = "%\(q)%"
@@ -136,22 +148,25 @@ final class TransactionStore {
     // MARK: - Internals
 
     private static let selectColumns = """
-        SELECT id, occurred_on, amount_minor, kind, category_id, account_id,
-               counterparty_account_id, note, tags, created_at, updated_at
+        SELECT id, occurred_on, amount_minor, currency, kind, category_id, account_id,
+               counterparty_account_id, counterparty_amount_minor,
+               note, tags, created_at, updated_at
     """
 
     private func bindInsert(_ s: Statement, _ tx: Transaction, now: Int64) {
         s.bind(Int64(tx.occurredOn.dayKey),       at: 1)
         s.bind(Int64(tx.occurredOn.yearMonthKey), at: 2)
         s.bind(tx.amountMinor,                    at: 3)
-        s.bind(tx.kind.rawValue,                  at: 4)
-        s.bind(tx.categoryId,                     at: 5)
-        s.bind(tx.accountId,                      at: 6)
-        s.bind(tx.counterpartyAccountId,          at: 7)
-        s.bind(tx.note,                           at: 8)
-        s.bind(Self.encodeTags(tx.tags),          at: 9)
-        s.bind(now,                               at: 10)
-        s.bind(now,                               at: 11)
+        s.bind(tx.currency,                       at: 4)
+        s.bind(tx.kind.rawValue,                  at: 5)
+        s.bind(tx.categoryId,                     at: 6)
+        s.bind(tx.accountId,                      at: 7)
+        s.bind(tx.counterpartyAccountId,          at: 8)
+        s.bind(tx.counterpartyAmountMinor,        at: 9)
+        s.bind(tx.note,                           at: 10)
+        s.bind(Self.encodeTags(tx.tags),          at: 11)
+        s.bind(now,                               at: 12)
+        s.bind(now,                               at: 13)
     }
 
     private static func read(_ s: Statement) -> Transaction {
@@ -159,14 +174,16 @@ final class TransactionStore {
             id: s.int64(0),
             occurredOn: Date.from(dayKey: s.int(1)),
             amountMinor: s.int64(2),
-            kind: TransactionKind(rawValue: s.string(3)) ?? .expense,
-            categoryId: s.int64(4),
-            accountId: s.int64(5),
-            counterpartyAccountId: s.optionalInt64(6),
-            note: s.optionalString(7),
-            tags: decodeTags(s.optionalString(8)),
-            createdAt: Date(timeIntervalSince1970: TimeInterval(s.int64(9))),
-            updatedAt: Date(timeIntervalSince1970: TimeInterval(s.int64(10)))
+            currency: s.string(3),
+            kind: TransactionKind(rawValue: s.string(4)) ?? .expense,
+            categoryId: s.int64(5),
+            accountId: s.int64(6),
+            counterpartyAccountId: s.optionalInt64(7),
+            counterpartyAmountMinor: s.optionalInt64(8),
+            note: s.optionalString(9),
+            tags: decodeTags(s.optionalString(10)),
+            createdAt: Date(timeIntervalSince1970: TimeInterval(s.int64(11))),
+            updatedAt: Date(timeIntervalSince1970: TimeInterval(s.int64(12)))
         )
     }
 

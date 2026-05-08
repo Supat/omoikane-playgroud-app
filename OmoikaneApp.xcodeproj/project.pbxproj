@@ -22,6 +22,7 @@
 		B10000000000000000000D /* TransactionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000D /* TransactionStore.swift */; };
 		B10000000000000000000E /* SummaryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000E /* SummaryStore.swift */; };
 		B10000000000000000000F /* SeedData.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000F /* SeedData.swift */; };
+		B100000000000000000020 /* CurrencyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000020 /* CurrencyStore.swift */; };
 		B100000000000000000010 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000010 /* Models.swift */; };
 		B100000000000000000011 /* Money.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000011 /* Money.swift */; };
 		B100000000000000000012 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000012 /* AppState.swift */; };
@@ -44,6 +45,7 @@
 		F10000000000000000000D /* TransactionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TransactionStore.swift; path = Omoikane.swiftpm/Database/TransactionStore.swift; sourceTree = SOURCE_ROOT; };
 		F10000000000000000000E /* SummaryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SummaryStore.swift; path = Omoikane.swiftpm/Database/SummaryStore.swift; sourceTree = SOURCE_ROOT; };
 		F10000000000000000000F /* SeedData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SeedData.swift; path = Omoikane.swiftpm/Database/SeedData.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000020 /* CurrencyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CurrencyStore.swift; path = Omoikane.swiftpm/Database/CurrencyStore.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000010 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Models.swift; path = Omoikane.swiftpm/Models/Models.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000011 /* Money.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Money.swift; path = Omoikane.swiftpm/Models/Money.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000012 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppState.swift; path = Omoikane.swiftpm/State/AppState.swift; sourceTree = SOURCE_ROOT; };
@@ -115,6 +117,7 @@
 				F10000000000000000000D /* TransactionStore.swift */,
 				F10000000000000000000E /* SummaryStore.swift */,
 				F10000000000000000000F /* SeedData.swift */,
+				F100000000000000000020 /* CurrencyStore.swift */,
 			);
 			name = Database;
 			sourceTree = "<group>";
@@ -236,6 +239,7 @@
 				B10000000000000000000D /* TransactionStore.swift in Sources */,
 				B10000000000000000000E /* SummaryStore.swift in Sources */,
 				B10000000000000000000F /* SeedData.swift in Sources */,
+				B100000000000000000020 /* CurrencyStore.swift in Sources */,
 				B100000000000000000010 /* Models.swift in Sources */,
 				B100000000000000000011 /* Money.swift in Sources */,
 				B100000000000000000012 /* AppState.swift in Sources */,

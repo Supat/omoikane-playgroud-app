@@ -60,3 +60,30 @@ struct EmptyStateView: View {
         }
     }
 }
+
+/// Native currency picker driven by `Locale.Currency.isoCurrencies`.
+/// Display label is the localized name plus the ISO code so users see
+/// "Japanese Yen (JPY)" rather than just a code.
+struct CurrencyPicker: View {
+    let title: String
+    @Binding var selection: String
+
+    var body: some View {
+        Picker(title, selection: $selection) {
+            ForEach(Self.codes, id: \.self) { code in
+                Text(Self.label(code)).tag(code)
+            }
+        }
+    }
+
+    static let codes: [String] = Locale.Currency.isoCurrencies
+        .map(\.identifier)
+        .sorted()
+
+    static func label(_ code: String) -> String {
+        if let name = Locale.current.localizedString(forCurrencyCode: code) {
+            return "\(name) (\(code))"
+        }
+        return code
+    }
+}
