@@ -19,10 +19,10 @@ struct TransactionsView: View {
     /// We claim list focus on appear so search doesn't auto-grab the keyboard;
     /// users invoke search deliberately via ⌘F.
     @FocusState private var listFocused: Bool
-    /// `.searchable(text:isPresented:)` uses this to toggle the search field
-    /// active. iOS 18+ has `.searchFocused` which is cleaner; this is the
-    /// iOS 17 equivalent.
-    @State private var searchPresented: Bool = false
+    /// Bound to the search field via `.searchFocused`. Setting it to `true`
+    /// programmatically focuses the search field; setting it to `false`
+    /// resigns focus back to wherever it was.
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
         // The hidden ⌘F button has to live somewhere in the hierarchy so its
@@ -57,8 +57,8 @@ struct TransactionsView: View {
         }
         .navigationTitle("Transactions")
         .searchable(text: $search,
-                    isPresented: $searchPresented,
                     placement: .navigationBarDrawer(displayMode: .always))
+        .searchFocused($searchFocused)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Menu {
@@ -126,16 +126,19 @@ struct TransactionsView: View {
     /// occupies no layout space. SwiftUI's `.searchable` does not surface
     /// a built-in keyboard shortcut on iPad, so we add one explicitly.
     private var searchShortcut: some View {
+        // Real, hit-testable Button — `.allowsHitTesting(false)` removes the
+        // view from the responder chain, which is exactly where SwiftUI
+        // registers `.keyboardShortcut`, so it must NOT be applied here.
+        // Opacity 0 keeps it invisible; 1×1 keeps it out of the way.
         Button {
             listFocused = false
-            searchPresented = true
+            searchFocused = true
         } label: {
             EmptyView()
         }
         .keyboardShortcut("f", modifiers: .command)
         .frame(width: 1, height: 1)
         .opacity(0)
-        .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
 

@@ -18,6 +18,8 @@ Strictly conform to native API in the implementation, especially in UI implement
 
 Keyboard navigation support is top priority, consider it for all implementation.
 
+Implementation target for the most recent iPadOS, iOS, macOS. No need to consider backward compatibility with the older version
+
 ## Common commands
 
 iPad simulator UDID is needed for `-destination`. List with:

@@ -41,26 +41,31 @@ struct OmoikaneApp: App {
             }
         }
         .commands {
-            // CommandMenu items show up in the iPadOS ⌘-hold shortcut overlay
-            // (and in a macOS app's menu bar). Each Button's keyboardShortcut
-            // is registered at Scene scope, so it works regardless of which
-            // tab is currently visible.
-            CommandMenu("AppTabs") {
-                ForEach(Array(AppTab.allCases.enumerated()), id: \.element) { idx, t in
-                    Button(t.title) { tab = t }
-                        .keyboardShortcut(KeyEquivalent(Character("\(idx + 1)")),
-                                          modifiers: .command)
-                }
+            // On iPadOS 26+, `.commands` populates the new Mac-style menu
+            // bar (revealed via swipe-down from the top of the screen or by
+            // moving the pointer to the top edge). Each Button's
+            // `keyboardShortcut` is registered at Scene scope so it works
+            // regardless of which tab is currently visible.
+            //
+            // Buttons are unrolled (rather than driven by ForEach) because
+            // SwiftUI's command-content view-builder has historically had
+            // edge cases with dynamic content; unrolled is the form Apple's
+            // own samples use.
+            CommandMenu("Tabs") {
+                Button("Dashboard")    { tab = .dashboard    }.keyboardShortcut("1", modifiers: .command)
+                Button("Transactions") { tab = .transactions }.keyboardShortcut("2", modifiers: .command)
+                Button("Reports")      { tab = .reports      }.keyboardShortcut("3", modifiers: .command)
+                Button("Accounts")     { tab = .accounts     }.keyboardShortcut("4", modifiers: .command)
+                Button("Categories")   { tab = .categories   }.keyboardShortcut("5", modifiers: .command)
+                Button("Settings")     { tab = .settings     }.keyboardShortcut("6", modifiers: .command)
                 Divider()
-                Button("Next AppTab") { cycleAppTab(by: 1) }
-                    .keyboardShortcut(.tab, modifiers: .control)
-                Button("Previous AppTab") { cycleAppTab(by: -1) }
-                    .keyboardShortcut(.tab, modifiers: [.control, .shift])
+                Button("Next Tab")     { cycleTab(by:  1) }.keyboardShortcut(.tab, modifiers: .control)
+                Button("Previous Tab") { cycleTab(by: -1) }.keyboardShortcut(.tab, modifiers: [.control, .shift])
             }
         }
     }
 
-    private func cycleAppTab(by delta: Int) {
+    private func cycleTab(by delta: Int) {
         let all = AppTab.allCases
         guard let i = all.firstIndex(of: tab) else { return }
         tab = all[(i + delta + all.count) % all.count]
