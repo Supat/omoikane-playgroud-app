@@ -238,8 +238,9 @@ struct AccountTransactionsView: View {
         // .background(EmptyView() …) or 0×0 frame keeps layout untouched.
         List(selection: $selectedId) {
             // Period header doubles as a status line — the user can see
-            // which window is active without opening the toolbar menu.
-            Section(periodFilter.displayName) {
+            // which window is active and the net total at a glance,
+            // without opening the toolbar menu.
+            Section {
                 ForEach(rows) { tx in
                     rowView(tx)
                         .tag(tx.id)
@@ -258,6 +259,14 @@ struct AccountTransactionsView: View {
                                 Label("Delete", systemImage: "trash")
                             }
                         }
+                }
+            } header: {
+                HStack {
+                    Text(periodFilter.displayName)
+                    Spacer()
+                    Text(Formatters.money(periodTotalMinor, currency: account.currency))
+                        .monospacedDigit()
+                        .foregroundStyle(periodTotalColor)
                 }
             }
         }
@@ -421,6 +430,36 @@ struct AccountTransactionsView: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    /// Net signed total of `rows` from this account's perspective, in
+    /// the account's own currency. Mirrors the sign convention used by
+    /// `AccountStore.balanceMinor`:
+    /// - income on this account → +amount
+    /// - expense on this account → −amount
+    /// - transfer from this account → −amount (outgoing leg)
+    /// - transfer into this account → +counterparty_amount when set,
+    ///   otherwise +amount (incoming leg)
+    private var periodTotalMinor: Int64 {
+        var total: Int64 = 0
+        for tx in rows {
+            if tx.accountId == account.id {
+                switch tx.kind {
+                case .income:   total += tx.amountMinor
+                case .expense:  total -= tx.amountMinor
+                case .transfer: total -= tx.amountMinor
+                }
+            } else if tx.counterpartyAccountId == account.id {
+                total += tx.counterpartyAmountMinor ?? tx.amountMinor
+            }
+        }
+        return total
+    }
+
+    private var periodTotalColor: Color {
+        if periodTotalMinor > 0 { return .green }
+        if periodTotalMinor < 0 { return .red }
+        return .gray
     }
 
     private func tint(for kind: TransactionKind) -> Color {
