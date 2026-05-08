@@ -143,6 +143,10 @@ struct AccountTransactionsView: View {
     @State private var showingNew = false
     @State private var categoriesById: [Int64: LedgerCategory] = [:]
     @State private var accountsById: [Int64: Account] = [:]
+    /// When true, each row exposes a tappable cleared checkbox on the
+    /// right edge. Toggling it stamps / clears the leg of the transaction
+    /// that belongs to *this* account (cleared_at vs counterparty_cleared_at).
+    @State private var reconciliationMode: Bool = false
 
     /// Currently keyboard-selected row. The List shows it highlighted; arrow
     /// keys move it; Return opens the editor for the selected row. In
@@ -307,6 +311,16 @@ struct AccountTransactionsView: View {
                     Label(periodFilter.displayName, systemImage: "calendar")
                 }
             }
+            // Distinct ToolbarItem so it renders next to the filter cluster
+            // but isn't visually grouped with it. .toggleStyle(.button)
+            // gives the iOS 26 Liquid Glass on/off chip treatment.
+            ToolbarItem(placement: .topBarTrailing) {
+                Toggle(isOn: $reconciliationMode) {
+                    Label("Reconcile", systemImage: "checkmark.circle")
+                }
+                .toggleStyle(.button)
+                .accessibilityLabel("Reconciliation mode")
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     showingNew = true
@@ -429,7 +443,60 @@ struct AccountTransactionsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            if reconciliationMode {
+                // Button (rather than a Toggle) so the parent row's
+                // .onTapGesture doesn't also fire — Button intercepts
+                // its hit area cleanly.
+                Button {
+                    toggleClear(tx)
+                } label: {
+                    Image(systemName: legClearedAt(for: tx) != nil ? "checkmark.circle.fill" : "circle")
+                        .font(.title3)
+                        .foregroundStyle(legClearedAt(for: tx) != nil ? .green : .secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(legClearedAt(for: tx) != nil ? "Cleared" : "Not cleared")
+                .accessibilityAddTraits(.isButton)
+            }
         }
+    }
+
+    /// Cleared timestamp for the leg of `tx` that belongs to this
+    /// account. Returns nil when this account is neither leg of `tx`,
+    /// which shouldn't normally happen since `rows` is filtered by
+    /// `accountIdAnyLeg = account.id`.
+    private func legClearedAt(for tx: Transaction) -> Date? {
+        if tx.accountId == account.id { return tx.clearedAt }
+        if tx.counterpartyAccountId == account.id { return tx.counterpartyClearedAt }
+        return nil
+    }
+
+    /// Flip the cleared state on this account's leg of the row. Toggling
+    /// off also detaches the row from any reconciled statement (matches
+    /// the semantics of the Cleared toggle in TransactionEntryView).
+    private func toggleClear(_ tx: Transaction) {
+        var updated = tx
+        let now = Date()
+        if tx.accountId == account.id {
+            if tx.clearedAt == nil {
+                updated.clearedAt = now
+            } else {
+                updated.clearedAt = nil
+                updated.statementId = nil
+            }
+        } else if tx.counterpartyAccountId == account.id {
+            if tx.counterpartyClearedAt == nil {
+                updated.counterpartyClearedAt = now
+            } else {
+                updated.counterpartyClearedAt = nil
+                updated.counterpartyStatementId = nil
+            }
+        } else {
+            return
+        }
+        updated.updatedAt = now
+        do { try app.updateTransaction(updated) }
+        catch { print("Toggle clear error: \(error)") }
     }
 
     /// Net signed total of `rows` from this account's perspective, in
