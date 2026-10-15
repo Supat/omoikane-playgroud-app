@@ -264,10 +264,17 @@ struct DashboardView: View {
             } else {
                 Chart(monthlyHomeExpense, id: \.label) { row in
                     BarMark(
-                        x: .value("Month", row.label),
+                        x: .value("Month", YearMonth.date(fromLabel: row.label), unit: .month),
                         y: .value("Total", Double(row.minor))
                     )
                     .foregroundStyle(.red.gradient)
+                }
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 6)) { _ in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel(format: .dateTime.month(.abbreviated).year(.twoDigits))
+                    }
                 }
                 .frame(height: 220)
                 .padding(.vertical, 4)

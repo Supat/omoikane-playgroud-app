@@ -28,14 +28,22 @@ struct ReportsView: View {
                     } else {
                         Chart(trendRows, id: \.label) { row in
                             LineMark(
-                                x: .value("Month", row.label),
+                                x: .value("Month", YearMonth.date(fromLabel: row.label), unit: .month),
                                 y: .value("Total", Double(row.minor))
                             )
                             .interpolationMethod(.monotone)
                             PointMark(
-                                x: .value("Month", row.label),
+                                x: .value("Month", YearMonth.date(fromLabel: row.label), unit: .month),
                                 y: .value("Total", Double(row.minor))
                             )
+                        }
+                        // A date axis thins its own labels: "Oct 25", "Jan 26"…
+                        .chartXAxis {
+                            AxisMarks(values: .automatic(desiredCount: min(trendRows.count, 8))) { _ in
+                                AxisGridLine()
+                                AxisTick()
+                                AxisValueLabel(format: .dateTime.month(.abbreviated).year(.twoDigits))
+                            }
                         }
                         .frame(height: 240)
                     }
@@ -121,6 +129,7 @@ struct ReportsView: View {
             .pickerStyle(.segmented)
 
             Picker("Range", selection: $monthsBack) {
+                Text("1M").tag(1)
                 Text("3M").tag(3)
                 Text("6M").tag(6)
                 Text("12M").tag(12)

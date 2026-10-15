@@ -102,4 +102,14 @@ enum YearMonth {
     static func current() -> Int {
         Date().yearMonthKey
     }
+
+    /// First day of the month for a "YYYY-MM" or "YYYYMM" label. Lets charts
+    /// use a real date axis instead of truncated string labels.
+    static func date(fromLabel label: String) -> Date {
+        let digits = label.filter(\.isNumber)
+        guard digits.count >= 6, let y = Int(digits.prefix(4)), let m = Int(digits.dropFirst(4).prefix(2)) else {
+            return Date()
+        }
+        return Calendar.current.date(from: DateComponents(year: y, month: m, day: 1)) ?? Date()
+    }
 }
