@@ -18,7 +18,7 @@ struct SymbolPicker: View {
         "building.columns", "building.columns.fill", "yensign.circle", "yensign.circle.fill", "dollarsign.circle", "eurosign.circle",
         "sterlingsign.circle", "bitcoinsign.circle", "chart.line.uptrend.xyaxis", "chart.line.downtrend.xyaxis", "chart.pie",
         "chart.bar", "percent", "arrow.left.arrow.right", "arrow.down.circle", "arrow.up.circle", "gift", "gift.fill",
-        "equal.circle", "plusminus.circle", "coins", "hand.thumbsup", "handbag", "safari", "receipt", "list.bullet.clipboard",
+        "equal.circle", "plusminus.circle", "hand.thumbsup", "handbag", "safari", "receipt", "list.bullet.clipboard",
         // food & drink
         "fork.knife", "fork.knife.circle", "cup.and.saucer", "cup.and.saucer.fill", "mug", "takeoutbag.and.cup.and.straw",
         "carrot", "birthday.cake", "wineglass", "waterbottle", "cart", "cart.fill", "basket", "basket.fill", "frying.pan",
@@ -28,10 +28,10 @@ struct SymbolPicker: View {
         "chair.lounge", "table.furniture", "lamp.desk", "lamp.floor", "lamp.ceiling", "lightbulb", "lightbulb.fill",
         "washer", "dryer", "dishwasher", "shower", "bathtub", "toilet", "sink", "key", "key.fill", "lock", "lock.open",
         "door.left.hand.closed", "window.vertical.closed", "wrench.and.screwdriver", "wrench", "hammer", "screwdriver",
-        "paintbrush", "paintbrush.pointed", "paintroller", "ruler", "level", "bolt", "bolt.fill", "powerplug",
+        "paintbrush", "paintbrush.pointed", "ruler", "level", "bolt", "bolt.fill", "powerplug",
         "poweroutlet.type.b", "wifi", "wifi.router", "antenna.radiowaves.left.and.right", "phone", "phone.fill",
         "iphone", "ipad", "tv", "appletv", "homepod", "fan", "fan.floor", "air.conditioner.horizontal", "thermometer.medium",
-        "snowflake", "sun.max", "trash", "trash.fill", "recycle", "spigot", "cabinet", "fireplace", "candle",
+        "snowflake", "sun.max", "trash", "trash.fill", "spigot", "cabinet", "fireplace",
         // transport
         "tram", "tram.fill", "train.side.front.car", "bus", "bus.fill", "car", "car.fill", "car.2", "fuelpump", "fuelpump.fill",
         "ev.charger", "bicycle", "scooter", "motorcycle", "airplane", "airplane.departure", "airplane.arrival", "ferry",
@@ -48,7 +48,7 @@ struct SymbolPicker: View {
         // personal & health
         "heart", "heart.fill", "heart.text.square", "cross.case", "cross.case.fill", "cross.vial", "pills", "pills.fill",
         "pill", "bandage", "stethoscope", "syringe", "medical.thermometer", "ear", "eye", "eyebrow", "mouth", "nose",
-        "brain", "lungs", "tooth", "facemask", "figure.run", "figure.walk.motion", "figure.yoga", "figure.pool.swim",
+        "brain", "lungs", "facemask", "figure.run", "figure.walk.motion", "figure.yoga", "figure.pool.swim",
         "figure.hiking", "figure.outdoor.cycle", "figure.strengthtraining.traditional", "dumbbell", "dumbbell.fill",
         "sportscourt", "soccerball", "basketball", "baseball", "tennis.racket", "figure.golf", "figure.skiing.downhill",
         "sparkles", "drop.fill", "hands.and.sparkles", "hand.raised", "person", "person.fill", "person.2", "person.3",
