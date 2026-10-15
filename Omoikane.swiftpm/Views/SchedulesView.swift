@@ -140,15 +140,11 @@ struct ScheduleEditor: View {
                         NumberPadField(text: $amountText, placeholder: "0", alignment: .right)
                     }
                     Picker("Account", selection: $accountId) {
-                        ForEach(accounts) { a in
-                            Text("\(a.name) (\(a.currency))").tag(Int64?.some(a.id))
-                        }
+                        accountOptions(accounts)
                     }
                     if kind == .transfer {
                         Picker("To account", selection: $counterpartyAccountId) {
-                            ForEach(accounts.filter { $0.id != accountId }) { a in
-                                Text("\(a.name) (\(a.currency))").tag(Int64?.some(a.id))
-                            }
+                            accountOptions(accounts.filter { $0.id != accountId })
                         }
                         if isCrossCurrency {
                             LabeledContent("To amount") {
@@ -226,6 +222,18 @@ struct ScheduleEditor: View {
     private var fromCurrency: String { accounts.first { $0.id == accountId }?.currency ?? app.homeCurrency }
     private var toCurrency: String { accounts.first { $0.id == counterpartyAccountId }?.currency ?? fromCurrency }
     private var isCrossCurrency: Bool { kind == .transfer && fromCurrency != toCurrency }
+
+    /// Same four groups as the Accounts tab and the entry form.
+    @ViewBuilder
+    private func accountOptions(_ list: [Account]) -> some View {
+        ForEach(list.displayGroups(), id: \.title) { group in
+            Section(group.title) {
+                ForEach(group.accounts) { a in
+                    Label("\(a.name) (\(a.currency))", systemImage: a.kind.sfSymbol).tag(Int64?.some(a.id))
+                }
+            }
+        }
+    }
     private var availableCategories: [LedgerCategory] {
         categories.filter { $0.kind == (kind == .income ? .income : .expense) }
     }
