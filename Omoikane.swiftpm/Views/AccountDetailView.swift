@@ -31,6 +31,18 @@ struct AccountDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task(id: app.dataVersion) { reload() }
         .toolbar {
+            if account?.isArchived == true {
+                ToolbarItem(placement: .topBarTrailing) {
+                    // ⌘U — the same action as the Archived-section swipe
+                    // in AccountsView, reachable from the keyboard here.
+                    Button {
+                        try? app.unarchiveAccount(id: accountId)
+                    } label: {
+                        Label("Unarchive", systemImage: "tray.and.arrow.up")
+                    }
+                    .keyboardShortcut("u", modifiers: .command)
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     startingReconciliation = true
