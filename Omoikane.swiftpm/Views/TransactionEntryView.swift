@@ -50,6 +50,7 @@ struct TransactionEntryView: View {
     @State private var addingPayee = false
     @State private var newPayeeName = ""
     @State private var loanRole: LoanRole? = nil
+    @State private var isEssential: Bool = false
     /// New entries only: also create a schedule that repeats this entry.
     @State private var repeatFrequency: ScheduleFrequency? = nil
     /// Two or more lines = a split; the main Category picker and Amount
@@ -288,6 +289,11 @@ struct TransactionEntryView: View {
             }
 
             Section {
+                if kind == .expense {
+                    Toggle(isOn: $isEssential) {
+                        Label("Essential", systemImage: "lifepreserver")
+                    }
+                }
                 Toggle(kind == .transfer ? "From-side cleared" : "Cleared",
                        isOn: $clearedNow)
                 if kind == .transfer {
@@ -296,7 +302,8 @@ struct TransactionEntryView: View {
             } header: {
                 Text("Status")
             } footer: {
-                Text("Cleared entries are marked with a check in the list and count toward an account's cleared balance. Toggling off here detaches this entry from any reconciled statement it was on.")
+                Text((kind == .expense ? "Essential marks spending you could not avoid in order to get by. " : "")
+                     + "Cleared entries are marked with a check in the list and count toward an account's cleared balance. Toggling off here detaches this entry from any reconciled statement it was on.")
                     .font(.footnote)
             }
 
@@ -487,6 +494,7 @@ struct TransactionEntryView: View {
         counterpartyClearedNow = (tx.counterpartyClearedAt != nil)
         payeeId = tx.payeeId
         loanRole = tx.loanRole
+        isEssential = tx.isEssential
         if let g = tx.splitGroup, let rows = try? app.transactions.listGroup(g), rows.count > 1 {
             splitLines = rows.map { SplitLine(categoryId: $0.categoryId, amountText: formatMinorToText($0.amountMinor, currency: $0.currency)) }
         }
@@ -540,6 +548,7 @@ struct TransactionEntryView: View {
                 template.updatedAt = now
                 template.payeeId = payeeId
                 template.loanRole = loanRole
+                template.isEssential = kind == .expense && isEssential
                 applyClearingToggles(to: &template, now: now)
                 let lines: [Transaction] = isSplit
                     ? splitLines.map { line in
@@ -567,6 +576,7 @@ struct TransactionEntryView: View {
                 updated.updatedAt = now
                 updated.payeeId = payeeId
                 updated.loanRole = loanRole
+                updated.isEssential = kind == .expense && isEssential
                 applyClearingToggles(to: &updated, now: now)
                 try app.updateTransaction(updated)
             } else {
@@ -587,6 +597,7 @@ struct TransactionEntryView: View {
                 )
                 tx.payeeId = payeeId
                 tx.loanRole = loanRole
+                tx.isEssential = kind == .expense && isEssential
                 applyClearingToggles(to: &tx, now: now)
                 try app.addTransaction(tx)
             }
@@ -621,6 +632,7 @@ struct TransactionEntryView: View {
                 clearedNow = fromAccount?.clearsEntriesByDefault ?? false
                 payeeId = nil
                 loanRole = nil
+                isEssential = false
                 repeatFrequency = nil
                 splitLines = []
                 focusedField = nil

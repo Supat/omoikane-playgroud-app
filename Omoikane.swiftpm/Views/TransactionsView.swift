@@ -496,6 +496,12 @@ struct AccountTransactionsView: View {
                             .font(.caption)
                             .accessibilityLabel("Part of a split")
                     }
+                    if tx.isEssential {
+                        Image(systemName: "lifepreserver")
+                            .foregroundStyle(.orange)
+                            .font(.caption)
+                            .accessibilityLabel("Essential")
+                    }
                     Text(cat?.name ?? "—").font(.body)
                 }
                 HStack(spacing: 6) {

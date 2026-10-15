@@ -170,6 +170,8 @@ struct Transaction: Identifiable, Hashable {
     var splitGroup: Int64? = nil
     var payeeId: Int64? = nil
     var loanRole: LoanRole? = nil
+    /// Could not be avoided in order to get by (rent, utilities, medicine).
+    var isEssential: Bool = false
 
     /// Amount with sign — useful for net-flow math (income positive, expense negative).
     var signedAmountMinor: Int64 {
