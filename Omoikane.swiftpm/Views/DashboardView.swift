@@ -270,10 +270,10 @@ struct DashboardView: View {
                     .foregroundStyle(.red.gradient)
                 }
                 .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: 6)) { _ in
+                    AxisMarks(values: .stride(by: .month)) { _ in
                         AxisGridLine()
                         AxisTick()
-                        AxisValueLabel(format: .dateTime.month(.abbreviated).year(.twoDigits))
+                        AxisValueLabel(format: .dateTime.month(.abbreviated).year())
                     }
                 }
                 .frame(height: 220)

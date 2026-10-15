@@ -39,10 +39,11 @@ struct ReportsView: View {
                         }
                         // A date axis thins its own labels: "Oct 25", "Jan 26"…
                         .chartXAxis {
-                            AxisMarks(values: .automatic(desiredCount: min(trendRows.count, 8))) { _ in
+                            // One mark per month, thinned so at most ~8 labels show.
+                            AxisMarks(values: .stride(by: .month, count: max(1, trendRows.count / 8))) { _ in
                                 AxisGridLine()
                                 AxisTick()
-                                AxisValueLabel(format: .dateTime.month(.abbreviated).year(.twoDigits))
+                                AxisValueLabel(format: .dateTime.month(.abbreviated).year())
                             }
                         }
                         .frame(height: 240)
