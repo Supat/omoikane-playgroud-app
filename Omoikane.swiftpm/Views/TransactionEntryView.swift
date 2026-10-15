@@ -122,9 +122,11 @@ struct TransactionEntryView: View {
                 HStack {
                     if isSplit {
                         Spacer()
-                        Text(formatMinorToText(splitTotalMinor, currency: fromCurrency))
+                        Text(NumberPadField.grouped(formatMinorToText(splitTotalMinor, currency: fromCurrency)))
                             .moneyStyle()
                             .font(.largeTitle)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
                             .accessibilityLabel("Total of split lines")
                     } else {
                         NumberPadField(

@@ -177,6 +177,11 @@ struct NumberPadField: UIViewRepresentable {
         tf.placeholder = placeholder
         tf.font = font
         tf.adjustsFontForContentSizeCategory = true
+        // Long amounts shrink rather than push the row's siblings off screen.
+        tf.adjustsFontSizeToFitWidth = true
+        tf.minimumFontSize = 11
+        tf.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        tf.setContentHuggingPriority(.defaultLow, for: .horizontal)
         tf.textAlignment = alignment
         tf.text = Self.grouped(text)
         tf.delegate = context.coordinator
