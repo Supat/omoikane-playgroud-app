@@ -96,7 +96,7 @@ final class CategoryStore {
         }
         return (transactions: try count("SELECT COUNT(*) FROM transactions WHERE category_id = ?;"),
                 children:     try count("SELECT COUNT(*) FROM categories WHERE parent_id = ?;"),
-                schedules:    try count("SELECT COUNT(*) FROM schedules WHERE category_id = ?;"))
+                schedules:    try count("SELECT COUNT(*) FROM schedules WHERE category_id = ?1 OR interest_category_id = ?1;"))
     }
 
     /// Hard delete. SQLite FK enforcement (`PRAGMA foreign_keys = ON`) will

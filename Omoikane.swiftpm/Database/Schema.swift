@@ -29,7 +29,7 @@ enum BalanceSQL {
 }
 
 enum Schema {
-    static let latestVersion = 10
+    static let latestVersion = 11
 
     static func migrate(_ db: Database) throws {
         try db.exec("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY);")
@@ -105,6 +105,12 @@ enum Schema {
             try db.transaction {
                 try migrateToV10(db)
                 try db.exec("INSERT INTO schema_version(version) VALUES (10);")
+            }
+        }
+        if current < 11 {
+            try db.transaction {
+                try migrateToV11(db)
+                try db.exec("INSERT INTO schema_version(version) VALUES (11);")
             }
         }
     }
@@ -605,5 +611,13 @@ extension Schema {
         try db.exec("DROP TABLE accounts;")
         try db.exec("ALTER TABLE accounts_v10 RENAME TO accounts;")
         try db.exec("CREATE INDEX idx_acc_archived ON accounts(is_archived, sort_order);")
+    }
+
+    /// V11: a scheduled repayment (transfer into a liability) carries its
+    /// interest; `postDue` posts the transfer and an interest expense as one
+    /// split group, the same shape the entry form writes.
+    static func migrateToV11(_ db: Database) throws {
+        try db.exec("ALTER TABLE schedules ADD COLUMN interest_minor INTEGER NOT NULL DEFAULT 0;")
+        try db.exec("ALTER TABLE schedules ADD COLUMN interest_category_id INTEGER REFERENCES categories(id);")
     }
 }

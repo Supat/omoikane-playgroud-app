@@ -67,6 +67,18 @@ enum AccountKind: String, CaseIterable, Codable, Hashable {
         }
     }
     static let displayGroups = ["Payment Accounts", "Credit Cards", "Assets", "Liabilities"]
+
+    /// What a transfer between these kinds amounts to, nil for an ordinary
+    /// transfer. Shown on schedule rows and in the Repeat footer.
+    static func transferRole(from: AccountKind, to: AccountKind) -> String? {
+        switch (from, to) {
+        case (_, .asset):     return "Asset purchase"
+        case (.asset, _):     return "Asset sale"
+        case (.liability, _): return "Borrowing"
+        case (_, .liability): return "Repayment"
+        default:              return nil
+        }
+    }
 }
 
 /// Renamed from `Category` to avoid clash with the ObjC-runtime `Category`
@@ -190,6 +202,10 @@ struct Schedule: Identifiable, Hashable {
     /// Anchor for monthly/yearly cadence (1...31). Kept separately so a
     /// schedule on the 31st survives short months.
     var dayOfMonth: Int? = nil
+    /// Repayment schedules only: interest posted alongside the transfer as
+    /// an expense in `interestCategoryId`, grouped with it.
+    var interestMinor: Int64 = 0
+    var interestCategoryId: Int64? = nil
 }
 
 /// Which leg of a transaction is being cleared. For non-transfers there is

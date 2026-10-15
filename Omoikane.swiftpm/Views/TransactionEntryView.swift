@@ -309,7 +309,7 @@ struct TransactionEntryView: View {
                     }
                 } footer: {
                     if repeatFrequency != nil {
-                        Text("Also creates a schedule that posts this entry again every period, starting with the next one. Manage schedules in Settings.")
+                        Text("Also creates a \(repeatSubject) schedule that posts it again every period, starting with the next one. Manage schedules in Settings.")
                             .font(.footnote)
                     }
                 }
@@ -451,6 +451,14 @@ struct TransactionEntryView: View {
 
     /// Not tied to the target account's kind: once an interest row exists,
     /// re-pointing the transfer must not silently drop it.
+    /// "repayment (with interest)", "asset purchase", "transfer", "expense" for the Repeat footer.
+    private var repeatSubject: String {
+        guard kind == .transfer else { return kind.displayName.lowercased() }
+        let role = (fromAccount.flatMap { f in toAccount.map { AccountKind.transferRole(from: f.kind, to: $0.kind) } } ?? nil)
+            ?? "transfer"
+        return role.lowercased() + (interestMinor > 0 ? " (with interest)" : "")
+    }
+
     private var interestMinor: Int64 {
         guard kind == .transfer else { return 0 }
         return Money.parseMinor(interestText, currency: fromCurrency) ?? 0
@@ -688,7 +696,9 @@ struct TransactionEntryView: View {
                     note: note.isEmpty ? nil : note, frequency: freq, interval: 1,
                     nextDue: ScheduleStore.advance(occurredOn, frequency: freq, interval: 1),
                     endOn: nil,
-                    isEssential: kind == .expense && isEssential
+                    isEssential: kind == .expense && isEssential,
+                    interestMinor: interestMinor,
+                    interestCategoryId: interestMinor > 0 ? interestCategoryId : nil
                 )
                 try app.addSchedule(sc)
             }

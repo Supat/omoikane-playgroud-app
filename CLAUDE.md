@@ -73,7 +73,7 @@ conditions*. Three reasons we went with raw `import SQLite3`:
 
 ### Schema (`Omoikane.swiftpm/Database/Schema.swift`)
 
-`Schema.latestVersion` is **10**. Migrations are applied in order by `Schema.migrate`, each in its own transaction, tracked in `schema_version`.
+`Schema.latestVersion` is **11**. Migrations are applied in order by `Schema.migrate`, each in its own transaction, tracked in `schema_version`.
 
 - `transactions` — append-heavy fact table. Money in **minor units** as `Int64`
   (yen as integer; multiply by 100 for currencies with sub-units). Derived
@@ -136,6 +136,12 @@ conditions*. Three reasons we went with raw `import SQLite3`:
   source is an asset (`adjustBalance(…, to: 0, on:)` writes the rest off
   under Balance adjustment). The Accounts tab shows a home-currency net
   worth and per-group totals.
+- V11: `schedules.interest_minor` + `interest_category_id`. A scheduled
+  repayment posts the transfer and its interest expense as one split
+  group (`ScheduleStore.postDue`), the shape the entry form writes; the
+  Repeat picker and the schedule editor both take the interest. Schedule
+  rows and the Repeat footer name the role via
+  `AccountKind.transferRole(from:to:)`.
 - `Schema.rebuildSummaries(_:)` — recompute the summary table from scratch.
   Exposed in Settings as a self-heal / sanity check.
 
@@ -143,7 +149,7 @@ conditions*. Three reasons we went with raw `import SQLite3`:
 
 ```
 Database/Database.swift          sqlite3 wrapper, WAL/pragmas, prepared statements
-Database/Schema.swift            DDL + triggers + migrations V1–V10
+Database/Schema.swift            DDL + triggers + migrations V1–V11
 Database/TransactionStore.swift  CRUD on transactions
 Database/CategoryAccountStore.swift  CRUD on categories + accounts, balances
 Database/SummaryStore.swift      reads monthly_summaries for dashboard/reports
@@ -239,8 +245,8 @@ so it stays as-is. If you add new top-level types, sanity-check against
   shape can't be served by `monthly_summaries`, add a covering index on
   `transactions` first; only add a new materialized table if profiling shows
   the index isn't enough.
-- **Adding a column to `transactions`** → write a `migrateToV11` in
-  `Schema.swift`, add the `current < 11` block to `Schema.migrate`, bump
+- **Adding a column to `transactions`** → write a `migrateToV12` in
+  `Schema.swift`, add the `current < 12` block to `Schema.migrate`, bump
   `latestVersion`, and update both insert/update bind sites in `TransactionStore`.
   If the column feeds `monthly_summaries`, also extend the `WHEN` clause of the
   `tx_au` trigger.

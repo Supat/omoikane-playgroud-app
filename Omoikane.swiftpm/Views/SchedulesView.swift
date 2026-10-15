@@ -64,7 +64,7 @@ struct SchedulesView: View {
                             .font(.caption)
                             .accessibilityLabel("Essential")
                     }
-                    Text(sc.kind == .transfer ? "Transfer" : (categories[sc.categoryId]?.name ?? sc.kind.displayName))
+                    Text(sc.kind == .transfer ? transferLabel(sc) : (categories[sc.categoryId]?.name ?? sc.kind.displayName))
                 }
                 Text("\(acct?.name ?? "—") · \(sc.cadenceLabel) · next \(Formatters.mediumDate.string(from: sc.nextDue))")
                     .font(.caption)
@@ -74,6 +74,13 @@ struct SchedulesView: View {
             Formatters.moneyText(sc.amountMinor, currency: acct?.currency ?? app.homeCurrency)
                 .monospacedDigit()
         }
+    }
+
+    /// "Repayment + interest", "Asset purchase", or plain "Transfer".
+    private func transferLabel(_ sc: Schedule) -> String {
+        let role = (accounts[sc.accountId].flatMap { f in sc.counterpartyAccountId.flatMap { accounts[$0] }.map { AccountKind.transferRole(from: f.kind, to: $0.kind) } } ?? nil)
+            ?? "Transfer"
+        return sc.interestMinor > 0 ? role + " + interest" : role
     }
 
     private func reload() {
@@ -120,6 +127,8 @@ struct ScheduleEditor: View {
     @State private var hasEnd = false
     @State private var endOn = Date()
     @State private var isEssential = false
+    @State private var interestText = ""
+    @State private var interestCategoryId: Int64? = nil
 
     @State private var categories: [LedgerCategory] = []
     @State private var accounts: [Account] = []
@@ -149,6 +158,26 @@ struct ScheduleEditor: View {
                         if isCrossCurrency {
                             LabeledContent("To amount") {
                                 NumberPadField(text: $counterpartyAmountText, placeholder: "0", alignment: .right)
+                            }
+                        }
+                        if toAccount?.kind == .liability || !interestText.isEmpty {
+                            LabeledContent("Interest") {
+                                NumberPadField(text: $interestText, placeholder: "0", alignment: .right)
+                            }
+                            if interestMinor > 0 {
+                                VStack(alignment: .leading, spacing: 0) {
+                                    HStack {
+                                        Text("Interest category")
+                                        Spacer()
+                                        Text(interestCategoryId.flatMap { id in categories.first { $0.id == id }?.displayPath(in: categories) } ?? "Choose a category")
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.top, 10)
+                                    CategoryGlyphPicker(categories: categories.filter { $0.kind == .expense }, selection: $interestCategoryId)
+                                }
+                                .listRowInsets(EdgeInsets())
                             }
                         }
                     } else {
@@ -219,8 +248,10 @@ struct ScheduleEditor: View {
         }
     }
 
+    private var toAccount: Account? { accounts.first { $0.id == counterpartyAccountId } }
     private var fromCurrency: String { accounts.first { $0.id == accountId }?.currency ?? app.homeCurrency }
-    private var toCurrency: String { accounts.first { $0.id == counterpartyAccountId }?.currency ?? fromCurrency }
+    private var toCurrency: String { toAccount?.currency ?? fromCurrency }
+    private var interestMinor: Int64 { kind == .transfer ? (Money.parseMinor(interestText, currency: fromCurrency) ?? 0) : 0 }
     private var isCrossCurrency: Bool { kind == .transfer && fromCurrency != toCurrency }
 
     /// Same four groups as the Accounts tab and the entry form.
@@ -246,7 +277,7 @@ struct ScheduleEditor: View {
         if kind == .transfer {
             guard let cp = counterpartyAccountId, cp != accountId else { return false }
             if isCrossCurrency, (Money.parseMinor(counterpartyAmountText, currency: toCurrency) ?? 0) <= 0 { return false }
-            return true
+            return interestMinor == 0 || interestCategoryId != nil
         }
         return categoryId != nil
     }
@@ -272,6 +303,10 @@ struct ScheduleEditor: View {
             hasEnd = sc.endOn != nil
             endOn = sc.endOn ?? sc.nextDue
             isEssential = sc.isEssential
+            if sc.interestMinor > 0 {
+                interestText = Money.formatMinorText(sc.interestMinor, currency: fromCurrency)
+                interestCategoryId = sc.interestCategoryId
+            }
         } else {
             accountId = accounts.first?.id
         }
@@ -301,7 +336,9 @@ struct ScheduleEditor: View {
             nextDue: nextDue,
             endOn: hasEnd ? endOn : nil,
             isEssential: kind == .expense && isEssential,
-            dayOfMonth: Calendar.current.component(.day, from: nextDue)
+            dayOfMonth: Calendar.current.component(.day, from: nextDue),
+            interestMinor: interestMinor,
+            interestCategoryId: interestMinor > 0 ? interestCategoryId : nil
         )
         do {
             if schedule == nil { try app.addSchedule(sc) } else { try app.updateSchedule(sc) }

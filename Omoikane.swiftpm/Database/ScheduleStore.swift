@@ -10,7 +10,8 @@ final class ScheduleStore {
 
     private static let columns = """
         SELECT id, kind, amount_minor, category_id, account_id, counterparty_account_id,
-               counterparty_amount_minor, payee_id, note, frequency, interval, next_due, end_on, is_essential, day_of_month
+               counterparty_amount_minor, payee_id, note, frequency, interval, next_due, end_on, is_essential, day_of_month,
+               interest_minor, interest_category_id
     """
 
     func list() throws -> [Schedule] {
@@ -24,8 +25,9 @@ final class ScheduleStore {
     func insert(_ sc: Schedule) throws -> Int64 {
         let s = try db.prepare("""
             INSERT INTO schedules (kind, amount_minor, category_id, account_id, counterparty_account_id,
-                                   counterparty_amount_minor, payee_id, note, frequency, interval, next_due, end_on, is_essential, day_of_month)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?);
+                                   counterparty_amount_minor, payee_id, note, frequency, interval, next_due, end_on, is_essential, day_of_month,
+                                   interest_minor, interest_category_id)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
         """)
         bind(s, sc)
         try s.step()
@@ -37,11 +39,12 @@ final class ScheduleStore {
             UPDATE schedules
                SET kind = ?, amount_minor = ?, category_id = ?, account_id = ?, counterparty_account_id = ?,
                    counterparty_amount_minor = ?, payee_id = ?, note = ?, frequency = ?, interval = ?,
-                   next_due = ?, end_on = ?, is_essential = ?, day_of_month = ?
+                   next_due = ?, end_on = ?, is_essential = ?, day_of_month = ?,
+                   interest_minor = ?, interest_category_id = ?
              WHERE id = ?;
         """)
         bind(s, sc)
-        s.bind(sc.id, at: 15)
+        s.bind(sc.id, at: 17)
         try s.step()
     }
 
@@ -87,7 +90,19 @@ final class ScheduleStore {
                     tx.payeeId = sc.payeeId
                     tx.isEssential = sc.kind == .expense && sc.isEssential
                     if acct?.clearsEntriesByDefault == true { tx.clearedAt = now }
-                    _ = try transactions.insert(tx)
+                    if sc.kind == .transfer, sc.interestMinor > 0, let icat = sc.interestCategoryId {
+                        // Same shape as the entry form: transfer + interest expense in one group.
+                        var interest = tx
+                        interest.kind = .expense
+                        interest.amountMinor = sc.interestMinor
+                        interest.categoryId = icat
+                        interest.counterpartyAccountId = nil
+                        interest.counterpartyAmountMinor = nil
+                        interest.note = (tx.note.map { $0 + " · " } ?? "") + "Interest"
+                        try transactions.replace(groupId: nil, singleId: nil, with: [tx, interest])
+                    } else {
+                        _ = try transactions.insert(tx)
+                    }
                     posted += 1
                     sc.nextDue = Self.advance(sc.nextDue, frequency: sc.frequency, interval: sc.interval, dayOfMonth: sc.dayOfMonth)
                 }
@@ -130,6 +145,8 @@ final class ScheduleStore {
         s.bind(sc.endOn.map { Int64($0.dayKey) }, at: 12)
         s.bind(sc.isEssential ? 1 : 0, at: 13)
         s.bind(Int64(sc.dayOfMonth ?? Calendar.current.component(.day, from: sc.nextDue)), at: 14)
+        s.bind(sc.kind == .transfer ? sc.interestMinor : 0, at: 15)
+        s.bind(sc.kind == .transfer ? sc.interestCategoryId : nil, at: 16)
     }
 
     private static func read(_ s: Statement) -> Schedule {
@@ -148,7 +165,9 @@ final class ScheduleStore {
             nextDue: Date.from(dayKey: s.int(11)),
             endOn: s.optionalInt64(12).map { Date.from(dayKey: Int($0)) },
             isEssential: s.int(13) != 0,
-            dayOfMonth: s.optionalInt64(14).map(Int.init)
+            dayOfMonth: s.optionalInt64(14).map(Int.init),
+            interestMinor: s.int64(15),
+            interestCategoryId: s.optionalInt64(16)
         )
     }
 }
