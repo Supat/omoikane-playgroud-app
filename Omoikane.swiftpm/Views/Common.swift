@@ -275,3 +275,92 @@ struct CapsuleProgressStyle: ProgressViewStyle {
 extension ProgressViewStyle where Self == CapsuleProgressStyle {
     static func capsule(_ tint: Color) -> CapsuleProgressStyle { CapsuleProgressStyle(tint: tint) }
 }
+
+/// One budget line: name with kind icon, amounts, optional caption, capsule.
+/// Expense over budget reads red; income target reached reads green.
+struct BudgetRowView: View {
+    var line: BudgetLine
+    var currency: String
+    var showsCaption: Bool = false
+    var color: Color? = nil
+
+    private var bad: Bool { !line.isIncome && line.over }
+    private var good: Bool { line.isIncome && line.reached }
+    private var tone: Color { bad ? .red : (good ? .green : (color ?? .accentColor)) }
+    private var percent: Int { Int(line.fraction * 100) }
+
+    private var caption: String {
+        let diff = Formatters.money(abs(line.usedMinor - line.budgetMinor), currency: currency)
+        if line.isIncome { return line.reached ? "target reached, \(diff) above" : "\(diff) short" }
+        return line.over ? "over by \(diff)" : "\(diff) left"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Label(line.category.name, systemImage: line.isIncome ? "arrow.down.circle" : "arrow.up.circle")
+                Spacer()
+                if showsCaption {
+                    Text(caption)
+                        .moneyStyle()
+                        .font(.caption)
+                        .foregroundStyle(bad ? .red : (good ? .green : .secondary))
+                }
+                Text("\(Formatters.money(line.usedMinor, currency: currency)) / \(Formatters.money(line.budgetMinor, currency: currency))")
+                    .moneyStyle()
+                    .font(.subheadline)
+                    .foregroundStyle(bad ? .red : (showsCaption ? .primary : .secondary))
+            }
+            ProgressView(value: line.fraction)
+                .progressViewStyle(.capsule(tone))
+                .accessibilityLabel(line.isIncome ? "\(line.category.name) income target" : "\(line.category.name) budget")
+                .accessibilityValue(line.isIncome
+                    ? (line.reached ? "Target reached" : "\(percent) percent of target")
+                    : (line.over ? "Over budget" : "\(percent) percent used"))
+        }
+    }
+}
+
+/// A used-against-capacity bar: label, amounts or percentage, capsule that
+/// turns orange past 85% and red when over, optional caption beneath.
+struct LimitBar: View {
+    enum Trailing { case amounts, percent }
+    var label: String
+    var used: Int64
+    var capacity: Int64
+    var currency: String
+    var trailing: Trailing = .amounts
+    var caption: String? = nil
+    var titleFont: Font = .subheadline
+    var accessibilityLabel: String
+
+    private var share: Double { capacity > 0 ? Double(used) / Double(capacity) : 0 }
+    private var over: Bool { used > capacity }
+    private var tone: Color { over ? .red : (share > 0.85 ? .orange : .accentColor) }
+    private var percent: Int { Int((share * 100).rounded()) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(label).font(titleFont)
+                Spacer()
+                Text(trailing == .percent
+                     ? "\(percent)%"
+                     : "\(Formatters.money(used, currency: currency)) / \(Formatters.money(capacity, currency: currency))")
+                    .moneyStyle()
+                    .font(.subheadline)
+                    .foregroundStyle(over ? .red : (share > 0.85 && trailing == .percent ? .orange : .secondary))
+            }
+            ProgressView(value: min(share, 1))
+                .progressViewStyle(.capsule(tone))
+                .accessibilityLabel(accessibilityLabel)
+                .accessibilityValue(over ? "Over the limit" : "\(percent) percent used")
+            if let caption {
+                Text(caption)
+                    .moneyStyle()
+                    .font(.caption)
+                    .foregroundStyle(over ? .red : .secondary)
+            }
+        }
+    }
+}

@@ -319,3 +319,41 @@ struct CurrencyRate: Identifiable, Hashable {
     var updatedAt: Date
     var id: String { currency }
 }
+
+/// One category measured against its effective budget over a window.
+/// `usedMinor` is spend for expense categories and received income for
+/// income categories, in home-currency minor units.
+struct BudgetLine: Identifiable, Hashable {
+    var category: LedgerCategory
+    var budgetMinor: Int64
+    var usedMinor: Int64
+    var id: Int64 { category.id }
+    var isIncome: Bool { category.kind == .income }
+    var over: Bool { usedMinor > budgetMinor }
+    var reached: Bool { usedMinor >= budgetMinor }
+    var fraction: Double { Double(min(usedMinor, budgetMinor)) / Double(max(budgetMinor, 1)) }
+}
+
+/// The one place budgets are measured. Dashboard (one month) and Reports
+/// (a range) both call `lines`; totals take parent rows only so nothing is
+/// counted twice (a parent's effective budget already covers its children).
+enum BudgetMath {
+    static func lines(categories: [LedgerCategory],
+                      expense: [GroupedSummary], income: [GroupedSummary],
+                      months: Int,
+                      sumToHome: ([(minor: Int64, currency: String)]) -> Int64) -> [BudgetLine] {
+        categories.compactMap { c in
+            guard let monthly = c.effectiveBudgetMinor(in: categories) else { return nil }
+            let ids = c.familyIds(in: categories)
+            let source = c.kind == .income ? income : expense
+            let used = sumToHome(source.filter { ids.contains($0.keyId) }.map { ($0.totalMinor, $0.currency) })
+            return BudgetLine(category: c, budgetMinor: monthly * Int64(max(months, 1)), usedMinor: used)
+        }
+        .sorted { ($0.isIncome ? 1 : 0, $0.category.name) < ($1.isIncome ? 1 : 0, $1.category.name) }
+    }
+
+    static func totals(_ lines: [BudgetLine], kind: CategoryKind) -> (budget: Int64, used: Int64) {
+        let parents = lines.filter { $0.category.kind == kind && $0.category.parentId == nil }
+        return (parents.reduce(Int64(0)) { $0 + $1.budgetMinor }, parents.reduce(Int64(0)) { $0 + $1.usedMinor })
+    }
+}

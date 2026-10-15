@@ -22,16 +22,7 @@ struct ReportsView: View {
     @State private var totals: SummaryStore.CurrencyTotals = .init()
     @State private var availableCurrencies: [String] = []
     @State private var loans: [TransactionStore.LoanBalance] = []
-    @State private var budgetRows: [BudgetRow] = []
-
-    /// One budgeted category over the selected range: the monthly budget
-    /// times the number of months, against what was actually spent.
-    struct BudgetRow: Identifiable {
-        var category: LedgerCategory
-        var budgetMinor: Int64
-        var spentMinor: Int64
-        var id: Int64 { category.id }
-    }
+    @State private var budgetRows: [BudgetLine] = []
 
     var body: some View {
         ScrollView {
@@ -88,27 +79,12 @@ struct ReportsView: View {
                 if let monthly = app.monthlySpendingLimitMinor, monthly > 0 {
                     let limit = monthly * Int64(monthsBack)
                     let spent = homeExpenseTotal
-                    let over = spent > limit
-                    let share = Double(spent) / Double(limit)
                     section("Spending limit (\(app.homeCurrency), \(monthsBack) month\(monthsBack == 1 ? "" : "s"))") {
-                        HStack {
-                            Text("Spent")
-                            Spacer()
-                            Text("\(Formatters.money(spent, currency: app.homeCurrency)) / \(Formatters.money(limit, currency: app.homeCurrency))")
-                                .moneyStyle()
-                                .font(.subheadline)
-                                .foregroundStyle(over ? .red : .primary)
-                        }
-                        ProgressView(value: min(share, 1))
-                            .progressViewStyle(.capsule(over ? .red : (share > 0.85 ? .orange : .accentColor)))
-                            .accessibilityLabel("Spending against the limit for the range")
-                            .accessibilityValue(over ? "Over the limit" : "\(Int((share * 100).rounded())) percent used")
-                        Text(over
-                             ? "Over the limit by \(Formatters.money(spent - limit, currency: app.homeCurrency)) across the range."
-                             : "\(Formatters.money(limit - spent, currency: app.homeCurrency)) under the limit across the range (\(Formatters.money(monthly, currency: app.homeCurrency)) per month).")
-                            .moneyStyle()
-                            .font(.caption)
-                            .foregroundStyle(over ? .red : .secondary)
+                        LimitBar(label: "Spent", used: spent, capacity: limit, currency: app.homeCurrency,
+                                 caption: spent > limit
+                                    ? "Over the limit by \(Formatters.money(spent - limit, currency: app.homeCurrency)) across the range."
+                                    : "\(Formatters.money(limit - spent, currency: app.homeCurrency)) under the limit across the range (\(Formatters.money(monthly, currency: app.homeCurrency)) per month).",
+                                 accessibilityLabel: "Spending against the limit for the range")
                     }
                 }
 
@@ -118,46 +94,11 @@ struct ReportsView: View {
                             .foregroundStyle(.secondary)
                             .font(.subheadline)
                     } else {
-                        // Totals follow the effective-budget rule: one figure per parent
-                        // (max of its own budget and its sub-categories' total), which every
-                        // parent row already carries; sub-category rows are shown, not summed.
-                        let counted = budgetRows.filter { $0.category.parentId == nil }
-                        let expenseRows = counted.filter { $0.category.kind == .expense }
-                        let incomeRows = counted.filter { $0.category.kind == .income }
-                        let totalBudget = expenseRows.reduce(Int64(0)) { $0 + $1.budgetMinor }
-                        let totalSpent = expenseRows.reduce(Int64(0)) { $0 + $1.spentMinor }
-                        let totalTarget = incomeRows.reduce(Int64(0)) { $0 + $1.budgetMinor }
-                        let totalIncome = incomeRows.reduce(Int64(0)) { $0 + $1.spentMinor }
-                        ForEach(budgetRows) { row in
-                            let isIncome = row.category.kind == .income
-                            let over = row.spentMinor > row.budgetMinor
-                            let reached = row.spentMinor >= row.budgetMinor
-                            let bad = !isIncome && over
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Label(row.category.name, systemImage: isIncome ? "arrow.down.circle" : "arrow.up.circle")
-                                    Spacer()
-                                    Text(isIncome
-                                         ? (reached ? "target reached, \(Formatters.money(row.spentMinor - row.budgetMinor, currency: app.homeCurrency)) above"
-                                                    : "\(Formatters.money(row.budgetMinor - row.spentMinor, currency: app.homeCurrency)) short")
-                                         : (over ? "over by \(Formatters.money(row.spentMinor - row.budgetMinor, currency: app.homeCurrency))"
-                                                 : "\(Formatters.money(row.budgetMinor - row.spentMinor, currency: app.homeCurrency)) left"))
-                                        .moneyStyle()
-                                        .font(.caption)
-                                        .foregroundStyle(bad ? .red : (isIncome && reached ? .green : .secondary))
-                                    Text("\(Formatters.money(row.spentMinor, currency: app.homeCurrency)) / \(Formatters.money(row.budgetMinor, currency: app.homeCurrency))")
-                                        .moneyStyle()
-                                        .font(.subheadline)
-                                        .foregroundStyle(bad ? .red : .primary)
-                                }
-                                ProgressView(value: Double(min(row.spentMinor, row.budgetMinor)), total: Double(max(row.budgetMinor, 1)))
-                                    .progressViewStyle(.capsule(bad ? .red : (isIncome && reached ? .green : .accentColor)))
-                                    .accessibilityLabel(isIncome ? "\(row.category.name) income target" : "\(row.category.name) budget")
-                                    .accessibilityValue(isIncome
-                                        ? (reached ? "Target reached" : "\(Int(Double(row.spentMinor) / Double(max(row.budgetMinor, 1)) * 100)) percent of target")
-                                        : (over ? "Over budget" : "\(Int(Double(row.spentMinor) / Double(max(row.budgetMinor, 1)) * 100)) percent used"))
-                            }
-                            .padding(.vertical, 4)
+                        let (totalBudget, totalSpent) = BudgetMath.totals(budgetRows, kind: .expense)
+                        let (totalTarget, totalIncome) = BudgetMath.totals(budgetRows, kind: .income)
+                        ForEach(budgetRows) { line in
+                            BudgetRowView(line: line, currency: app.homeCurrency, showsCaption: true)
+                                .padding(.vertical, 4)
                         }
                         Divider()
                         if totalBudget > 0 {
@@ -412,15 +353,8 @@ struct ReportsView: View {
             categoryLabels = Dictionary(uniqueKeysWithValues: allCats.map { ($0.id, $0.displayPath(in: allCats)) })
             let spentRows = try app.summaries.byCategory(fromYM: win.start, toYM: win.end, kind: .expense)
             let earnedRows = try app.summaries.byCategory(fromYM: win.start, toYM: win.end, kind: .income)
-            budgetRows = cats.compactMap { c -> BudgetRow? in
-                guard let monthly = c.effectiveBudgetMinor(in: cats) else { return nil }
-                let ids = c.familyIds(in: cats)
-                let spent = app.sumToHome((c.kind == .income ? earnedRows : spentRows)
-                    .filter { ids.contains($0.keyId) }
-                    .map { ($0.totalMinor, $0.currency) })
-                return BudgetRow(category: c, budgetMinor: monthly * Int64(monthsBack), spentMinor: spent)
-            }
-            .sorted { Double($0.spentMinor) / Double(max($0.budgetMinor, 1)) > Double($1.spentMinor) / Double(max($1.budgetMinor, 1)) }
+            budgetRows = BudgetMath.lines(categories: cats, expense: spentRows, income: earnedRows, months: monthsBack, sumToHome: app.sumToHome)
+                .sorted { $0.fraction > $1.fraction }
             // If the chosen filter no longer has data, fall back to all.
             if let c = currencyFilter, !availableCurrencies.contains(c) {
                 currencyFilter = nil

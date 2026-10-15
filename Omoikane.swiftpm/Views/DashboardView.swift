@@ -12,7 +12,7 @@ struct DashboardView: View {
     /// Trend range in months; the bucket (daily/weekly/monthly) follows it.
     @State private var trendMonths: Int = 6
     @State private var trendDaily: [SummaryStore.DayTotal] = []
-    @State private var budgets: [BudgetRow] = []
+    @State private var budgets: [BudgetLine] = []
     @State private var essentialByCurrency: [String: Int64] = [:]
     @State private var dailyTotals: [Int: Int64] = [:]
     @State private var selectedDay: Int? = nil
@@ -33,12 +33,6 @@ struct DashboardView: View {
     @State private var categoryColors: [Int64: Color] = [:]
     @State private var accountsById: [Int64: Account] = [:]
 
-    struct BudgetRow: Identifiable {
-        var category: LedgerCategory
-        var budgetMinor: Int64
-        var spentHome: Int64
-        var id: Int64 { category.id }
-    }
 
     var body: some View {
         ScrollView {
@@ -170,28 +164,12 @@ struct DashboardView: View {
     private var limitSection: some View {
         if let limit = app.monthlySpendingLimitMinor, limit > 0 {
             let spent = homeExpense
-            let over = spent > limit
-            let share = Double(spent) / Double(limit)
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("Spending limit (\(app.homeCurrency))").font(.headline)
-                    Spacer()
-                    Text("\(Formatters.money(spent, currency: app.homeCurrency)) / \(Formatters.money(limit, currency: app.homeCurrency))")
-                        .moneyStyle()
-                        .font(.subheadline)
-                        .foregroundStyle(over ? .red : .secondary)
-                }
-                ProgressView(value: min(share, 1))
-                    .progressViewStyle(.capsule(over ? .red : (share > 0.85 ? .orange : .accentColor)))
-                    .accessibilityLabel("Spending against the monthly limit")
-                    .accessibilityValue(over ? "Over the limit" : "\(Int((share * 100).rounded())) percent used")
-                Text(over
-                     ? "Over the limit by \(Formatters.money(spent - limit, currency: app.homeCurrency))."
-                     : "\(Formatters.money(limit - spent, currency: app.homeCurrency)) left this month.")
-                    .moneyStyle()
-                    .font(.caption)
-                    .foregroundStyle(over ? .red : .secondary)
-            }
+            LimitBar(label: "Spending limit (\(app.homeCurrency))", used: spent, capacity: limit, currency: app.homeCurrency,
+                     caption: spent > limit
+                        ? "Over the limit by \(Formatters.money(spent - limit, currency: app.homeCurrency))."
+                        : "\(Formatters.money(limit - spent, currency: app.homeCurrency)) left this month.",
+                     titleFont: .headline,
+                     accessibilityLabel: "Spending against the monthly limit")
             .padding(12)
             .glassCard(cornerRadius: 12)
         }
@@ -249,7 +227,7 @@ struct DashboardView: View {
             if let pid = r.category.parentId, expenseRows.contains(where: { $0.category.id == pid }) { continue }
             let name = r.category.parentId.flatMap { categoryNames[$0] } ?? r.category.name   // parent-level label
             let color = (r.category.parentId.flatMap { categoryColors[$0] }) ?? r.category.ownColor ?? .accentColor
-            byParent[parentId, default: (name, color, 0)].amount += r.spentHome
+            byParent[parentId, default: (name, color, 0)].amount += r.usedMinor
         }
         return byParent.values
             .filter { $0.amount > 0 }
@@ -281,30 +259,8 @@ struct DashboardView: View {
                     StackedShareBar(slices: spendSlices, capacity: capacity, remainderLabel: "Left", overflowLabel: "Over")
                     Divider()
                 }
-                ForEach(budgets) { row in
-                    let limit = row.budgetMinor
-                    let isIncome = row.category.kind == .income
-                    // Expense: past the budget is bad (red). Income: reaching the target is good (green).
-                    let over = row.spentHome > limit
-                    let base = row.category.ownColor ?? .accentColor
-                    let tone: Color = isIncome ? (row.spentHome >= limit ? .green : base) : (over ? .red : base)
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Label(row.category.name, systemImage: isIncome ? "arrow.down.circle" : "arrow.up.circle")
-                                .labelStyle(.titleAndIcon)
-                            Spacer()
-                            Text("\(Formatters.money(row.spentHome, currency: app.homeCurrency)) / \(Formatters.money(limit, currency: app.homeCurrency))")
-                                .moneyStyle()
-                                .font(.subheadline)
-                                .foregroundStyle(!isIncome && over ? .red : .secondary)
-                        }
-                        ProgressView(value: Double(min(row.spentHome, limit)), total: Double(max(limit, 1)))
-                            .progressViewStyle(.capsule(tone))
-                            .accessibilityLabel(isIncome ? "\(row.category.name) income target" : "\(row.category.name) budget")
-                            .accessibilityValue(isIncome
-                                ? (row.spentHome >= limit ? "Target reached" : "\(Int(Double(row.spentHome) / Double(max(limit, 1)) * 100)) percent of target")
-                                : (over ? "Over budget" : "\(Int(Double(row.spentHome) / Double(max(limit, 1)) * 100)) percent"))
-                    }
+                ForEach(budgets) { line in
+                    BudgetRowView(line: line, currency: app.homeCurrency, color: line.category.ownColor)
                 }
             }
             .padding(12)
@@ -567,14 +523,7 @@ struct DashboardView: View {
             loadDayRows()
             let cats = try app.categories.list()
             let incomeByCategory = try app.summaries.byCategory(fromYM: ymKey, toYM: ymKey, kind: .income)
-            budgets = cats.compactMap { c -> BudgetRow? in
-                guard let budget = c.effectiveBudgetMinor(in: cats) else { return nil }
-                let ids = c.familyIds(in: cats)
-                let source = c.kind == .income ? incomeByCategory : byCategory
-                let spent = app.sumToHome(source.filter { ids.contains($0.keyId) }.map { ($0.totalMinor, $0.currency) })
-                return BudgetRow(category: c, budgetMinor: budget, spentHome: spent)
-            }
-            .sorted { ($0.category.kind == .expense ? 0 : 1, $0.category.name) < ($1.category.kind == .expense ? 0 : 1, $1.category.name) }
+            budgets = BudgetMath.lines(categories: cats, expense: byCategory, income: incomeByCategory, months: 1, sumToHome: app.sumToHome)
         } catch {
             print("Dashboard reload error: \(error)")
         }
