@@ -174,8 +174,21 @@ struct ReconciliationSheet: View {
         let cleared = clearedTotalForTickedRows
         let diff = target - cleared
 
+        // How far the ticked rows have moved the cleared balance toward the
+        // statement figure. 1.0 (green) means reconciled.
+        let progress: Double = {
+            guard stmtSigned != openingCleared else { return diff == 0 ? 1 : 0 }
+            let span = Double(stmtSigned - openingCleared)
+            return min(max(Double(cleared) / span, 0), 1)
+        }()
+
         return VStack(spacing: 8) {
             Divider()
+            ProgressView(value: progress)
+                .progressViewStyle(.capsule(diff == 0 ? .green : .orange))
+                .padding(.horizontal)
+                .accessibilityLabel("Reconciliation progress")
+                .accessibilityValue(diff == 0 ? "Reconciled" : "\(Int((progress * 100).rounded())) percent of the statement balance cleared")
             HStack {
                 stat("Statement", Formatters.money(stmtSigned, currency: account.currency))
                 Divider().frame(height: 28)
