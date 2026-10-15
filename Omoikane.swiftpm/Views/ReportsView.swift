@@ -9,7 +9,10 @@ struct ReportsView: View {
     /// pinning it elsewhere makes every section treat that month as "now".
     @State private var anchorYM: Int = YearMonth.current()
     private var isPinned: Bool { anchorYM != YearMonth.current() }
-    @State private var kind: TransactionKind = .expense
+    /// Expense and Income read one kind; Net is income minus expense, so
+    /// expense rows are negated and merged with income rows.
+    enum ReportMode: Hashable { case expense, income, net }
+    @State private var mode: ReportMode = .expense
     /// nil = "All currencies → home rollup". Non-nil = isolate one currency.
     @State private var currencyFilter: String? = nil
     @State private var byMonth: [GroupedSummary] = []
@@ -182,15 +185,16 @@ struct ReportsView: View {
         .task(id: app.rateVersion) { reload() }
         .onChange(of: monthsBack)     { _, _ in reload() }
         .onChange(of: anchorYM)       { _, _ in reload() }
-        .onChange(of: kind)           { _, _ in reload() }
+        .onChange(of: mode)           { _, _ in reload() }
         .onChange(of: currencyFilter) { _, _ in reload() }
     }
 
     private var controls: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Picker("Kind", selection: $kind) {
-                Text("Expense").tag(TransactionKind.expense)
-                Text("Income").tag(TransactionKind.income)
+            Picker("Kind", selection: $mode) {
+                Text("Expense").tag(ReportMode.expense)
+                Text("Income").tag(ReportMode.income)
+                Text("Net").tag(ReportMode.net)
             }
             .pickerStyle(.segmented)
 
@@ -311,7 +315,8 @@ struct ReportsView: View {
         }
         return bucket
             .map { CategoryRow(name: $0.key, minor: $0.value) }
-            .sorted { $0.minor > $1.minor }
+            // Net mixes signs: rank by magnitude so the biggest movers lead.
+            .sorted { mode == .net ? abs($0.minor) > abs($1.minor) : $0.minor > $1.minor }
     }
 
     // MARK: - Logic
@@ -319,11 +324,28 @@ struct ReportsView: View {
     private func reload() {
         let win = YearMonth.window(endingAt: anchorYM, monthsBack: monthsBack)
         do {
-            byMonth     = try app.summaries.byMonth(fromYM: win.start, toYM: win.end, kind: kind, currency: currencyFilter)
-            byDay       = trendUnit == .month ? [] : try app.summaries.dailyTotals(fromYM: win.start, toYM: win.end, kind: kind)
-            byCategory  = try app.summaries.byCategory(fromYM: win.start, toYM: win.end, kind: kind, currency: currencyFilter)
-            byAccount   = try app.summaries.byAccount(fromYM: win.start, toYM: win.end, kind: kind)
-                .filter { currencyFilter == nil || $0.currency == currencyFilter }
+            switch mode {
+            case .expense, .income:
+                let kind: TransactionKind = mode == .income ? .income : .expense
+                byMonth     = try app.summaries.byMonth(fromYM: win.start, toYM: win.end, kind: kind, currency: currencyFilter)
+                byDay       = trendUnit == .month ? [] : try app.summaries.dailyTotals(fromYM: win.start, toYM: win.end, kind: kind)
+                byCategory  = try app.summaries.byCategory(fromYM: win.start, toYM: win.end, kind: kind, currency: currencyFilter)
+                byAccount   = try app.summaries.byAccount(fromYM: win.start, toYM: win.end, kind: kind)
+                    .filter { currencyFilter == nil || $0.currency == currencyFilter }
+            case .net:
+                func negated(_ rows: [GroupedSummary]) -> [GroupedSummary] {
+                    rows.map { var r = $0; r.totalMinor = -r.totalMinor; return r }
+                }
+                byMonth = try app.summaries.byMonth(fromYM: win.start, toYM: win.end, kind: .income, currency: currencyFilter)
+                    + negated(try app.summaries.byMonth(fromYM: win.start, toYM: win.end, kind: .expense, currency: currencyFilter))
+                byDay = trendUnit == .month ? [] :
+                    try app.summaries.dailyTotals(fromYM: win.start, toYM: win.end, kind: .income)
+                    + (try app.summaries.dailyTotals(fromYM: win.start, toYM: win.end, kind: .expense)).map { var d = $0; d.minor = -d.minor; return d }
+                byCategory = try app.summaries.byCategory(fromYM: win.start, toYM: win.end, kind: .income, currency: currencyFilter)
+                    + negated(try app.summaries.byCategory(fromYM: win.start, toYM: win.end, kind: .expense, currency: currencyFilter))
+                byAccount = try app.summaries.netByAccount(fromYM: win.start, toYM: win.end)
+                    .filter { currencyFilter == nil || $0.currency == currencyFilter }
+            }
             totals      = try app.summaries.totals(fromYM: win.start, toYM: win.end)
             availableCurrencies = try app.summaries.distinctCurrencies(fromYM: win.start, toYM: win.end)
             loans = try app.transactions.loanBalances()
