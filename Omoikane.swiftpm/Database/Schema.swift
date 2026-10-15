@@ -19,7 +19,7 @@ import Foundation
 /// "spending by category in May 2026 for the credit card account" is a small index
 /// range scan over the summary table.
 enum Schema {
-    static let latestVersion = 5
+    static let latestVersion = 6
 
     static func migrate(_ db: Database) throws {
         try db.exec("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY);")
@@ -61,6 +61,12 @@ enum Schema {
             try db.transaction {
                 try migrateToV5(db)
                 try db.exec("INSERT INTO schema_version(version) VALUES (5);")
+            }
+        }
+        if current < 6 {
+            try db.transaction {
+                try migrateToV6(db)
+                try db.exec("INSERT INTO schema_version(version) VALUES (6);")
             }
         }
     }
@@ -442,6 +448,48 @@ enum Schema {
     /// created in-app rather than only by the Money Pro importer.
     private static func migrateToV5(_ db: Database) throws {
         try db.exec("ALTER TABLE transactions ADD COLUMN split_group INTEGER;")
+    }
+
+    /// V6: the rest of Money Pro's data model, minimal form.
+    /// - `payees` + `transactions.payee_id`: who the money went to / came from.
+    /// - `transactions.loan_role`: lend (expense, owed to me), borrow (income,
+    ///   I owe), repay (either direction, reduces the matching balance).
+    ///   Outstanding per payee is a query, not a table.
+    /// - `categories.budget_minor`: monthly budget in the home currency.
+    /// - `accounts.credit_limit_minor`: for the available-credit figure.
+    /// - `schedules`: recurring templates; `next_due` is a day key and
+    ///   `AppState.postDueSchedules` inserts real rows and advances it.
+    /// None of these touch `monthly_summaries`, so the triggers stay as-is.
+    private static func migrateToV6(_ db: Database) throws {
+        try db.exec("""
+            CREATE TABLE payees (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                name        TEXT    NOT NULL UNIQUE,
+                is_archived INTEGER NOT NULL DEFAULT 0
+            );
+        """)
+        try db.exec("ALTER TABLE transactions ADD COLUMN payee_id INTEGER REFERENCES payees(id);")
+        try db.exec("ALTER TABLE transactions ADD COLUMN loan_role TEXT CHECK(loan_role IN ('lend','borrow','repay'));")
+        try db.exec("CREATE INDEX idx_tx_payee ON transactions(payee_id);")
+        try db.exec("ALTER TABLE categories ADD COLUMN budget_minor INTEGER;")
+        try db.exec("ALTER TABLE accounts ADD COLUMN credit_limit_minor INTEGER;")
+        try db.exec("""
+            CREATE TABLE schedules (
+                id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind                      TEXT    NOT NULL CHECK(kind IN ('income','expense','transfer')),
+                amount_minor              INTEGER NOT NULL,
+                category_id               INTEGER NOT NULL REFERENCES categories(id),
+                account_id                INTEGER NOT NULL REFERENCES accounts(id),
+                counterparty_account_id   INTEGER REFERENCES accounts(id),
+                counterparty_amount_minor INTEGER,
+                payee_id                  INTEGER REFERENCES payees(id),
+                note                      TEXT,
+                frequency                 TEXT    NOT NULL CHECK(frequency IN ('daily','weekly','monthly','yearly')),
+                interval                  INTEGER NOT NULL DEFAULT 1,
+                next_due                  INTEGER NOT NULL,
+                end_on                    INTEGER
+            );
+        """)
     }
 
     /// Recompute monthly_summaries from scratch. Useful after bulk imports that

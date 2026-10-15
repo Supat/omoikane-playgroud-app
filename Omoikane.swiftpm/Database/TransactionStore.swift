@@ -13,8 +13,9 @@ final class TransactionStore {
                  category_id, account_id, counterparty_account_id,
                  counterparty_amount_minor, note, tags, created_at, updated_at,
                  cleared_at, statement_id,
-                 counterparty_cleared_at, counterparty_statement_id, split_group)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
+                 counterparty_cleared_at, counterparty_statement_id, split_group,
+                 payee_id, loan_role)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
         """)
         bindInsert(s, tx, now: now)
         try s.step()
@@ -31,8 +32,9 @@ final class TransactionStore {
                      category_id, account_id, counterparty_account_id,
                      counterparty_amount_minor, note, tags, created_at, updated_at,
                      cleared_at, statement_id,
-                     counterparty_cleared_at, counterparty_statement_id, split_group)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
+                     counterparty_cleared_at, counterparty_statement_id, split_group,
+                     payee_id, loan_role)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
             """)
             for tx in items {
                 s.reset()
@@ -53,7 +55,7 @@ final class TransactionStore {
                    note = ?, tags = ?, updated_at = ?,
                    cleared_at = ?, statement_id = ?,
                    counterparty_cleared_at = ?, counterparty_statement_id = ?,
-                   split_group = ?
+                   split_group = ?, payee_id = ?, loan_role = ?
              WHERE id = ?;
         """)
         s.bind(Int64(tx.occurredOn.dayKey),                   at: 1)
@@ -74,7 +76,9 @@ final class TransactionStore {
         s.bind(tx.counterpartyClearedAt.map { Int64($0.timeIntervalSince1970) }, at: 16)
         s.bind(tx.counterpartyStatementId,                    at: 17)
         s.bind(tx.splitGroup,                                 at: 18)
-        s.bind(tx.id,                                         at: 19)
+        s.bind(tx.payeeId,                                    at: 19)
+        s.bind(tx.loanRole?.rawValue,                         at: 20)
+        s.bind(tx.id,                                         at: 21)
         try s.step()
     }
 
@@ -216,6 +220,69 @@ final class TransactionStore {
         return out
     }
 
+    /// All rows of one split group, in insertion order.
+    func listGroup(_ group: Int64) throws -> [Transaction] {
+        let s = try db.prepare(Self.selectColumns + " FROM transactions WHERE split_group = ? ORDER BY id;")
+        s.bind(group, at: 1)
+        var out: [Transaction] = []
+        while try s.step() { out.append(Self.read(s)) }
+        return out
+    }
+
+    /// Replace a logical transaction with `lines`. Deletes the old rows
+    /// (the whole group, or the single row) and inserts one row per line;
+    /// two or more lines share a fresh group id, one line gets none.
+    func replace(groupId: Int64?, singleId: Int64?, with lines: [Transaction]) throws {
+        try db.transaction {
+            if let groupId {
+                let d = try db.prepare("DELETE FROM transactions WHERE split_group = ?;")
+                d.bind(groupId, at: 1); try d.step()
+            } else if let singleId {
+                try delete(id: singleId)
+            }
+            var group: Int64? = nil
+            if lines.count > 1 {
+                let g = try db.prepare("SELECT COALESCE(MAX(split_group), 0) + 1 FROM transactions;")
+                if try g.step() { group = g.int64(0) }
+            }
+            for var line in lines {
+                line.splitGroup = group
+                _ = try insert(line)
+            }
+        }
+    }
+
+    struct LoanBalance: Identifiable, Hashable {
+        var payee: String
+        var currency: String
+        var lentMinor: Int64
+        var borrowedMinor: Int64
+        var id: String { "\(payee)|\(currency)" }
+    }
+
+    /// Outstanding loans per payee and currency. Lend − repayments received,
+    /// borrow − repayments made. Rows where both are zero are dropped.
+    func loanBalances() throws -> [LoanBalance] {
+        let s = try db.prepare("""
+            SELECT COALESCE(p.name, '(no payee)'), t.currency,
+                   SUM(CASE WHEN t.loan_role = 'lend' THEN t.amount_minor
+                            WHEN t.loan_role = 'repay' AND t.kind = 'income' THEN -t.amount_minor ELSE 0 END),
+                   SUM(CASE WHEN t.loan_role = 'borrow' THEN t.amount_minor
+                            WHEN t.loan_role = 'repay' AND t.kind = 'expense' THEN -t.amount_minor ELSE 0 END)
+              FROM transactions t LEFT JOIN payees p ON p.id = t.payee_id
+             WHERE t.loan_role IS NOT NULL
+             GROUP BY 1, 2
+            HAVING 3 <> 0 OR 4 <> 0
+             ORDER BY 1, 2;
+        """)
+        var out: [LoanBalance] = []
+        while try s.step() {
+            let row = LoanBalance(payee: s.string(0), currency: s.string(1), lentMinor: s.int64(2), borrowedMinor: s.int64(3))
+            if row.lentMinor != 0 || row.borrowedMinor != 0 { out.append(row) }
+        }
+        return out
+    }
+
     func count() throws -> Int {
         let s = try db.prepare("SELECT COUNT(*) FROM transactions;")
         if try s.step() { return s.int(0) }
@@ -230,7 +297,8 @@ final class TransactionStore {
                counterparty_account_id, counterparty_amount_minor,
                note, tags, created_at, updated_at,
                cleared_at, statement_id,
-               counterparty_cleared_at, counterparty_statement_id, split_group
+               counterparty_cleared_at, counterparty_statement_id, split_group,
+               payee_id, loan_role
     """
 
     private func bindInsert(_ s: Statement, _ tx: Transaction, now: Int64) {
@@ -253,6 +321,8 @@ final class TransactionStore {
         s.bind(tx.counterpartyClearedAt.map { Int64($0.timeIntervalSince1970) }, at: 17)
         s.bind(tx.counterpartyStatementId,                    at: 18)
         s.bind(tx.splitGroup,                                 at: 19)
+        s.bind(tx.payeeId,                                    at: 20)
+        s.bind(tx.loanRole?.rawValue,                         at: 21)
     }
 
     private static func read(_ s: Statement) -> Transaction {
@@ -283,7 +353,9 @@ final class TransactionStore {
             statementId: s.optionalInt64(15),
             counterpartyClearedAt: s.optionalInt64(16).map { Date(timeIntervalSince1970: TimeInterval($0)) },
             counterpartyStatementId: s.optionalInt64(17),
-            splitGroup: s.optionalInt64(18)
+            splitGroup: s.optionalInt64(18),
+            payeeId: s.optionalInt64(19),
+            loanRole: s.optionalString(20).flatMap(LoanRole.init(rawValue:))
         )
     }
 

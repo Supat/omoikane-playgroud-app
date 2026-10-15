@@ -83,7 +83,9 @@ enum MoneyProImport {
     }
 
     /// Money Pro transactionType → kind. 0 expense, 1 income, 2 transfer,
-    /// 3 lend, 4/5 borrow, 6 repay, 7 opening balance (dropped), 8 misc.
+    /// 3 lend (expense, loan_role lend), 4 income, 5 borrow (income, loan_role
+    /// borrow), 6 repay (expense, loan_role repay), 7 opening balance
+    /// (dropped), 8 misc expense.
     static let sql = """
         DELETE FROM transactions;
         DELETE FROM statements;
@@ -91,6 +93,8 @@ enum MoneyProImport {
         DELETE FROM categories;
         DELETE FROM accounts;
         DELETE FROM currency_rates;
+        DELETE FROM schedules;
+        DELETE FROM payees;
 
         CREATE TEMP TABLE cur_scale AS
         SELECT key AS cur, CASE WHEN key IN ('JPY','KRW','VND','IDR') THEN 1 ELSE 100 END AS scale
@@ -98,7 +102,7 @@ enum MoneyProImport {
 
         -- Live accounts, plus deleted ones that still own a live transaction leg (imported archived).
         CREATE TEMP TABLE acct_src AS
-        SELECT b.primaryKey, b.name, b.currencyKey, b.sum, b.isDeleted, b.indexNumber, b.defaultCleared,
+        SELECT b.primaryKey, b.name, b.currencyKey, b.sum, b.isDeleted, b.indexNumber, b.defaultCleared, b.limitSum,
                CASE b.balanceType
                  WHEN 1 THEN 'credit' WHEN 2 THEN 'investment' WHEN 3 THEN 'other'
                  ELSE CASE WHEN b.name LIKE '%Bank%' OR b.name LIKE '%SMBC%' OR b.name LIKE '%Saving%' OR b.name LIKE '%Wise%'
@@ -110,9 +114,20 @@ enum MoneyProImport {
             OR EXISTS (SELECT 1 FROM mp.transactions t WHERE t.isDeleted = 0
                           AND (t.cashFlowPrimaryKey = b.primaryKey OR t.secondCashFlowPrimaryKey = b.primaryKey));
 
-        INSERT INTO accounts (id, name, kind, currency, initial_balance_minor, is_archived, sort_order, clears_entries_by_default)
-        SELECT a.new_id, a.name, a.kind, a.currencyKey, 0, a.isDeleted, a.indexNumber, a.defaultCleared
-          FROM acct_src a ORDER BY a.new_id;
+        INSERT INTO accounts (id, name, kind, currency, initial_balance_minor, is_archived, sort_order,
+                              clears_entries_by_default, credit_limit_minor)
+        SELECT a.new_id, a.name, a.kind, a.currencyKey, 0, a.isDeleted, a.indexNumber, a.defaultCleared,
+               CASE WHEN a.kind = 'credit' AND a.limitSum > 0
+                    THEN CAST(ROUND(a.limitSum * COALESCE(cs.scale, 100)) AS INTEGER) END
+          FROM acct_src a LEFT JOIN cur_scale cs ON cs.cur = a.currencyKey ORDER BY a.new_id;
+
+        -- Payees that a live transaction actually references.
+        CREATE TEMP TABLE payee_src AS
+        SELECT p.primaryKey, p.name, ROW_NUMBER() OVER (ORDER BY p.name, p.primaryKey) AS new_id
+          FROM mp.payee p
+         WHERE p.isDeleted = 0
+           AND EXISTS (SELECT 1 FROM mp.transactions t WHERE t.isDeleted = 0 AND t.payeePrimaryKey = p.primaryKey);
+        INSERT INTO payees (id, name, is_archived) SELECT new_id, name, 0 FROM payee_src ORDER BY new_id;
 
         CREATE TEMP TABLE cat_src AS
         SELECT c.primaryKey, c.name, c.flowType, c.parentPrimaryKey, c.hidden, c.indexNumber,
@@ -151,7 +166,8 @@ enum MoneyProImport {
 
         INSERT INTO transactions (occurred_on, year_month, occurred_at, amount_minor, currency, kind,
                                   category_id, account_id, counterparty_account_id, counterparty_amount_minor,
-                                  note, tags, created_at, updated_at, cleared_at, counterparty_cleared_at, split_group)
+                                  note, tags, created_at, updated_at, cleared_at, counterparty_cleared_at, split_group,
+                                  payee_id, loan_role)
         SELECT CAST(julianday(x.date, 'unixepoch', 'localtime') - julianday('1970-01-01') AS INTEGER),
                CAST(strftime('%Y%m', x.date, 'unixepoch', 'localtime') AS INTEGER),
                CAST(x.date AS INTEGER),
@@ -169,7 +185,9 @@ enum MoneyProImport {
                CAST(x.date AS INTEGER), CAST(x.date AS INTEGER),
                CASE WHEN x.isCleared = 1 THEN CAST(x.date AS INTEGER) END,
                CASE WHEN x.isCleared = 1 AND x.ty = 2 THEN CAST(x.date AS INTEGER) END,
-               (SELECT g.grp FROM split_groups g WHERE g.pk = x.pk)
+               (SELECT g.grp FROM split_groups g WHERE g.pk = x.pk),
+               (SELECT ps.new_id FROM payee_src ps WHERE ps.primaryKey = x.payee),
+               CASE x.ty WHEN 3 THEN 'lend' WHEN 5 THEN 'borrow' WHEN 6 THEN 'repay' END
           FROM tx_src x
           LEFT JOIN cur_scale fs ON fs.cur = x.from_cur
           LEFT JOIN cur_scale ts ON ts.cur = x.to_cur
@@ -201,5 +219,6 @@ enum MoneyProImport {
         DROP TABLE fallback;
         DROP TABLE split_groups;
         DROP TABLE tx_src;
+        DROP TABLE payee_src;
         """
 }

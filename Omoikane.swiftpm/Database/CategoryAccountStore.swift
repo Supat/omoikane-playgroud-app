@@ -17,7 +17,7 @@ final class CategoryStore {
 
     func list(includeArchived: Bool = false) throws -> [LedgerCategory] {
         let sql = """
-            SELECT id, name, kind, parent_id, icon, color, sort_order, is_archived
+            SELECT id, name, kind, parent_id, icon, color, sort_order, is_archived, budget_minor
               FROM categories
              \(includeArchived ? "" : "WHERE is_archived = 0")
              ORDER BY sort_order, name;
@@ -33,7 +33,8 @@ final class CategoryStore {
                 icon: s.optionalString(4),
                 color: s.optionalString(5),
                 sortOrder: s.int(6),
-                isArchived: s.int(7) != 0
+                isArchived: s.int(7) != 0,
+                budgetMinor: s.optionalInt64(8)
             ))
         }
         return out
@@ -57,7 +58,8 @@ final class CategoryStore {
     func update(_ c: LedgerCategory) throws {
         let s = try db.prepare("""
             UPDATE categories
-               SET name = ?, kind = ?, parent_id = ?, icon = ?, color = ?, sort_order = ?, is_archived = ?
+               SET name = ?, kind = ?, parent_id = ?, icon = ?, color = ?, sort_order = ?, is_archived = ?,
+                   budget_minor = ?
              WHERE id = ?;
         """)
         s.bind(c.name, at: 1)
@@ -67,7 +69,8 @@ final class CategoryStore {
             .bind(c.color, at: 5)
             .bind(c.sortOrder, at: 6)
             .bind(c.isArchived ? 1 : 0, at: 7)
-            .bind(c.id, at: 8)
+            .bind(c.budgetMinor, at: 8)
+            .bind(c.id, at: 9)
         try s.step()
     }
 
@@ -118,7 +121,7 @@ final class AccountStore {
     func list(includeArchived: Bool = false) throws -> [Account] {
         let sql = """
             SELECT id, name, kind, currency, initial_balance_minor, is_archived, sort_order,
-                   clears_entries_by_default, statement_closing_day
+                   clears_entries_by_default, statement_closing_day, credit_limit_minor
               FROM accounts
               \(includeArchived ? "" : "WHERE is_archived = 0")
              ORDER BY sort_order, name;
@@ -135,7 +138,8 @@ final class AccountStore {
                 isArchived: s.int(5) != 0,
                 sortOrder: s.int(6),
                 clearsEntriesByDefault: s.int(7) != 0,
-                statementClosingDay: s.optionalInt64(8).map(Int.init)
+                statementClosingDay: s.optionalInt64(8).map(Int.init),
+                creditLimitMinor: s.optionalInt64(9)
             ))
         }
         return out
@@ -144,7 +148,7 @@ final class AccountStore {
     func get(id: Int64) throws -> Account? {
         let s = try db.prepare("""
             SELECT id, name, kind, currency, initial_balance_minor, is_archived, sort_order,
-                   clears_entries_by_default, statement_closing_day
+                   clears_entries_by_default, statement_closing_day, credit_limit_minor
               FROM accounts WHERE id = ?;
         """)
         s.bind(id, at: 1)
@@ -158,7 +162,8 @@ final class AccountStore {
                 isArchived: s.int(5) != 0,
                 sortOrder: s.int(6),
                 clearsEntriesByDefault: s.int(7) != 0,
-                statementClosingDay: s.optionalInt64(8).map(Int.init)
+                statementClosingDay: s.optionalInt64(8).map(Int.init),
+                creditLimitMinor: s.optionalInt64(9)
             )
         }
         return nil
@@ -171,15 +176,16 @@ final class AccountStore {
         currency: String = "JPY",
         initialBalanceMinor: Int64 = 0,
         clearsEntriesByDefault: Bool = false,
-        statementClosingDay: Int? = nil
+        statementClosingDay: Int? = nil,
+        creditLimitMinor: Int64? = nil
     ) throws -> Int64 {
         let s = try db.prepare("""
             INSERT INTO accounts (name, kind, currency, initial_balance_minor,
                                   is_archived, sort_order,
-                                  clears_entries_by_default, statement_closing_day)
+                                  clears_entries_by_default, statement_closing_day, credit_limit_minor)
             VALUES (?, ?, ?, ?, 0,
                     COALESCE((SELECT MAX(sort_order)+1 FROM accounts), 0),
-                    ?, ?);
+                    ?, ?, ?);
         """)
         s.bind(name, at: 1)
         s.bind(kind.rawValue, at: 2)
@@ -187,6 +193,7 @@ final class AccountStore {
         s.bind(initialBalanceMinor, at: 4)
         s.bind(clearsEntriesByDefault ? 1 : 0, at: 5)
         s.bind(statementClosingDay.map { Int64($0) }, at: 6)
+        s.bind(creditLimitMinor, at: 7)
         try s.step()
         return db.lastInsertId
     }
@@ -214,7 +221,7 @@ final class AccountStore {
             UPDATE accounts
                SET name = ?, kind = ?, currency = ?, initial_balance_minor = ?,
                    is_archived = ?, sort_order = ?,
-                   clears_entries_by_default = ?, statement_closing_day = ?
+                   clears_entries_by_default = ?, statement_closing_day = ?, credit_limit_minor = ?
              WHERE id = ?;
         """)
         s.bind(a.name, at: 1)
@@ -225,7 +232,8 @@ final class AccountStore {
         s.bind(a.sortOrder, at: 6)
         s.bind(a.clearsEntriesByDefault ? 1 : 0, at: 7)
         s.bind(a.statementClosingDay.map { Int64($0) }, at: 8)
-        s.bind(a.id, at: 9)
+        s.bind(a.creditLimitMinor, at: 9)
+        s.bind(a.id, at: 10)
         try s.step()
     }
 

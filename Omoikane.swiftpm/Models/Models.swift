@@ -60,6 +60,8 @@ struct LedgerCategory: Identifiable, Hashable {
     var color: String?
     var sortOrder: Int
     var isArchived: Bool
+    /// Monthly budget in the home currency's minor units. nil = no budget.
+    var budgetMinor: Int64? = nil
 }
 
 struct Account: Identifiable, Hashable {
@@ -76,6 +78,59 @@ struct Account: Identifiable, Hashable {
     /// Day-of-month (1...28) when the account's statement closes. Drives the
     /// default statement date in `ReconciliationSheet`. nil = no preference.
     var statementClosingDay: Int? = nil
+    /// Credit accounts only. Available credit = limit + balance (debt is negative).
+    var creditLimitMinor: Int64? = nil
+}
+
+struct Payee: Identifiable, Hashable {
+    var id: Int64
+    var name: String
+    var isArchived: Bool
+}
+
+/// Lend = expense that someone owes back to me. Borrow = income I owe back.
+/// Repay = the return leg in either direction, matched by kind.
+enum LoanRole: String, CaseIterable, Codable, Hashable {
+    case lend, borrow, repay
+    var displayName: String {
+        switch self {
+        case .lend:   return "Lend"
+        case .borrow: return "Borrow"
+        case .repay:  return "Repayment"
+        }
+    }
+}
+
+enum ScheduleFrequency: String, CaseIterable, Codable, Hashable {
+    case daily, weekly, monthly, yearly
+    var displayName: String { rawValue.capitalized }
+    var calendarComponent: Calendar.Component {
+        switch self {
+        case .daily:   return .day
+        case .weekly:  return .weekOfYear
+        case .monthly: return .month
+        case .yearly:  return .year
+        }
+    }
+}
+
+/// A recurring transaction template. `nextDue` is the next day it should
+/// post; posting inserts a real Transaction and advances it by
+/// `interval × frequency` until it passes `endOn`.
+struct Schedule: Identifiable, Hashable {
+    var id: Int64
+    var kind: TransactionKind
+    var amountMinor: Int64
+    var categoryId: Int64
+    var accountId: Int64
+    var counterpartyAccountId: Int64?
+    var counterpartyAmountMinor: Int64?
+    var payeeId: Int64?
+    var note: String?
+    var frequency: ScheduleFrequency
+    var interval: Int
+    var nextDue: Date
+    var endOn: Date?
 }
 
 /// Which leg of a transaction is being cleared. For non-transfers there is
@@ -113,6 +168,8 @@ struct Transaction: Identifiable, Hashable {
     /// Rows sharing a group are one logical transaction split across
     /// categories (V5). nil for ordinary single-category rows.
     var splitGroup: Int64? = nil
+    var payeeId: Int64? = nil
+    var loanRole: LoanRole? = nil
 
     /// Amount with sign — useful for net-flow math (income positive, expense negative).
     var signedAmountMinor: Int64 {

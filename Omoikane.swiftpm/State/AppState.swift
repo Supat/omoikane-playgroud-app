@@ -16,6 +16,8 @@ final class AppState {
     let summaries: SummaryStore
     let currencyRates: CurrencyStore
     let statements: StatementStore
+    let payees: PayeeStore
+    let schedules: ScheduleStore
 
     private(set) var dataVersion: Int = 0
     private(set) var rateVersion: Int = 0
@@ -45,6 +47,8 @@ final class AppState {
         self.summaries = SummaryStore(db: db)
         self.currencyRates = CurrencyStore(db: db)
         self.statements = StatementStore(db: db, transactions: txStore)
+        self.payees = PayeeStore(db: db)
+        self.schedules = ScheduleStore(db: db, transactions: txStore)
 
         // Home currency: persisted preference > device locale > JPY.
         let stored = UserDefaults.standard.string(forKey: Self.homeCurrencyKey)
@@ -53,6 +57,14 @@ final class AppState {
 
         try SeedData.seedIfNeeded(db: db, homeCurrency: self.homeCurrency, addSampleTransactions: true)
         try refreshRates()
+        try postDueSchedules()
+    }
+
+    /// Post every recurring transaction that has come due. Called at
+    /// launch and whenever the app returns to the foreground.
+    func postDueSchedules() throws {
+        let n = try db.sync { try schedules.postDue() }
+        if n > 0 { bump() }
     }
 
     private static let homeCurrencyKey = "omoikane.homeCurrency"
@@ -138,6 +150,75 @@ final class AppState {
         bump()
     }
 
+    /// Save a logical transaction as one row per line (a split when there
+    /// is more than one). Replaces the previous rows of the same group or
+    /// the previous single row.
+    func saveLines(_ lines: [Transaction], replacingGroup: Int64?, replacingSingle: Int64?) throws {
+        try db.sync { try transactions.replace(groupId: replacingGroup, singleId: replacingSingle, with: lines) }
+        bump()
+    }
+
+    /// Post an income or expense that moves the account to `newBalanceMinor`.
+    /// Uses (and lazily creates) a "Balance adjustment" category of the
+    /// matching kind so the correction is visible and reportable.
+    func adjustBalance(accountId: Int64, to newBalanceMinor: Int64) throws {
+        try db.sync {
+            guard let acct = try accounts.get(id: accountId) else { return }
+            let delta = newBalanceMinor - (try accounts.balanceMinor(accountId: accountId))
+            guard delta != 0 else { return }
+            let kind: TransactionKind = delta > 0 ? .income : .expense
+            let catKind: CategoryKind = delta > 0 ? .income : .expense
+            let all = try categories.list(includeArchived: true)
+            let catId = try all.first { $0.name == "Balance adjustment" && $0.kind == catKind }?.id
+                ?? categories.insert(name: "Balance adjustment", kind: catKind, icon: "equal.circle")
+            let now = Date()
+            var tx = Transaction(
+                id: 0, occurredOn: now, amountMinor: abs(delta), currency: acct.currency,
+                kind: kind, categoryId: catId, accountId: accountId,
+                counterpartyAccountId: nil, counterpartyAmountMinor: nil,
+                note: "Balance adjustment", tags: [], createdAt: now, updatedAt: now
+            )
+            tx.clearedAt = now
+            _ = try transactions.insert(tx)
+        }
+        bump()
+    }
+
+    // MARK: - Payees & schedules
+
+    func findOrCreatePayee(name: String) throws -> Int64? {
+        let id = try db.sync { try payees.findOrCreate(name: name) }
+        bump()
+        return id
+    }
+
+    func updatePayee(_ p: Payee) throws {
+        try db.sync { try payees.update(p) }
+        bump()
+    }
+
+    func deletePayee(id: Int64) throws {
+        try db.sync { try payees.delete(id: id) }
+        bump()
+    }
+
+    @discardableResult
+    func addSchedule(_ sc: Schedule) throws -> Int64 {
+        let id = try db.sync { try schedules.insert(sc) }
+        bump()
+        return id
+    }
+
+    func updateSchedule(_ sc: Schedule) throws {
+        try db.sync { try schedules.update(sc) }
+        bump()
+    }
+
+    func deleteSchedule(id: Int64) throws {
+        try db.sync { try schedules.delete(id: id) }
+        bump()
+    }
+
     @discardableResult
     func addCategory(name: String, kind: CategoryKind, icon: String? = nil) throws -> Int64 {
         let id = try db.sync { try categories.insert(name: name, kind: kind, icon: icon) }
@@ -172,14 +253,16 @@ final class AppState {
         currency: String,
         initialBalanceMinor: Int64,
         clearsEntriesByDefault: Bool = false,
-        statementClosingDay: Int? = nil
+        statementClosingDay: Int? = nil,
+        creditLimitMinor: Int64? = nil
     ) throws -> Int64 {
         let id = try db.sync {
             try accounts.insert(
                 name: name, kind: kind, currency: currency,
                 initialBalanceMinor: initialBalanceMinor,
                 clearsEntriesByDefault: clearsEntriesByDefault,
-                statementClosingDay: statementClosingDay
+                statementClosingDay: statementClosingDay,
+                creditLimitMinor: creditLimitMinor
             )
         }
         bump()
