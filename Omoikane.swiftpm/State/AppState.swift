@@ -87,6 +87,18 @@ final class AppState {
     }
 
     private static let homeCurrencyKey = "omoikane.homeCurrency"
+    private static let spendingLimitKey = "omoikane.monthlySpendingLimitMinor"
+
+    /// Overall monthly spending limit in home-currency minor units; nil = none.
+    /// A preference like the home currency, so it lives in UserDefaults.
+    var monthlySpendingLimitMinor: Int64? {
+        get { UserDefaults.standard.object(forKey: Self.spendingLimitKey) as? Int64 }
+        set {
+            if let v = newValue { UserDefaults.standard.set(v, forKey: Self.spendingLimitKey) }
+            else { UserDefaults.standard.removeObject(forKey: Self.spendingLimitKey) }
+            bump()
+        }
+    }
 
     static func defaultDatabaseURL() throws -> URL {
         let dir = try FileManager.default.url(

@@ -148,7 +148,7 @@ Mutating helpers on `AppState` serialize through `db.sync { … }` and bump
 | Accounts | `AccountsView` → `AccountDetailView` → `ReconciliationSheet` | account management, balances, reconciliation statements |
 | Transactions | `TransactionsView` | account list → per-account transaction list; landscape split view with inline `TransactionEntryView`, portrait uses the `TransactionEditor` sheet. The entry form handles splits (one row per line, shared `split_group`), payee, loan role and Repeat (creates a schedule) |
 | Reports | `ReportsView` | aggregate queries over `monthly_summaries` |
-| Settings | `SettingsView` → `CategoriesView`, `SchedulesView`, `PayeesView`, `BackupsView` | home currency, rates, Manage (categories with sub-categories, scheduled transactions, payees), backups (auto/manual/restore/share), rebuild summaries, delete all transactions, Money Pro import |
+| Settings | `SettingsView` → `CategoriesView`, `SchedulesView`, `PayeesView`, `BackupsView` | home currency, rates, Manage (Categories and Budget: sub-categories, per-category monthly budgets, an overall monthly spending limit in UserDefaults visualised against the allocated budgets; scheduled transactions; payees), backups (auto/manual/restore/share), rebuild summaries, delete all transactions, Money Pro import |
 
 Entity management (add/edit/archive/delete) lives only in its dedicated
 surface: Accounts tab, or Settings › Manage for categories, schedules and

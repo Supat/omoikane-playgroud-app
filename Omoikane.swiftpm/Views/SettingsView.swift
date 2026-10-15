@@ -54,7 +54,7 @@ struct SettingsView: View {
                 NavigationLink {
                     CategoriesView()
                 } label: {
-                    Label("Categories", systemImage: "folder")
+                    Label("Categories and Budget", systemImage: "folder")
                 }
                 NavigationLink {
                     SchedulesView()

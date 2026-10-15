@@ -16,14 +16,16 @@ struct CategoriesView: View {
     /// user (or refuse) when the category is still in use.
     @State private var deletePrompt: CategoryDeletePrompt? = nil
     @State private var actionError: String? = nil
+    @State private var limitText: String = ""
 
     var body: some View {
         List {
+            limitSection
             section(for: .expense)
             section(for: .income)
             archivedSection
         }
-        .navigationTitle("Categories")
+        .navigationTitle("Categories and Budget")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -51,6 +53,65 @@ struct CategoriesView: View {
         }
         .task(id: app.dataVersion) { reload() }
         .modifier(CategoryManagementAlerts(deletePrompt: $deletePrompt, actionError: $actionError))
+    }
+
+    /// Sum of monthly budgets that actually count: a parent's budget covers
+    /// its children, so a child's own budget is only added when the parent
+    /// has none.
+    private var allocatedBudgetMinor: Int64 {
+        categories.filter { $0.kind == .expense }.reduce(Int64(0)) { sum, c in
+            guard let b = c.budgetMinor else { return sum }
+            if let p = c.parentId, categories.first(where: { $0.id == p })?.budgetMinor != nil { return sum }
+            return sum + b
+        }
+    }
+
+    /// Overall monthly limit against what the category budgets add up to.
+    @ViewBuilder
+    private var limitSection: some View {
+        Section {
+            LabeledContent("Monthly spending limit (\(app.homeCurrency))") {
+                NumberPadField(
+                    text: $limitText,
+                    placeholder: "None",
+                    alignment: .right,
+                    onSubmit: { app.monthlySpendingLimitMinor = Money.parseMinor(limitText, currency: app.homeCurrency) }
+                )
+                .frame(maxWidth: 180)
+            }
+            let allocated = allocatedBudgetMinor
+            if let limit = app.monthlySpendingLimitMinor, limit > 0 {
+                let over = allocated > limit
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Budgeted")
+                        Spacer()
+                        Text("\(Formatters.money(allocated, currency: app.homeCurrency)) / \(Formatters.money(limit, currency: app.homeCurrency))")
+                            .moneyStyle()
+                            .foregroundStyle(over ? .red : .primary)
+                    }
+                    ProgressView(value: Double(min(allocated, limit)), total: Double(limit))
+                        .tint(over ? .red : .accentColor)
+                        .accessibilityLabel("Budgets against the spending limit")
+                        .accessibilityValue(over ? "Over the limit" : "\(Int(Double(allocated) / Double(limit) * 100)) percent allocated")
+                    Text(over
+                         ? "Category budgets exceed the limit by \(Formatters.money(allocated - limit, currency: app.homeCurrency))."
+                         : "\(Formatters.money(limit - allocated, currency: app.homeCurrency)) of the limit is not yet allocated to a category.")
+                        .moneyStyle()
+                        .font(.caption)
+                        .foregroundStyle(over ? .red : .secondary)
+                }
+            } else if allocated > 0 {
+                LabeledContent("Budgeted") {
+                    Formatters.moneyText(allocated, currency: app.homeCurrency)
+                }
+            }
+        } header: {
+            Text("Spending limit")
+        } footer: {
+            Text("The limit is the most you intend to spend per month across all categories. Category budgets below are measured against it. Press Return to save the limit.")
+                .font(.footnote)
+        }
     }
 
     @ViewBuilder
@@ -92,6 +153,7 @@ struct CategoriesView: View {
                         .leadingIcon()
                     Text(c.name)
                     Spacer()
+                    budgetLabel(c)
                 }
                 .contentShape(Rectangle())
             }
@@ -123,12 +185,25 @@ struct CategoriesView: View {
                     .leadingIcon()
                 Text(c.name)
                 Spacer()
+                budgetLabel(c)
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .padding(.leading, 24)
         .accessibilityHint("Edit sub-category")
+    }
+
+    /// "¥60,000 / mo" for a budgeted category, nothing otherwise.
+    @ViewBuilder
+    private func budgetLabel(_ c: LedgerCategory) -> some View {
+        if let b = c.budgetMinor {
+            Text("\(Formatters.money(b, currency: app.homeCurrency)) / mo")
+                .moneyStyle()
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("Budget \(Formatters.money(b, currency: app.homeCurrency)) per month")
+        }
     }
 
     private func children(of parent: LedgerCategory) -> [LedgerCategory] {
@@ -163,6 +238,7 @@ struct CategoriesView: View {
                     .leadingIcon()
                 Text(c.name)
                 Spacer()
+                budgetLabel(c)
                 Text(c.kind == .income ? "Income" : "Expense")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -218,6 +294,7 @@ struct CategoriesView: View {
     }
 
     private func reload() {
+        limitText = app.monthlySpendingLimitMinor.map { Money.formatMinorText($0, currency: app.homeCurrency) } ?? ""
         do {
             // One round trip; partition in memory so the existing
             // section(for:) helpers keep operating on the active list.
