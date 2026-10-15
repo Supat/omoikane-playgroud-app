@@ -136,6 +136,9 @@ struct TransactionEntryView: View {
                             alignment: .right,
                             onSubmit: { advanceFocus(from: .amount) }
                         )
+                        // Fill the row so the text stays right-aligned next
+                        // to the currency instead of floating to the centre.
+                        .frame(maxWidth: .infinity)
                     }
                     Text(fromCurrency)
                         .foregroundStyle(.secondary)
