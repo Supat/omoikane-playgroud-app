@@ -131,7 +131,7 @@ struct AccountsView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Text(Formatters.money(balanceByAccount[a.id] ?? 0, currency: a.currency))
+                Formatters.moneyText(balanceByAccount[a.id] ?? 0, currency: a.currency)
                     .monospacedDigit()
                     .foregroundStyle((balanceByAccount[a.id] ?? 0) >= 0 ? Color.primary : .red)
             }
@@ -188,6 +188,7 @@ struct AddAccountSheet: View {
     @State private var initialBalanceText: String = "0"
     @State private var clearsByDefault: Bool = false
     @State private var closingDay: Int = 0      // 0 == None
+    @State private var creditLimitText = ""
 
     var body: some View {
         NavigationStack {
@@ -205,6 +206,11 @@ struct AddAccountSheet: View {
                         placeholder: "0",
                         alignment: .right
                     )
+                }
+                if kind == .credit {
+                    LabeledContent("Credit limit") {
+                        NumberPadField(text: $creditLimitText, placeholder: "None", alignment: .right)
+                    }
                 }
 
                 Section {
@@ -243,7 +249,8 @@ struct AddAccountSheet: View {
                                 name: name, kind: kind,
                                 currency: currency, initialBalanceMinor: minor,
                                 clearsEntriesByDefault: clearsByDefault,
-                                statementClosingDay: closingDay == 0 ? nil : closingDay
+                                statementClosingDay: closingDay == 0 ? nil : closingDay,
+                                creditLimitMinor: kind == .credit ? Money.parseMinor(creditLimitText, currency: currency) : nil
                             )
                             dismiss()
                         } catch {

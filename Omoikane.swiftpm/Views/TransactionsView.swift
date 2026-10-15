@@ -95,7 +95,7 @@ struct TransactionsView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Text(Formatters.money(balanceByAccount[a.id] ?? 0, currency: a.currency))
+            Formatters.moneyText(balanceByAccount[a.id] ?? 0, currency: a.currency)
                 .monospacedDigit()
                 .foregroundStyle((balanceByAccount[a.id] ?? 0) >= 0 ? Color.primary : .red)
             Image(systemName: "chevron.right")
@@ -315,7 +315,7 @@ struct AccountTransactionsView: View {
                 HStack {
                     Text(periodFilter.displayName)
                     Spacer()
-                    Text(Formatters.money(periodTotalMinor, currency: account.currency))
+                    Formatters.moneyText(periodTotalMinor, currency: account.currency)
                         .monospacedDigit()
                         .foregroundStyle(periodTotalColor)
                 }
@@ -513,9 +513,9 @@ struct AccountTransactionsView: View {
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
                 Text(formatAmount(tx))
+                    .moneyStyle()
                     .font(.body.weight(.medium))
                     .foregroundStyle(tint(for: tx.kind))
-                    .monospacedDigit()
                 Text("\(Formatters.mediumDate.string(from: tx.occurredOn)) · \(Formatters.shortTime.string(from: tx.occurredOn))")
                     .font(.caption)
                     .foregroundStyle(.secondary)

@@ -36,6 +36,8 @@
 		B100000000000000000024 /* CategoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000024 /* CategoriesView.swift */; };
 		B100000000000000000025 /* TransactionEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000025 /* TransactionEntryView.swift */; };
 		B100000000000000000026 /* NumberPadField.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000026 /* NumberPadField.swift */; };
+		B100000000000000000030 /* SchedulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000030 /* SchedulesView.swift */; };
+		B100000000000000000031 /* PayeesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000031 /* PayeesView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -68,6 +70,8 @@
 		F100000000000000000024 /* CategoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CategoriesView.swift; path = Omoikane.swiftpm/Views/CategoriesView.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000025 /* TransactionEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TransactionEntryView.swift; path = Omoikane.swiftpm/Views/TransactionEntryView.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000026 /* NumberPadField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = NumberPadField.swift; path = Omoikane.swiftpm/Views/NumberPadField.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000030 /* SchedulesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SchedulesView.swift; path = Omoikane.swiftpm/Views/SchedulesView.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000031 /* PayeesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PayeesView.swift; path = Omoikane.swiftpm/Views/PayeesView.swift; sourceTree = SOURCE_ROOT; };
 		F1000000000000000000FF /* OmoikaneApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OmoikaneApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -120,6 +124,8 @@
 				F100000000000000000005 /* TransactionEditor.swift */,
 				F100000000000000000025 /* TransactionEntryView.swift */,
 				F100000000000000000026 /* NumberPadField.swift */,
+				F100000000000000000030 /* SchedulesView.swift */,
+				F100000000000000000031 /* PayeesView.swift */,
 				F100000000000000000006 /* ReportsView.swift */,
 				F100000000000000000007 /* AccountsView.swift */,
 				F100000000000000000024 /* CategoriesView.swift */,
@@ -258,6 +264,8 @@
 				B100000000000000000005 /* TransactionEditor.swift in Sources */,
 				B100000000000000000025 /* TransactionEntryView.swift in Sources */,
 				B100000000000000000026 /* NumberPadField.swift in Sources */,
+				B100000000000000000030 /* SchedulesView.swift in Sources */,
+				B100000000000000000031 /* PayeesView.swift in Sources */,
 				B100000000000000000006 /* ReportsView.swift in Sources */,
 				B100000000000000000007 /* AccountsView.swift in Sources */,
 				B100000000000000000024 /* CategoriesView.swift in Sources */,

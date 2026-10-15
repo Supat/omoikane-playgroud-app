@@ -31,6 +31,8 @@ enum AppTab: Hashable, CaseIterable {
 ///   ⇧⌃AppTab  — previous tab (wraps)
 struct ContentView: View {
     @Binding var selection: AppTab
+    @Environment(AppState.self) private var app
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         TabView(selection: $selection) {
@@ -57,6 +59,11 @@ struct ContentView: View {
             NavigationStack { SettingsView() }
                 .tabItem { Label("Settings", systemImage: "gearshape.fill") }
                 .tag(AppTab.settings)
+        }
+        // Recurring entries post when they come due; launch covers the
+        // cold start, this covers an app that stayed open overnight.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { try? app.postDueSchedules() }
         }
     }
 }

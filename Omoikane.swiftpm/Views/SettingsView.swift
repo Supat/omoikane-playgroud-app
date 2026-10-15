@@ -46,6 +46,19 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Manage") {
+                NavigationLink {
+                    SchedulesView()
+                } label: {
+                    Label("Scheduled transactions", systemImage: "calendar.badge.clock")
+                }
+                NavigationLink {
+                    PayeesView()
+                } label: {
+                    Label("Payees", systemImage: "person.crop.circle")
+                }
+            }
+
             Section("Database") {
                 LabeledContent("Transactions", value: "\(transactionCount)")
                 LabeledContent("Location", value: app.db.url.lastPathComponent)

@@ -274,6 +274,7 @@ struct CategoryEditor: View {
     @State private var kind: CategoryKind
     @State private var icon: String
     @State private var parentId: Int64?
+    @State private var budgetText: String
     @State private var allCategories: [LedgerCategory] = []
     @State private var saveError: String?
     @State private var deletePrompt: CategoryDeletePrompt? = nil
@@ -287,6 +288,7 @@ struct CategoryEditor: View {
         _kind = State(initialValue: existing.kind)
         _icon = State(initialValue: existing.icon ?? "tag")
         _parentId = State(initialValue: existing.parentId)
+        _budgetText = State(initialValue: existing.budgetMinor.map { String($0) } ?? "")
     }
 
     init(initialKind: CategoryKind, initialParent: LedgerCategory?) {
@@ -297,6 +299,7 @@ struct CategoryEditor: View {
         _kind = State(initialValue: initialKind)
         _icon = State(initialValue: "tag")
         _parentId = State(initialValue: initialParent?.id)
+        _budgetText = State(initialValue: "")
     }
 
     var body: some View {
@@ -310,6 +313,12 @@ struct CategoryEditor: View {
                 .pickerStyle(.segmented)
                 .disabled(existing != nil) // changing kind on an existing cat would orphan transactions
                 TextField("SF Symbol", text: $icon)
+                if kind == .expense {
+                    LabeledContent("Monthly budget (\(app.homeCurrency))") {
+                        NumberPadField(text: $budgetText, placeholder: "None", alignment: .right)
+                            .frame(maxWidth: 160)
+                    }
+                }
 
                 Picker("Parent", selection: $parentId) {
                     Text("Top level").tag(Int64?.none)
@@ -324,7 +333,10 @@ struct CategoryEditor: View {
             }
             .navigationTitle(existing == nil ? "New Category" : "Edit Category")
             .navigationBarTitleDisplayMode(.inline)
-            .task { allCategories = (try? app.categories.list(includeArchived: false)) ?? [] }
+            .task {
+                allCategories = (try? app.categories.list(includeArchived: false)) ?? []
+                if let b = existing?.budgetMinor { budgetText = Money.formatMinorText(b, currency: app.homeCurrency) }
+            }
             .onChange(of: kind) { _, _ in
                 // If parent no longer matches (kind switched), clear it.
                 if let pid = parentId,
@@ -397,16 +409,18 @@ struct CategoryEditor: View {
     }
 
     private func save() {
+        let budget = kind == .expense ? Money.parseMinor(budgetText, currency: app.homeCurrency) : nil
         do {
             if var copy = existing {
                 copy.name = name
                 copy.icon = icon.isEmpty ? nil : icon
                 copy.parentId = parentId
+                copy.budgetMinor = budget
                 // kind is intentionally not edited (see disabled picker).
                 try app.updateCategory(copy)
             } else {
                 _ = try app.db.sync {
-                    try app.categories.insert(name: name, kind: kind, icon: icon.isEmpty ? nil : icon, parentId: parentId)
+                    try app.categories.insert(name: name, kind: kind, icon: icon.isEmpty ? nil : icon, parentId: parentId, budgetMinor: budget)
                 }
                 app.bump()
             }

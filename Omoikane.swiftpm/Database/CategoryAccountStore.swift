@@ -41,16 +41,17 @@ final class CategoryStore {
     }
 
     @discardableResult
-    func insert(name: String, kind: CategoryKind, icon: String? = nil, color: String? = nil, parentId: Int64? = nil) throws -> Int64 {
+    func insert(name: String, kind: CategoryKind, icon: String? = nil, color: String? = nil, parentId: Int64? = nil, budgetMinor: Int64? = nil) throws -> Int64 {
         let s = try db.prepare("""
-            INSERT INTO categories (name, kind, parent_id, icon, color, sort_order, is_archived)
-            VALUES (?, ?, ?, ?, ?, COALESCE((SELECT MAX(sort_order)+1 FROM categories), 0), 0);
+            INSERT INTO categories (name, kind, parent_id, icon, color, sort_order, is_archived, budget_minor)
+            VALUES (?, ?, ?, ?, ?, COALESCE((SELECT MAX(sort_order)+1 FROM categories), 0), 0, ?);
         """)
         s.bind(name, at: 1)
             .bind(kind.rawValue, at: 2)
             .bind(parentId, at: 3)
             .bind(icon, at: 4)
             .bind(color, at: 5)
+            .bind(budgetMinor, at: 6)
         try s.step()
         return db.lastInsertId
     }

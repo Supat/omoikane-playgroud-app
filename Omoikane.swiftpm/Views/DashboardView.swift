@@ -9,6 +9,13 @@ struct DashboardView: View {
     @State private var trend: [GroupedSummary] = []
     @State private var topAccounts: [GroupedSummary] = []
     @State private var ymKey: Int = YearMonth.current()
+    @State private var budgets: [BudgetRow] = []
+
+    struct BudgetRow: Identifiable {
+        var category: LedgerCategory
+        var spentHome: Int64
+        var id: Int64 { category.id }
+    }
 
     var body: some View {
         ScrollView {
@@ -16,6 +23,7 @@ struct DashboardView: View {
                 header
                 if !missing.isEmpty { missingRatesBanner }
                 summaryCards
+                budgetSection
                 trendChart
                 categoryBreakdown
                 accountBreakdown
@@ -46,6 +54,37 @@ struct DashboardView: View {
                 if m < 1  { ymKey = YearMonth.key(year: y - 1, month: 12) }
                 if m > 12 { ymKey = YearMonth.key(year: y + 1, month: 1) }
             }
+        }
+    }
+
+    /// Monthly budgets from Categories, spent this month in the home
+    /// currency. A parent's budget covers its sub-categories.
+    @ViewBuilder
+    private var budgetSection: some View {
+        if !budgets.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Budgets (\(app.homeCurrency))").font(.headline)
+                ForEach(budgets) { row in
+                    let limit = row.category.budgetMinor ?? 0
+                    let over = row.spentHome > limit
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(row.category.name)
+                            Spacer()
+                            Text("\(Formatters.money(row.spentHome, currency: app.homeCurrency)) / \(Formatters.money(limit, currency: app.homeCurrency))")
+                                .moneyStyle()
+                                .font(.subheadline)
+                                .foregroundStyle(over ? .red : .secondary)
+                        }
+                        ProgressView(value: Double(min(row.spentHome, limit)), total: Double(max(limit, 1)))
+                            .tint(over ? .red : .accentColor)
+                            .accessibilityLabel("\(row.category.name) budget")
+                            .accessibilityValue(over ? "Over budget" : "\(Int(Double(row.spentHome) / Double(max(limit, 1)) * 100)) percent")
+                    }
+                }
+            }
+            .padding(12)
+            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 
@@ -103,11 +142,11 @@ struct DashboardView: View {
                         HStack {
                             Text(row.currency).font(.body.weight(.medium))
                             Spacer()
-                            Text(Formatters.money(row.income, currency: row.currency))
+                            Formatters.moneyText(row.income, currency: row.currency)
                                 .foregroundStyle(.green)
                                 .monospacedDigit()
                             Text("·").foregroundStyle(.secondary)
-                            Text(Formatters.money(row.expense, currency: row.currency))
+                            Formatters.moneyText(row.expense, currency: row.currency)
                                 .foregroundStyle(.red)
                                 .monospacedDigit()
                         }
@@ -155,7 +194,7 @@ struct DashboardView: View {
                     HStack {
                         Text(row.name)
                         Spacer()
-                        Text(Formatters.money(row.minor, currency: app.homeCurrency))
+                        Formatters.moneyText(row.minor, currency: app.homeCurrency)
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
                     }
@@ -181,7 +220,7 @@ struct DashboardView: View {
                         Text(row.key)
                         Text(row.currency).font(.caption).foregroundStyle(.secondary)
                         Spacer()
-                        Text(Formatters.money(row.totalMinor, currency: row.currency))
+                        Formatters.moneyText(row.totalMinor, currency: row.currency)
                             .foregroundStyle(row.totalMinor >= 0 ? Color.primary : .red)
                             .monospacedDigit()
                     }
@@ -274,6 +313,14 @@ struct DashboardView: View {
             let win = YearMonth.window(endingAt: ymKey, monthsBack: 6)
             trend = try app.summaries.byMonth(fromYM: win.start, toYM: win.end, kind: .expense)
             topAccounts = try app.summaries.netByAccount(fromYM: ymKey, toYM: ymKey)
+            let cats = try app.categories.list()
+            budgets = cats.filter { $0.budgetMinor != nil }.map { c in
+                let ids = Set([c.id] + cats.filter { $0.parentId == c.id }.map(\.id))
+                let spent = byCategory
+                    .filter { ids.contains($0.keyId) }
+                    .reduce(Int64(0)) { $0 + (app.convertedToHome($1.totalMinor, from: $1.currency) ?? 0) }
+                return BudgetRow(category: c, spentHome: spent)
+            }
         } catch {
             print("Dashboard reload error: \(error)")
         }

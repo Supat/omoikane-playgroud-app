@@ -66,6 +66,13 @@ enum Formatters {
         Money(minor: minor, currency: currency).format()
     }
 
+    /// Every amount on screen goes through this so money always reads in a
+    /// monospaced face with tabular digits. Returns `Text` so callers can
+    /// keep chaining `.font` / `.foregroundStyle`.
+    static func moneyText(_ minor: Int64, currency: String = "JPY") -> Text {
+        Text(money(minor, currency: currency)).moneyStyle()
+    }
+
     static let mediumDate: DateFormatter = {
         let f = DateFormatter()
         f.dateStyle = .medium
@@ -89,6 +96,11 @@ enum Formatters {
     }()
 }
 
+extension Text {
+    /// Monospaced face + tabular digits, the house style for amounts.
+    func moneyStyle() -> Text { fontDesign(.monospaced).monospacedDigit() }
+}
+
 struct StatCard: View {
     let title: String
     let value: String
@@ -106,6 +118,7 @@ struct StatCard: View {
                     .foregroundStyle(.secondary)
             }
             Text(value)
+                .moneyStyle()
                 .font(.title2.weight(.semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)

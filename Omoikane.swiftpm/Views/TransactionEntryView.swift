@@ -122,7 +122,8 @@ struct TransactionEntryView: View {
                     if isSplit {
                         Spacer()
                         Text(formatMinorToText(splitTotalMinor, currency: fromCurrency))
-                            .font(.system(size: 28, weight: .regular, design: .default).monospacedDigit())
+                            .moneyStyle()
+                            .font(.system(size: 28))
                             .accessibilityLabel("Total of split lines")
                     } else {
                         NumberPadField(

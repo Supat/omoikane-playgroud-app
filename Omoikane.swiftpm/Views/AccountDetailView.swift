@@ -17,6 +17,9 @@ struct AccountDetailView: View {
     @State private var editingClosingDay = false
     @State private var deletePrompt: AccountDeletePrompt? = nil
     @State private var actionError: String? = nil
+    @State private var creditLimitText = ""
+    @State private var adjusting = false
+    @State private var adjustText = ""
 
     var body: some View {
         Form {
@@ -65,6 +68,13 @@ struct AccountDetailView: View {
                             }
                             .keyboardShortcut("a", modifiers: [.command, .shift])
                         }
+                        Button {
+                            adjustText = Money.formatMinorText(totalBalance, currency: account.currency)
+                            adjusting = true
+                        } label: {
+                            Label("Adjust balance…", systemImage: "equal.circle")
+                        }
+                        .keyboardShortcut("b", modifiers: [.command, .shift])
                         Button(role: .destructive) {
                             do { deletePrompt = try AccountDeletePrompt.make(for: account, app: app) }
                             catch { actionError = "Couldn't check references: \(error)" }
@@ -81,6 +91,19 @@ struct AccountDetailView: View {
             }
         }
         .modifier(AccountManagementAlerts(deletePrompt: $deletePrompt, actionError: $actionError, onDone: { dismiss() }))
+        .alert("Adjust balance", isPresented: $adjusting) {
+            TextField("New balance", text: $adjustText)
+                .keyboardType(.numbersAndPunctuation)
+            Button("Adjust") {
+                if let v = Money.parseMinor(adjustText, currency: account?.currency ?? app.homeCurrency) {
+                    do { try app.adjustBalance(accountId: accountId, to: v) }
+                    catch { actionError = "\(error)" }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Posts an income or expense under a Balance adjustment category so the account lands on this figure.")
+        }
         .sheet(isPresented: $startingReconciliation) {
             if let account {
                 ReconciliationSheet(account: account, existingStatementId: nil)
@@ -110,19 +133,26 @@ struct AccountDetailView: View {
     private func balanceSection(_ a: Account) -> some View {
         Section("Balance") {
             LabeledContent("Total") {
-                Text(Formatters.money(totalBalance, currency: a.currency))
+                Formatters.moneyText(totalBalance, currency: a.currency)
                     .monospacedDigit()
                     .foregroundStyle(totalBalance >= 0 ? Color.primary : .red)
             }
             LabeledContent("Cleared") {
-                Text(Formatters.money(clearedBalance, currency: a.currency))
+                Formatters.moneyText(clearedBalance, currency: a.currency)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
             }
             LabeledContent("Uncleared") {
-                Text(Formatters.money(totalBalance - clearedBalance, currency: a.currency))
+                Formatters.moneyText(totalBalance - clearedBalance, currency: a.currency)
                     .monospacedDigit()
                     .foregroundStyle(.orange)
+            }
+            if a.kind == .credit, let limit = a.creditLimitMinor {
+                LabeledContent("Available credit") {
+                    Formatters.moneyText(limit + totalBalance, currency: a.currency)
+                        .monospacedDigit()
+                        .foregroundStyle(limit + totalBalance >= 0 ? Color.primary : .red)
+                }
             }
         }
     }
@@ -143,6 +173,22 @@ struct AccountDetailView: View {
                     Text("New entries on this account are marked cleared on insert.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+            }
+
+            if a.kind == .credit {
+                LabeledContent("Credit limit") {
+                    NumberPadField(
+                        text: $creditLimitText,
+                        placeholder: "None",
+                        alignment: .right,
+                        onSubmit: {
+                            var copy = a
+                            copy.creditLimitMinor = Money.parseMinor(creditLimitText, currency: a.currency)
+                            try? app.updateAccount(copy)
+                        }
+                    )
+                    .frame(maxWidth: 160)
                 }
             }
 
@@ -179,6 +225,9 @@ struct AccountDetailView: View {
     private func reload() {
         do {
             account = try app.accounts.get(id: accountId)
+            if let a = account {
+                creditLimitText = a.creditLimitMinor.map { Money.formatMinorText($0, currency: a.currency) } ?? ""
+            }
             totalBalance = try app.accounts.balanceMinor(accountId: accountId)
             clearedBalance = try ClearedBalance.compute(db: app.db, accountId: accountId)
             statementsList = try app.statements.list(accountId: accountId)
@@ -206,7 +255,7 @@ private struct StatementRow: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Text(Formatters.money(statement.statementBalanceMinor, currency: statement.currency))
+                Formatters.moneyText(statement.statementBalanceMinor, currency: statement.currency)
                     .monospacedDigit()
                 Image(systemName: statement.status == .reconciled ? "checkmark.seal.fill" : "clock")
                     .foregroundStyle(statement.status == .reconciled ? .green : .orange)

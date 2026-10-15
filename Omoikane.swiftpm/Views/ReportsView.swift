@@ -13,6 +13,7 @@ struct ReportsView: View {
     @State private var byAccount: [GroupedSummary] = []
     @State private var totals: SummaryStore.CurrencyTotals = .init()
     @State private var availableCurrencies: [String] = []
+    @State private var loans: [TransactionStore.LoanBalance] = []
 
     var body: some View {
         ScrollView {
@@ -54,6 +55,33 @@ struct ReportsView: View {
                     }
                 }
 
+                section("Loans") {
+                    if loans.isEmpty {
+                        Text("No open loans. Mark an entry as Lend, Borrow or Repayment in the entry form.")
+                            .foregroundStyle(.secondary)
+                            .font(.subheadline)
+                    } else {
+                        ForEach(loans) { row in
+                            HStack {
+                                Text(row.payee)
+                                Spacer()
+                                if row.lentMinor != 0 {
+                                    Text("owed to you \(Formatters.money(row.lentMinor, currency: row.currency))")
+                                        .moneyStyle()
+                                        .foregroundStyle(row.lentMinor > 0 ? .green : .secondary)
+                                }
+                                if row.borrowedMinor != 0 {
+                                    Text("you owe \(Formatters.money(row.borrowedMinor, currency: row.currency))")
+                                        .moneyStyle()
+                                        .foregroundStyle(row.borrowedMinor > 0 ? .red : .secondary)
+                                }
+                            }
+                            .font(.subheadline)
+                            .monospacedDigit()
+                        }
+                    }
+                }
+
                 section("By account") {
                     if byAccount.isEmpty {
                         Text("—").foregroundStyle(.secondary)
@@ -63,7 +91,7 @@ struct ReportsView: View {
                                 Text(row.key)
                                 Text(row.currency).font(.caption).foregroundStyle(.secondary)
                                 Spacer()
-                                Text(Formatters.money(row.totalMinor, currency: row.currency))
+                                Formatters.moneyText(row.totalMinor, currency: row.currency)
                                     .monospacedDigit()
                             }
                             .padding(.vertical, 4)
@@ -199,6 +227,7 @@ struct ReportsView: View {
                 .filter { currencyFilter == nil || $0.currency == currencyFilter }
             totals      = try app.summaries.totals(fromYM: win.start, toYM: win.end)
             availableCurrencies = try app.summaries.distinctCurrencies(fromYM: win.start, toYM: win.end)
+            loans = try app.transactions.loanBalances()
             // If the chosen filter no longer has data, fall back to all.
             if let c = currencyFilter, !availableCurrencies.contains(c) {
                 currencyFilter = nil

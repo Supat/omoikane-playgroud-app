@@ -73,7 +73,7 @@ conditions*. Three reasons we went with raw `import SQLite3`:
 
 ### Schema (`Omoikane.swiftpm/Database/Schema.swift`)
 
-`Schema.latestVersion` is **5**. Migrations are applied in order by `Schema.migrate`, each in its own transaction, tracked in `schema_version`.
+`Schema.latestVersion` is **6**. Migrations are applied in order by `Schema.migrate`, each in its own transaction, tracked in `schema_version`.
 
 - `transactions` — append-heavy fact table. Money in **minor units** as `Int64`
   (yen as integer; multiply by 100 for currencies with sub-units). Derived
@@ -101,6 +101,13 @@ conditions*. Three reasons we went with raw `import SQLite3`:
   statement as an audit record.
 - `currency_rates` (V2) — rate to the home currency for every non-home
   currency. The home currency itself lives in `UserDefaults` via `AppState`.
+- V6 (the rest of Money Pro's model, minimal): `payees` +
+  `transactions.payee_id`; `transactions.loan_role` (`lend` / `borrow` /
+  `repay`, outstanding per payee is a query in `TransactionStore`);
+  `categories.budget_minor` (monthly, home currency, parent covers
+  children); `accounts.credit_limit_minor`; `schedules` (recurring
+  templates, `next_due` is a day key, `ScheduleStore.postDue` inserts real
+  rows and advances it; runs at launch and on scene activation).
 - `Schema.rebuildSummaries(_:)` — recompute the summary table from scratch.
   Exposed in Settings as a self-heal / sanity check.
 
@@ -108,12 +115,14 @@ conditions*. Three reasons we went with raw `import SQLite3`:
 
 ```
 Database/Database.swift          sqlite3 wrapper, WAL/pragmas, prepared statements
-Database/Schema.swift            DDL + triggers + migrations V1–V5
+Database/Schema.swift            DDL + triggers + migrations V1–V6
 Database/TransactionStore.swift  CRUD on transactions
 Database/CategoryAccountStore.swift  CRUD on categories + accounts, balances
 Database/SummaryStore.swift      reads monthly_summaries for dashboard/reports
 Database/StatementStore.swift    statements CRUD + atomic finalize/reopen
 Database/CurrencyStore.swift     currency_rates CRUD
+Database/PayeeStore.swift        payees CRUD, find-or-create by name
+Database/ScheduleStore.swift     schedules CRUD + postDue
 Database/MoneyProImport.swift    Money Pro `.back` importer (replaces the ledger; plain SQL over ATTACH)
 Database/SeedData.swift          first-launch defaults + sample transactions
 Models/Models.swift, Money.swift domain structs, minor-unit money helpers
@@ -132,10 +141,10 @@ Mutating helpers on `AppState` serialize through `db.sync { … }` and bump
 |---|---|---|
 | Dashboard | `DashboardView` | summary of the current period |
 | Accounts | `AccountsView` → `AccountDetailView` → `ReconciliationSheet` | account management, balances, reconciliation statements |
-| Transactions | `TransactionsView` | account list → per-account transaction list; landscape split view with inline `TransactionEntryView`, portrait uses the `TransactionEditor` sheet |
+| Transactions | `TransactionsView` | account list → per-account transaction list; landscape split view with inline `TransactionEntryView`, portrait uses the `TransactionEditor` sheet. The entry form handles splits (one row per line, shared `split_group`), payee, loan role and Repeat (creates a schedule) |
 | Reports | `ReportsView` | aggregate queries over `monthly_summaries` |
 | Categories | `CategoriesView` | expense/income categories with sub-categories |
-| Settings | `SettingsView` | home currency, rates, rebuild summaries, Money Pro import |
+| Settings | `SettingsView` → `SchedulesView`, `PayeesView` | home currency, rates, scheduled transactions, payees, rebuild summaries, Money Pro import |
 
 Entity management (add/edit/archive/delete) lives only in its dedicated tab.
 Drill-down lists elsewhere are read-only.
@@ -150,7 +159,7 @@ swallows arrow keys before the List sees them.
 Shortcut vocabulary, keep it consistent: ⌘N new, ⌘F search, ⌘R reconcile
 (open the sheet, toggle reconciliation mode, or reopen a statement depending
 on the screen), Space ticks the selected row in reconciliation mode,
-⌘⇧A archive, ⌘U unarchive, ⌘⌫ delete. Every swipe action has one of these
+⌘⇧A archive, ⌘U unarchive, ⌘⌫ delete, ⌘⇧B adjust balance. Every swipe action has one of these
 twins, either on the keyboard-selected row or in the entity's detail
 surface (account detail screen, category editor sheet). The delete path
 always goes through the shared `*ManagementAlerts` modifier so the
@@ -158,6 +167,10 @@ reference-count gate runs no matter where the delete started.
 
 `NumberPadField` is a custom Numbers-style numpad for amount entry (one of
 the few deliberate departures from stock controls).
+
+Amounts on screen always go through `Formatters.moneyText(_:currency:)` or
+`Text.moneyStyle()` (monospaced face + tabular digits). Don't write a bare
+`Text(Formatters.money(...))`.
 
 ### Naming gotcha worth knowing
 
@@ -175,8 +188,8 @@ so it stays as-is. If you add new top-level types, sanity-check against
   shape can't be served by `monthly_summaries`, add a covering index on
   `transactions` first; only add a new materialized table if profiling shows
   the index isn't enough.
-- **Adding a column to `transactions`** → write a `migrateToV6` in
-  `Schema.swift`, add the `current < 6` block to `Schema.migrate`, bump
+- **Adding a column to `transactions`** → write a `migrateToV7` in
+  `Schema.swift`, add the `current < 7` block to `Schema.migrate`, bump
   `latestVersion`, and update both insert/update bind sites in `TransactionStore`.
   If the column feeds `monthly_summaries`, also extend the `WHEN` clause of the
   `tx_au` trigger.

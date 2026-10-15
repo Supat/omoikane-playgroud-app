@@ -156,7 +156,7 @@ struct ReconciliationSheet: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Text(Formatters.money(signed, currency: account.currency))
+                Formatters.moneyText(signed, currency: account.currency)
                     .monospacedDigit()
                     .foregroundStyle(signed >= 0 ? Color.primary : .red)
             }
@@ -192,7 +192,8 @@ struct ReconciliationSheet: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title).font(.caption).foregroundStyle(.secondary)
             Text(value)
-                .font(.subheadline.monospacedDigit())
+                .moneyStyle()
+                .font(.subheadline)
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)

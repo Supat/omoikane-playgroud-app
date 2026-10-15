@@ -23,6 +23,23 @@ struct Money: Hashable, CustomStringConvertible {
         return f.string(from: NSNumber(value: value)) ?? "\(value)"
     }
 
+    /// "1,234.5" → minor units for `currency`; nil for empty or unparsable text.
+    static func parseMinor(_ text: String, currency: String) -> Int64? {
+        let cleaned = text.replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)
+        guard !cleaned.isEmpty else { return nil }
+        let digits = fractionDigits(for: currency)
+        if digits == 0 { return Int64(cleaned) }
+        guard let d = Double(cleaned) else { return nil }
+        return Int64((d * pow(10.0, Double(digits))).rounded())
+    }
+
+    /// Minor units → plain editable text ("1234" or "12.34"), no symbol.
+    static func formatMinorText(_ minor: Int64, currency: String) -> String {
+        let digits = fractionDigits(for: currency)
+        if digits == 0 { return String(minor) }
+        return String(format: "%.\(digits)f", Double(minor) / pow(10.0, Double(digits)))
+    }
+
     static func fractionDigits(for currency: String) -> Int {
         // Most everyday currencies; "JPY", "KRW" have no fraction.
         switch currency {
