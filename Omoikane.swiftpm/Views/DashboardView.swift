@@ -9,6 +9,9 @@ struct DashboardView: View {
     @State private var trend: [GroupedSummary] = []
     @State private var topAccounts: [GroupedSummary] = []
     @State private var ymKey: Int = YearMonth.current()
+    /// Trend range in months; the bucket (daily/weekly/monthly) follows it.
+    @State private var trendMonths: Int = 6
+    @State private var trendDaily: [SummaryStore.DayTotal] = []
     @State private var budgets: [BudgetRow] = []
     @State private var essentialByCurrency: [String: Int64] = [:]
     @State private var dailyTotals: [Int: Int64] = [:]
@@ -310,25 +313,50 @@ struct DashboardView: View {
         }
     }
 
+    private var trendUnit: Calendar.Component { TrendSeries.unit(forMonths: trendMonths) }
+
+    private var trendPoints: [TrendSeries.Point] {
+        TrendSeries.points(
+            unit: trendUnit, endingAt: ymKey, monthsBack: trendMonths,
+            monthly: trend.compactMap { r in app.convertedToHome(r.totalMinor, from: r.currency).map { (r.key, $0) } },
+            daily: trendDaily.compactMap { r in app.convertedToHome(r.minor, from: r.currency).map { (r.dayKey, $0) } }
+        )
+    }
+
     private var trendChart: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Last 6 months — expense (\(app.homeCurrency))").font(.headline)
-            if monthlyHomeExpense.isEmpty {
+            HStack {
+                Text("Expense trend (\(app.homeCurrency)) · \(TrendSeries.unitName(trendUnit))").font(.headline)
+                Spacer()
+                Picker("Range", selection: $trendMonths) {
+                    Text("1M").tag(1)
+                    Text("3M").tag(3)
+                    Text("6M").tag(6)
+                    Text("12M").tag(12)
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 260)
+            }
+            if trendPoints.allSatisfy({ $0.minor == 0 }) {
                 EmptyStateView(title: "No data", message: "Add a few entries to see trends.", sfSymbol: "chart.bar")
                     .frame(height: 180)
             } else {
-                Chart(monthlyHomeExpense, id: \.label) { row in
+                Chart(trendPoints, id: \.date) { p in
                     BarMark(
-                        x: .value("Month", YearMonth.date(fromLabel: row.label), unit: .month),
-                        y: .value("Total", Double(row.minor))
+                        x: .value("Date", p.date, unit: trendUnit),
+                        y: .value("Total", Double(p.minor))
                     )
                     .foregroundStyle(.red.gradient)
                 }
                 .chartXAxis {
-                    AxisMarks(values: .stride(by: .month)) { _ in
+                    AxisMarks(values: .stride(by: trendUnit, count: max(1, trendPoints.count / 8))) { _ in
                         AxisGridLine()
                         AxisTick()
-                        AxisValueLabel(format: .dateTime.month(.abbreviated).year())
+                        if trendUnit == .month {
+                            AxisValueLabel(format: .dateTime.month(.abbreviated).year())
+                        } else {
+                            AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                        }
                     }
                 }
                 .frame(height: 220)
@@ -337,6 +365,7 @@ struct DashboardView: View {
         }
         .padding(14)
         .glassCard()
+        .onChange(of: trendMonths) { _, _ in reload() }
     }
 
     private var categoryBreakdown: some View {
@@ -433,18 +462,6 @@ struct DashboardView: View {
 
     private struct LabeledMinor: Hashable { let label: String; let minor: Int64 }
 
-    private var monthlyHomeExpense: [LabeledMinor] {
-        var bucket: [String: Int64] = [:]
-        for row in trend {
-            if let h = app.convertedToHome(row.totalMinor, from: row.currency) {
-                bucket[row.key, default: 0] += h
-            }
-        }
-        return bucket
-            .sorted { $0.key < $1.key }
-            .map { LabeledMinor(label: $0.key, minor: $0.value) }
-    }
-
     private struct CategoryRow: Hashable { let name: String; let minor: Int64 }
 
     private var categoryRows: [CategoryRow] {
@@ -465,8 +482,9 @@ struct DashboardView: View {
         do {
             totals = try app.summaries.totals(fromYM: ymKey, toYM: ymKey)
             byCategory = try app.summaries.byCategory(fromYM: ymKey, toYM: ymKey, kind: .expense)
-            let win = YearMonth.window(endingAt: ymKey, monthsBack: 6)
+            let win = YearMonth.window(endingAt: ymKey, monthsBack: trendMonths)
             trend = try app.summaries.byMonth(fromYM: win.start, toYM: win.end, kind: .expense)
+            trendDaily = trendUnit == .month ? [] : try app.summaries.dailyTotals(fromYM: win.start, toYM: win.end, kind: .expense)
             topAccounts = try app.summaries.netByAccount(fromYM: ymKey, toYM: ymKey)
             essentialByCurrency = try app.summaries.essentialExpense(fromYM: ymKey, toYM: ymKey)
             dailyTotals = try app.summaries.dailyExpense(yearMonth: ymKey).mapValues { sumToHome($0) }

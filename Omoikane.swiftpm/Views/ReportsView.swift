@@ -279,24 +279,8 @@ struct ReportsView: View {
         }
     }
 
-    /// Bucket size for the trend chart: daily for one month, weekly for a
-    /// quarter, monthly beyond that.
-    private var trendUnit: Calendar.Component {
-        switch monthsBack {
-        case 1:  return .day
-        case 3:  return .weekOfYear
-        default: return .month
-        }
-    }
-    private var trendUnitName: String {
-        switch trendUnit {
-        case .day:        return "daily"
-        case .weekOfYear: return "weekly"
-        default:          return "monthly"
-        }
-    }
-
-    private struct TrendPoint: Hashable { let date: Date; let minor: Int64 }
+    private var trendUnit: Calendar.Component { TrendSeries.unit(forMonths: monthsBack) }
+    private var trendUnitName: String { TrendSeries.unitName(trendUnit) }
 
     /// Amount in the display currency, or nil when it can't be shown.
     private func displayAmount(_ minor: Int64, currency: String) -> Int64? {
@@ -304,49 +288,12 @@ struct ReportsView: View {
         return app.convertedToHome(minor, from: currency)
     }
 
-    /// One point per bucket across the whole window, zero-filled so gaps
-    /// read as zero rather than vanishing. The window stops at today when
-    /// it ends in the current month.
-    private var trendPoints: [TrendPoint] {
-        let cal = Calendar.current
-        let win = YearMonth.window(endingAt: anchorYM, monthsBack: monthsBack)
-        let (sy, sm) = YearMonth.components(win.start)
-        let (ey, em) = YearMonth.components(win.end)
-        guard let startDate = cal.date(from: DateComponents(year: sy, month: sm, day: 1)),
-              let nextMonth = cal.date(from: DateComponents(year: ey, month: em + 1, day: 1)),
-              let monthEnd = cal.date(byAdding: .day, value: -1, to: nextMonth)
-        else { return [] }
-        let endDate = min(monthEnd, Date())
-        guard startDate <= endDate else { return [] }
-
-        func bucketStart(_ d: Date) -> Date {
-            cal.dateInterval(of: trendUnit, for: d)?.start ?? d
-        }
-        var bucket: [Date: Int64] = [:]
-        if trendUnit == .month {
-            for row in byMonth {
-                if let a = displayAmount(row.totalMinor, currency: row.currency) {
-                    bucket[bucketStart(YearMonth.date(fromLabel: row.key)), default: 0] += a
-                }
-            }
-        } else {
-            for row in byDay {
-                if let a = displayAmount(row.minor, currency: row.currency) {
-                    bucket[bucketStart(Date.from(dayKey: row.dayKey)), default: 0] += a
-                }
-            }
-        }
-        var points: [TrendPoint] = []
-        var cursor = bucketStart(startDate)
-        let last = bucketStart(endDate)
-        var guardCount = 0
-        while cursor <= last, guardCount < 1000 {
-            points.append(TrendPoint(date: cursor, minor: bucket[cursor] ?? 0))
-            guard let next = cal.date(byAdding: trendUnit, value: 1, to: cursor) else { break }
-            cursor = bucketStart(next)
-            guardCount += 1
-        }
-        return points
+    private var trendPoints: [TrendSeries.Point] {
+        TrendSeries.points(
+            unit: trendUnit, endingAt: anchorYM, monthsBack: monthsBack,
+            monthly: byMonth.compactMap { r in displayAmount(r.totalMinor, currency: r.currency).map { (r.key, $0) } },
+            daily: byDay.compactMap { r in displayAmount(r.minor, currency: r.currency).map { (r.dayKey, $0) } }
+        )
     }
 
     private struct CategoryRow: Hashable { let name: String; let minor: Int64 }
