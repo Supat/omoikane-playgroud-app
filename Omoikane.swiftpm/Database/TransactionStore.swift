@@ -14,8 +14,8 @@ final class TransactionStore {
                  counterparty_amount_minor, note, tags, created_at, updated_at,
                  cleared_at, statement_id,
                  counterparty_cleared_at, counterparty_statement_id, split_group,
-                 payee_id, loan_role, is_essential)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
+                 payee_id, loan_role, is_essential, is_reimbursable)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
         """)
         bindInsert(s, tx, now: now)
         try s.step()
@@ -33,8 +33,8 @@ final class TransactionStore {
                      counterparty_amount_minor, note, tags, created_at, updated_at,
                      cleared_at, statement_id,
                      counterparty_cleared_at, counterparty_statement_id, split_group,
-                     payee_id, loan_role, is_essential)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
+                     payee_id, loan_role, is_essential, is_reimbursable)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
             """)
             for tx in items {
                 s.reset()
@@ -65,7 +65,7 @@ final class TransactionStore {
                    note = ?, tags = ?, updated_at = ?,
                    cleared_at = ?, statement_id = ?,
                    counterparty_cleared_at = ?, counterparty_statement_id = ?,
-                   split_group = ?, payee_id = ?, loan_role = ?, is_essential = ?
+                   split_group = ?, payee_id = ?, loan_role = ?, is_essential = ?, is_reimbursable = ?
              WHERE id = ?;
         """)
         s.bind(dayKey,                                        at: 1)
@@ -89,7 +89,8 @@ final class TransactionStore {
         s.bind(tx.payeeId,                                    at: 19)
         s.bind(tx.loanRole?.rawValue,                         at: 20)
         s.bind(tx.isEssential ? 1 : 0,                        at: 21)
-        s.bind(tx.id,                                         at: 22)
+        s.bind(tx.isReimbursable ? 1 : 0,                     at: 22)
+        s.bind(tx.id,                                         at: 23)
         try s.step()
     }
 
@@ -285,7 +286,7 @@ final class TransactionStore {
                note, tags, created_at, updated_at,
                cleared_at, statement_id,
                counterparty_cleared_at, counterparty_statement_id, split_group,
-               payee_id, loan_role, is_essential
+               payee_id, loan_role, is_essential, is_reimbursable
     """
 
     private func bindInsert(_ s: Statement, _ tx: Transaction, now: Int64) {
@@ -311,6 +312,7 @@ final class TransactionStore {
         s.bind(tx.payeeId,                                    at: 20)
         s.bind(tx.loanRole?.rawValue,                         at: 21)
         s.bind(tx.isEssential ? 1 : 0,                        at: 22)
+        s.bind(tx.isReimbursable ? 1 : 0,                     at: 23)
     }
 
     private static func read(_ s: Statement) -> Transaction {
@@ -344,7 +346,8 @@ final class TransactionStore {
             splitGroup: s.optionalInt64(18),
             payeeId: s.optionalInt64(19),
             loanRole: s.optionalString(20).flatMap(LoanRole.init(rawValue:)),
-            isEssential: s.int(21) != 0
+            isEssential: s.int(21) != 0,
+            isReimbursable: s.int(22) != 0
         )
     }
 

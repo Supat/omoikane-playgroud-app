@@ -29,7 +29,7 @@ enum BalanceSQL {
 }
 
 enum Schema {
-    static let latestVersion = 11
+    static let latestVersion = 12
 
     static func migrate(_ db: Database) throws {
         try db.exec("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY);")
@@ -111,6 +111,12 @@ enum Schema {
             try db.transaction {
                 try migrateToV11(db)
                 try db.exec("INSERT INTO schema_version(version) VALUES (11);")
+            }
+        }
+        if current < 12 {
+            try db.transaction {
+                try migrateToV12(db)
+                try db.exec("INSERT INTO schema_version(version) VALUES (12);")
             }
         }
     }
@@ -619,5 +625,13 @@ extension Schema {
     static func migrateToV11(_ db: Database) throws {
         try db.exec("ALTER TABLE schedules ADD COLUMN interest_minor INTEGER NOT NULL DEFAULT 0;")
         try db.exec("ALTER TABLE schedules ADD COLUMN interest_category_id INTEGER REFERENCES categories(id);")
+    }
+
+    /// V12: `is_reimbursable` on transactions and schedules, the twin of
+    /// `is_essential`: spending someone else will pay back. Expense only in
+    /// the UI; not in `monthly_summaries`.
+    static func migrateToV12(_ db: Database) throws {
+        try db.exec("ALTER TABLE transactions ADD COLUMN is_reimbursable INTEGER NOT NULL DEFAULT 0;")
+        try db.exec("ALTER TABLE schedules ADD COLUMN is_reimbursable INTEGER NOT NULL DEFAULT 0;")
     }
 }

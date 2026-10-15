@@ -64,6 +64,12 @@ struct SchedulesView: View {
                             .font(.caption)
                             .accessibilityLabel("Essential")
                     }
+                    if sc.isReimbursable {
+                        Image(systemName: "arrow.uturn.backward.circle")
+                            .foregroundStyle(.teal)
+                            .font(.caption)
+                            .accessibilityLabel("Reimbursable")
+                    }
                     Text(sc.kind == .transfer ? transferLabel(sc) : (categories[sc.categoryId]?.name ?? sc.kind.displayName))
                 }
                 Text("\(acct?.name ?? "—") · \(sc.cadenceLabel) · next \(Formatters.mediumDate.string(from: sc.nextDue))")
@@ -127,6 +133,7 @@ struct ScheduleEditor: View {
     @State private var hasEnd = false
     @State private var endOn = Date()
     @State private var isEssential = false
+    @State private var isReimbursable = false
     @State private var interestText = ""
     @State private var interestCategoryId: Int64? = nil
 
@@ -203,6 +210,9 @@ struct ScheduleEditor: View {
                     if kind == .expense {
                         Toggle(isOn: $isEssential) {
                             Label("Essential", systemImage: "lifepreserver")
+                        }
+                        Toggle(isOn: $isReimbursable) {
+                            Label("Reimbursable", systemImage: "arrow.uturn.backward.circle")
                         }
                     }
                 }
@@ -303,6 +313,7 @@ struct ScheduleEditor: View {
             hasEnd = sc.endOn != nil
             endOn = sc.endOn ?? sc.nextDue
             isEssential = sc.isEssential
+            isReimbursable = sc.isReimbursable
             if sc.interestMinor > 0 {
                 interestText = Money.formatMinorText(sc.interestMinor, currency: fromCurrency)
                 interestCategoryId = sc.interestCategoryId
@@ -336,6 +347,7 @@ struct ScheduleEditor: View {
             nextDue: nextDue,
             endOn: hasEnd ? endOn : nil,
             isEssential: kind == .expense && isEssential,
+            isReimbursable: kind == .expense && isReimbursable,
             dayOfMonth: Calendar.current.component(.day, from: nextDue),
             interestMinor: interestMinor,
             interestCategoryId: interestMinor > 0 ? interestCategoryId : nil

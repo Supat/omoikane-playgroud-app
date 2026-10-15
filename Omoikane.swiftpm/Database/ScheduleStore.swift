@@ -11,7 +11,7 @@ final class ScheduleStore {
     private static let columns = """
         SELECT id, kind, amount_minor, category_id, account_id, counterparty_account_id,
                counterparty_amount_minor, payee_id, note, frequency, interval, next_due, end_on, is_essential, day_of_month,
-               interest_minor, interest_category_id
+               interest_minor, interest_category_id, is_reimbursable
     """
 
     func list() throws -> [Schedule] {
@@ -26,8 +26,8 @@ final class ScheduleStore {
         let s = try db.prepare("""
             INSERT INTO schedules (kind, amount_minor, category_id, account_id, counterparty_account_id,
                                    counterparty_amount_minor, payee_id, note, frequency, interval, next_due, end_on, is_essential, day_of_month,
-                                   interest_minor, interest_category_id)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
+                                   interest_minor, interest_category_id, is_reimbursable)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
         """)
         bind(s, sc)
         try s.step()
@@ -40,11 +40,11 @@ final class ScheduleStore {
                SET kind = ?, amount_minor = ?, category_id = ?, account_id = ?, counterparty_account_id = ?,
                    counterparty_amount_minor = ?, payee_id = ?, note = ?, frequency = ?, interval = ?,
                    next_due = ?, end_on = ?, is_essential = ?, day_of_month = ?,
-                   interest_minor = ?, interest_category_id = ?
+                   interest_minor = ?, interest_category_id = ?, is_reimbursable = ?
              WHERE id = ?;
         """)
         bind(s, sc)
-        s.bind(sc.id, at: 17)
+        s.bind(sc.id, at: 18)
         try s.step()
     }
 
@@ -89,6 +89,7 @@ final class ScheduleStore {
                     )
                     tx.payeeId = sc.payeeId
                     tx.isEssential = sc.kind == .expense && sc.isEssential
+                    tx.isReimbursable = sc.kind == .expense && sc.isReimbursable
                     if acct?.clearsEntriesByDefault == true { tx.clearedAt = now }
                     if sc.kind == .transfer, sc.interestMinor > 0, let icat = sc.interestCategoryId {
                         // Same shape as the entry form: transfer + interest expense in one group.
@@ -147,6 +148,7 @@ final class ScheduleStore {
         s.bind(Int64(sc.dayOfMonth ?? Calendar.current.component(.day, from: sc.nextDue)), at: 14)
         s.bind(sc.kind == .transfer ? sc.interestMinor : 0, at: 15)
         s.bind(sc.kind == .transfer ? sc.interestCategoryId : nil, at: 16)
+        s.bind(sc.isReimbursable ? 1 : 0, at: 17)
     }
 
     private static func read(_ s: Statement) -> Schedule {
@@ -165,6 +167,7 @@ final class ScheduleStore {
             nextDue: Date.from(dayKey: s.int(11)),
             endOn: s.optionalInt64(12).map { Date.from(dayKey: Int($0)) },
             isEssential: s.int(13) != 0,
+            isReimbursable: s.int(17) != 0,
             dayOfMonth: s.optionalInt64(14).map(Int.init),
             interestMinor: s.int64(15),
             interestCategoryId: s.optionalInt64(16)

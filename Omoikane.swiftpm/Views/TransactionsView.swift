@@ -471,6 +471,12 @@ struct AccountTransactionsView: View {
                             .font(.caption)
                             .accessibilityLabel("Essential")
                     }
+                    if tx.isReimbursable {
+                        Image(systemName: "arrow.uturn.backward.circle")
+                            .foregroundStyle(.teal)
+                            .font(.caption)
+                            .accessibilityLabel("Reimbursable")
+                    }
                     Text(tx.kind == .transfer ? role : (cat?.name ?? "—")).font(.body)
                 }
                 HStack(spacing: 6) {

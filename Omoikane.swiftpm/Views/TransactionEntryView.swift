@@ -61,6 +61,7 @@ struct TransactionEntryView: View {
     /// even when its interest row was tapped. nil for new entries.
     @State private var editedRow: Transaction? = nil
     @State private var isEssential: Bool = false
+    @State private var isReimbursable: Bool = false
     /// New entries only: also create a schedule that repeats this entry.
     @State private var repeatFrequency: ScheduleFrequency? = nil
     /// Two or more lines = a split; the main Category picker and Amount
@@ -335,6 +336,9 @@ struct TransactionEntryView: View {
                     Toggle(isOn: $isEssential) {
                         Label("Essential", systemImage: "lifepreserver")
                     }
+                    Toggle(isOn: $isReimbursable) {
+                        Label("Reimbursable", systemImage: "arrow.uturn.backward.circle")
+                    }
                 }
                 Toggle(kind == .transfer ? "From-side cleared" : "Cleared",
                        isOn: $clearedNow)
@@ -344,7 +348,7 @@ struct TransactionEntryView: View {
             } header: {
                 Text("Status")
             } footer: {
-                Text((kind == .expense ? "Essential marks spending you could not avoid in order to get by. " : "")
+                Text((kind == .expense ? "Essential marks spending you could not avoid in order to get by. Reimbursable marks spending someone else will pay back. " : "")
                      + "Cleared entries are marked with a check in the list and count toward an account's cleared balance. Toggling off here detaches this entry from any reconciled statement it was on.")
                     .font(.footnote)
             }
@@ -555,6 +559,7 @@ struct TransactionEntryView: View {
         counterpartyClearedNow = (tx.counterpartyClearedAt != nil)
         payeeId = tx.payeeId
         isEssential = tx.isEssential
+        isReimbursable = tx.isReimbursable
         if tx.kind == .transfer {
             if let interest = rows.first(where: { $0.kind == .expense }) {
                 interestText = Money.formatMinorText(interest.amountMinor, currency: interest.currency)
@@ -620,6 +625,7 @@ struct TransactionEntryView: View {
                 template.updatedAt = now
                 template.payeeId = payeeId
                 template.isEssential = kind == .expense && isEssential
+                template.isReimbursable = kind == .expense && isReimbursable
                 applyClearingToggles(to: &template, now: now)
                 var lines: [Transaction] = isSplit
                     ? splitLines.map { line in
@@ -662,6 +668,7 @@ struct TransactionEntryView: View {
                 updated.updatedAt = now
                 updated.payeeId = payeeId
                 updated.isEssential = kind == .expense && isEssential
+                updated.isReimbursable = kind == .expense && isReimbursable
                 applyClearingToggles(to: &updated, now: now)
                 try app.updateTransaction(updated)
             } else {
@@ -682,6 +689,7 @@ struct TransactionEntryView: View {
                 )
                 tx.payeeId = payeeId
                 tx.isEssential = kind == .expense && isEssential
+                tx.isReimbursable = kind == .expense && isReimbursable
                 applyClearingToggles(to: &tx, now: now)
                 try app.addTransaction(tx)
                 if soldEntirely, kind == .transfer, fromAccount?.kind == .asset {
@@ -697,6 +705,7 @@ struct TransactionEntryView: View {
                     nextDue: ScheduleStore.advance(occurredOn, frequency: freq, interval: 1),
                     endOn: nil,
                     isEssential: kind == .expense && isEssential,
+                    isReimbursable: kind == .expense && isReimbursable,
                     interestMinor: interestMinor,
                     interestCategoryId: interestMinor > 0 ? interestCategoryId : nil
                 )
@@ -725,6 +734,7 @@ struct TransactionEntryView: View {
                 interestCategoryId = nil
                 soldEntirely = false
                 isEssential = false
+                isReimbursable = false
                 repeatFrequency = nil
                 splitLines = []
                 focusedField = nil

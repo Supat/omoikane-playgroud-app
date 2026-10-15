@@ -199,6 +199,7 @@ struct Schedule: Identifiable, Hashable {
     var nextDue: Date
     var endOn: Date?
     var isEssential: Bool = false
+    var isReimbursable: Bool = false
     /// Anchor for monthly/yearly cadence (1...31). Kept separately so a
     /// schedule on the 31st survives short months.
     var dayOfMonth: Int? = nil
@@ -247,6 +248,8 @@ struct Transaction: Identifiable, Hashable {
     var loanRole: LoanRole? = nil
     /// Could not be avoided in order to get by (rent, utilities, medicine).
     var isEssential: Bool = false
+    /// Someone else will pay this back (work expenses, a friend's share).
+    var isReimbursable: Bool = false
 
     /// Amount with sign — useful for net-flow math (income positive, expense negative).
     var signedAmountMinor: Int64 {
