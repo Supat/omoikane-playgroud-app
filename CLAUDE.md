@@ -128,9 +128,11 @@ conditions*. Three reasons we went with raw `import SQLite3`:
   every sign flip (balance owed is stored negative); `displayGroup` /
   `[Account].displayGroups()` drive the four sections (Payment Accounts,
   Credit Cards, Assets, Liabilities) on Accounts, Transactions and in
-  account pickers. The entry form adds, for new transfers only: an
-  Interest amount + category when the target is a liability (posted as a
-  separate, unlinked expense row) and a "Sold entirely" toggle when the
+  account pickers. The entry form adds for transfers: an
+  Interest amount + category when the target is a liability (an expense
+  row sharing the transfer's `split_group`, so the form edits both from
+  either row and delete takes both; the importer links a discharge's
+  interest the same way) and, new entries only, a "Sold entirely" toggle when the
   source is an asset (`adjustBalance(…, to: 0, on:)` writes the rest off
   under Balance adjustment). The Accounts tab shows a home-currency net
   worth and per-group totals.

@@ -156,9 +156,12 @@ enum MoneyProImport {
         SELECT (SELECT id FROM categories WHERE name = 'Transfer' AND sort_order = 9000) AS transfer_cat,
                (SELECT id FROM categories WHERE name = 'Uncategorized' AND sort_order = 9001) AS uncat;
 
+        -- Multi-line splits, plus discharges with interest (transfer + interest row share a group).
         CREATE TEMP TABLE split_groups AS
-        SELECT transactionsPrimaryKey AS pk, ROW_NUMBER() OVER (ORDER BY transactionsPrimaryKey) AS grp
-          FROM mp.splitTransaction GROUP BY transactionsPrimaryKey HAVING COUNT(*) > 1;
+        SELECT pk, ROW_NUMBER() OVER (ORDER BY pk) AS grp FROM (
+            SELECT transactionsPrimaryKey AS pk FROM mp.splitTransaction GROUP BY transactionsPrimaryKey HAVING COUNT(*) > 1
+            UNION
+            SELECT primaryKey FROM mp.transactions WHERE isDeleted = 0 AND transactionType = 6 AND COALESCE(interest, 0) > 0);
 
         -- One row per split line; rows with no split (transfers, strays) import whole.
         -- Types 3/6 move money from the payment account into the asset/liability,
@@ -183,7 +186,10 @@ enum MoneyProImport {
           JOIN acct_src fa ON fa.primaryKey = t.cashFlowPrimaryKey
           LEFT JOIN acct_src ta ON ta.primaryKey = t.secondCashFlowPrimaryKey
           LEFT JOIN acct_src xa ON xa.primaryKey <> '' AND xa.primaryKey IN (t.assetsPrimaryKey, t.liabilitiesPrimaryKey)
+          -- Transfers are one row whatever Money Pro split them into; keep the first line for its category.
           LEFT JOIN mp.splitTransaction s ON s.transactionsPrimaryKey = t.primaryKey
+               AND (t.transactionType NOT IN (2, 3, 4, 5, 6)
+                    OR s.rowid = (SELECT MIN(rowid) FROM mp.splitTransaction WHERE transactionsPrimaryKey = t.primaryKey))
          WHERE t.isDeleted = 0 AND t.transactionType <> 7;
 
         INSERT INTO transactions (occurred_on, year_month, occurred_at, amount_minor, currency, kind,
@@ -217,7 +223,7 @@ enum MoneyProImport {
 
         -- Interest paid on a discharge: an expense from the payment account.
         INSERT INTO transactions (occurred_on, year_month, occurred_at, amount_minor, currency, kind,
-                                  category_id, account_id, note, tags, created_at, updated_at, cleared_at, payee_id)
+                                  category_id, account_id, note, tags, created_at, updated_at, cleared_at, payee_id, split_group)
         SELECT CAST(julianday(x.date, 'unixepoch', 'localtime') - julianday('1970-01-01') AS INTEGER),
                CAST(strftime('%Y%m', x.date, 'unixepoch', 'localtime') AS INTEGER),
                CAST(x.date AS INTEGER),
@@ -228,10 +234,12 @@ enum MoneyProImport {
                COALESCE(NULLIF(x.description, '') || ' · ', '') || 'Interest',
                '[]', CAST(x.date AS INTEGER), CAST(x.date AS INTEGER),
                CASE WHEN x.isCleared = 1 THEN CAST(x.date AS INTEGER) END,
-               (SELECT ps.new_id FROM payee_src ps WHERE ps.primaryKey = x.payee)
-          FROM (SELECT * FROM tx_src WHERE interest > 0 GROUP BY pk) x
+               (SELECT ps.new_id FROM payee_src ps WHERE ps.primaryKey = x.payee),
+               (SELECT g.grp FROM split_groups g WHERE g.pk = x.pk)
+          FROM tx_src x
           LEFT JOIN cur_scale fs ON fs.cur = x.cash_cur
-          CROSS JOIN fallback f;
+          CROSS JOIN fallback f
+         WHERE x.interest > 0;
 
         -- Money Pro stores "home units per 1 unit" inverted relative to currency_rates.
         INSERT INTO currency_rates (currency, rate_to_home, updated_at)

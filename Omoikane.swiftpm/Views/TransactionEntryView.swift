@@ -49,13 +49,17 @@ struct TransactionEntryView: View {
     @State private var payeeId: Int64? = nil
     @State private var addingPayee = false
     @State private var newPayeeName = ""
-    /// Transfers into a liability account only (a loan repayment): the
-    /// interest part is posted as a separate expense from the same account.
+    /// Transfers into a liability account (a loan repayment): the interest
+    /// part is an expense row from the same account, linked to the transfer
+    /// through `split_group` so the two load, save and delete together.
     @State private var interestText: String = ""
     @State private var interestCategoryId: Int64? = nil
     /// Transfers out of an asset account only: write the remaining value off
     /// after the sale so the asset lands on zero.
     @State private var soldEntirely: Bool = false
+    /// The row the form actually edits: the transfer of a repayment group
+    /// even when its interest row was tapped. nil for new entries.
+    @State private var editedRow: Transaction? = nil
     @State private var isEssential: Bool = false
     /// New entries only: also create a schedule that repeats this entry.
     @State private var repeatFrequency: ScheduleFrequency? = nil
@@ -98,7 +102,7 @@ struct TransactionEntryView: View {
 
     var body: some View {
         Form {
-            if let tx = transaction, tx.statementId != nil || tx.counterpartyStatementId != nil {
+            if let tx = editedRow ?? transaction, tx.statementId != nil || tx.counterpartyStatementId != nil {
                 Section {
                     HStack(spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill")
@@ -187,7 +191,7 @@ struct TransactionEntryView: View {
                     if let transferRole {
                         Text(transferRole).font(.footnote).foregroundStyle(.secondary)
                     }
-                    if !isEditing, toAccount?.kind == .liability {
+                    if toAccount?.kind == .liability || !interestText.isEmpty {
                         HStack {
                             Text("Interest")
                             Spacer()
@@ -445,8 +449,10 @@ struct TransactionEntryView: View {
         }
     }
 
+    /// Not tied to the target account's kind: once an interest row exists,
+    /// re-pointing the transfer must not silently drop it.
     private var interestMinor: Int64 {
-        guard !isEditing, toAccount?.kind == .liability else { return 0 }
+        guard kind == .transfer else { return 0 }
         return Money.parseMinor(interestText, currency: fromCurrency) ?? 0
     }
 
@@ -500,7 +506,7 @@ struct TransactionEntryView: View {
             accounts = try app.accounts.list()
             payees = try app.payees.list()
             // Needs the accounts (for the to-currency) before it can be formatted.
-            if let cp = transaction?.counterpartyAmountMinor {
+            if let cp = (editedRow ?? transaction)?.counterpartyAmountMinor {
                 counterpartyAmountText = Money.formatMinorText(cp, currency: toCurrency)
             }
             if accountId == nil {
@@ -523,20 +529,30 @@ struct TransactionEntryView: View {
     }
 
     private func primeFromExisting() {
-        guard let tx = transaction else { return }
+        guard let tapped = transaction else { return }
+        // A group holding a transfer is a repayment plus its interest row;
+        // the form edits the transfer whichever row was tapped.
+        let rows = tapped.splitGroup.flatMap { try? app.transactions.listGroup($0) } ?? []
+        let tx = rows.first { $0.kind == .transfer } ?? tapped
         kind = tx.kind
         amountText = Money.formatMinorText(tx.amountMinor, currency: tx.currency)
         occurredOn = tx.occurredOn
         categoryId = tx.categoryId
         accountId = tx.accountId
         counterpartyAccountId = tx.counterpartyAccountId
+        editedRow = tx
         note = tx.note ?? ""
         tagsText = tx.tags.joined(separator: ", ")
         clearedNow = (tx.clearedAt != nil)
         counterpartyClearedNow = (tx.counterpartyClearedAt != nil)
         payeeId = tx.payeeId
         isEssential = tx.isEssential
-        if let g = tx.splitGroup, let rows = try? app.transactions.listGroup(g), rows.count > 1 {
+        if tx.kind == .transfer {
+            if let interest = rows.first(where: { $0.kind == .expense }) {
+                interestText = Money.formatMinorText(interest.amountMinor, currency: interest.currency)
+                interestCategoryId = interest.categoryId
+            }
+        } else if rows.count > 1 {
             splitLines = rows.map { SplitLine(categoryId: $0.categoryId, amountText: Money.formatMinorText($0.amountMinor, currency: $0.currency)) }
         }
     }
@@ -572,10 +588,13 @@ struct TransactionEntryView: View {
             : nil
 
         do {
-            if isSplit || transaction?.splitGroup != nil {
-                // Split path: one row per line, replacing whatever rows
-                // this logical transaction had before.
-                var template = transaction ?? Transaction(
+            if isSplit || transaction?.splitGroup != nil || interestMinor > 0 {
+                // Group path: one row per line (split lines, or a repayment
+                // transfer plus its interest expense), replacing whatever
+                // rows this logical transaction had before.
+                // editedRow, not the tapped row: tapping the interest line
+                // must not hand its clearing state to the transfer.
+                var template = editedRow ?? transaction ?? Transaction(
                     id: 0, occurredOn: occurredOn, amountMinor: amt, currency: fromCurrency,
                     kind: kind, categoryId: cat, accountId: acct,
                     counterpartyAccountId: nil, counterpartyAmountMinor: nil,
@@ -594,7 +613,7 @@ struct TransactionEntryView: View {
                 template.payeeId = payeeId
                 template.isEssential = kind == .expense && isEssential
                 applyClearingToggles(to: &template, now: now)
-                let lines: [Transaction] = isSplit
+                var lines: [Transaction] = isSplit
                     ? splitLines.map { line in
                         var t = template
                         t.categoryId = line.categoryId ?? cat
@@ -602,9 +621,24 @@ struct TransactionEntryView: View {
                         return t
                     }
                     : [{ var t = template; t.categoryId = cat; t.amountMinor = amt; return t }()]
+                if interestMinor > 0, let icat = interestCategoryId {
+                    var interest = template
+                    interest.kind = .expense
+                    interest.amountMinor = interestMinor
+                    interest.categoryId = icat
+                    interest.counterpartyAccountId = nil
+                    interest.counterpartyAmountMinor = nil
+                    interest.counterpartyClearedAt = nil
+                    interest.counterpartyStatementId = nil
+                    interest.note = (template.note.map { $0 + " · " } ?? "") + "Interest"
+                    lines.append(interest)
+                }
                 try app.saveLines(lines,
                                   replacingGroup: transaction?.splitGroup,
                                   replacingSingle: transaction?.splitGroup == nil ? transaction?.id : nil)
+                if soldEntirely, kind == .transfer, fromAccount?.kind == .asset {
+                    try app.adjustBalance(accountId: acct, to: 0, on: occurredOn)
+                }
             } else if let existing = transaction {
                 var updated = existing
                 updated.kind = kind
@@ -642,20 +676,6 @@ struct TransactionEntryView: View {
                 tx.isEssential = kind == .expense && isEssential
                 applyClearingToggles(to: &tx, now: now)
                 try app.addTransaction(tx)
-                // ponytail: the interest row stands alone; editing the
-                // repayment later doesn't show it. Link via split_group if
-                // that ever matters.
-                if interestMinor > 0, let icat = interestCategoryId {
-                    var interest = tx
-                    interest.kind = .expense
-                    interest.amountMinor = interestMinor
-                    interest.categoryId = icat
-                    interest.counterpartyAccountId = nil
-                    interest.counterpartyAmountMinor = nil
-                    interest.counterpartyClearedAt = nil
-                    interest.note = (interest.note.map { $0 + " · " } ?? "") + "Interest"
-                    try app.addTransaction(interest)
-                }
                 if soldEntirely, kind == .transfer, fromAccount?.kind == .asset {
                     try app.adjustBalance(accountId: acct, to: 0, on: occurredOn)
                 }
