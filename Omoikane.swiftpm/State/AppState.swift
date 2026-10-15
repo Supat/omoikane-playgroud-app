@@ -18,6 +18,8 @@ final class AppState {
     let statements: StatementStore
     let payees: PayeeStore
     let schedules: ScheduleStore
+    let syncStore: SyncStore
+    let cloud: CloudSync
 
     private(set) var dataVersion: Int = 0
     private(set) var rateVersion: Int = 0
@@ -27,6 +29,7 @@ final class AppState {
     var homeCurrency: String {
         didSet {
             UserDefaults.standard.set(homeCurrency, forKey: Self.homeCurrencyKey)
+            if cloud.enabled { Self.kvs.set(homeCurrency, forKey: Self.homeCurrencyKey) }
             rateVersion &+= 1
         }
     }
@@ -49,6 +52,9 @@ final class AppState {
         self.statements = StatementStore(db: db, transactions: txStore)
         self.payees = PayeeStore(db: db)
         self.schedules = ScheduleStore(db: db, transactions: txStore)
+        let syncStore = SyncStore(db: db)
+        self.syncStore = syncStore
+        self.cloud = CloudSync(db: db, store: syncStore)
 
         // Home currency: persisted preference > device locale > JPY.
         let stored = UserDefaults.standard.string(forKey: Self.homeCurrencyKey)
@@ -59,6 +65,40 @@ final class AppState {
         try refreshRates()
         try postDueSchedules()
         BackupStore.backupIfDue(db: db)
+
+        cloud.onApplied = { [weak self] in
+            try? self?.refreshRates()
+            self?.bump(schedulesSync: false)
+        }
+        // Preferences ride the iCloud key-value store, not the ledger zone.
+        NotificationCenter.default.addObserver(forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+                                               object: Self.kvs, queue: .main) { [weak self] _ in
+            self?.applyCloudSettings()
+        }
+        if cloud.enabled { Self.kvs.synchronize(); applyCloudSettings() }
+    }
+
+    // MARK: - iCloud
+
+    private static let kvs = NSUbiquitousKeyValueStore.default
+
+    func setCloudSyncEnabled(_ on: Bool) {
+        cloud.enabled = on
+        guard on else { return }
+        Self.kvs.set(homeCurrency, forKey: Self.homeCurrencyKey)
+        if let v = monthlySpendingLimitMinor { Self.kvs.set(v, forKey: Self.spendingLimitKey) }
+    }
+
+    /// Take the other device's preferences when they differ from ours.
+    private func applyCloudSettings() {
+        guard cloud.enabled else { return }
+        if let h = Self.kvs.string(forKey: Self.homeCurrencyKey), h != homeCurrency { homeCurrency = h }
+        let remote = Self.kvs.object(forKey: Self.spendingLimitKey) as? Int64
+        if remote != monthlySpendingLimitMinor {
+            if let v = remote { UserDefaults.standard.set(v, forKey: Self.spendingLimitKey) }
+            else { UserDefaults.standard.removeObject(forKey: Self.spendingLimitKey) }
+            bump(schedulesSync: false)
+        }
     }
 
     // MARK: - Backups
@@ -74,6 +114,8 @@ final class AppState {
         try db.sync {
             try db.restore(from: url)
             try Schema.migrate(db)
+            // The backup's change token lies about what this copy has seen.
+            try syncStore.resetRemoteState()
         }
         try refreshRates()
         bump()
@@ -96,6 +138,9 @@ final class AppState {
         set {
             if let v = newValue { UserDefaults.standard.set(v, forKey: Self.spendingLimitKey) }
             else { UserDefaults.standard.removeObject(forKey: Self.spendingLimitKey) }
+            if cloud.enabled {
+                if let v = newValue { Self.kvs.set(v, forKey: Self.spendingLimitKey) } else { Self.kvs.removeObject(forKey: Self.spendingLimitKey) }
+            }
             bump()
         }
     }
@@ -111,7 +156,12 @@ final class AppState {
         return dir.appendingPathComponent("omoikane.sqlite", isDirectory: false)
     }
 
-    func bump() { dataVersion &+= 1 }
+    /// Every write ends here. `schedulesSync: false` is for changes that
+    /// came *from* iCloud, so applying them does not trigger another round.
+    func bump(schedulesSync: Bool = true) {
+        dataVersion &+= 1
+        if schedulesSync { cloud.scheduleSync() }
+    }
 
     // MARK: - Currency conversion
 

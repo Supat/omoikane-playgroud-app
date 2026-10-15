@@ -1,7 +1,20 @@
 import SwiftUI
+import CloudKit
+
+/// Only here for CloudKit's silent push: a change on another device wakes
+/// the app to pull it.
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
+        guard CKNotification(fromRemoteNotificationDictionary: userInfo) != nil, let sync = CloudSync.active else { return .noData }
+        await sync.syncNow()
+        return .newData
+    }
+}
 
 @main
 struct Omoikane: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var bootstrap: Bootstrap = .loading
     /// Selected tab is owned at Scene level so `.commands { ... }` can mutate
     /// it from keyboard shortcuts. Putting selection inside ContentView and
@@ -74,6 +87,7 @@ struct Omoikane: App {
         do {
             let state = try AppState()
             await MainActor.run { bootstrap = .ready(state) }
+            state.cloud.scheduleSync(after: 1)
         } catch {
             await MainActor.run { bootstrap = .failed("\(error)") }
         }

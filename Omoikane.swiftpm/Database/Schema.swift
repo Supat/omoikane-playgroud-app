@@ -29,7 +29,7 @@ enum BalanceSQL {
 }
 
 enum Schema {
-    static let latestVersion = 12
+    static let latestVersion = 13
 
     static func migrate(_ db: Database) throws {
         try db.exec("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY);")
@@ -117,6 +117,14 @@ enum Schema {
             try db.transaction {
                 try migrateToV12(db)
                 try db.exec("INSERT INTO schema_version(version) VALUES (12);")
+            }
+        }
+        if current < 13 {
+            try db.exec("PRAGMA foreign_keys = OFF;")   // payees is rebuilt
+            defer { try? db.exec("PRAGMA foreign_keys = ON;") }
+            try db.transaction {
+                try migrateToV13(db)
+                try db.exec("INSERT INTO schema_version(version) VALUES (13);")
             }
         }
     }
@@ -633,5 +641,80 @@ extension Schema {
     static func migrateToV12(_ db: Database) throws {
         try db.exec("ALTER TABLE transactions ADD COLUMN is_reimbursable INTEGER NOT NULL DEFAULT 0;")
         try db.exec("ALTER TABLE schedules ADD COLUMN is_reimbursable INTEGER NOT NULL DEFAULT 0;")
+    }
+}
+
+extension Schema {
+    /// V13: iCloud sync bookkeeping. Every synced table (`SyncStore.tables`)
+    /// gets a `uuid` (the record name on the wire) and an `updated_at`
+    /// (last-writer-wins clock), both filled by triggers so no store changes.
+    /// Triggers also queue inserts/updates in `sync_outbox` and deletes in
+    /// `sync_tombstones`, except while `sync_flags.applying` is set, which is
+    /// how remote rows are applied without echoing. `payees.name` loses its
+    /// UNIQUE: two devices can each create "Amazon" before they meet.
+    static func migrateToV13(_ db: Database) throws {
+        try db.exec("""
+            CREATE TABLE payees_v13 (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                name        TEXT    NOT NULL,
+                is_archived INTEGER NOT NULL DEFAULT 0
+            );
+            INSERT INTO payees_v13 SELECT id, name, is_archived FROM payees;
+            DROP TABLE payees;
+            ALTER TABLE payees_v13 RENAME TO payees;
+            CREATE INDEX idx_payee_name ON payees(name);
+
+            CREATE TABLE sync_flags (id INTEGER PRIMARY KEY CHECK (id = 1), applying INTEGER NOT NULL DEFAULT 0);
+            INSERT INTO sync_flags (id) VALUES (1);
+            CREATE TABLE sync_outbox (tbl TEXT NOT NULL, uuid TEXT NOT NULL, seq INTEGER NOT NULL,
+                                      PRIMARY KEY (tbl, uuid)) WITHOUT ROWID;
+            CREATE TABLE sync_tombstones (tbl TEXT NOT NULL, uuid TEXT NOT NULL, deleted_at INTEGER NOT NULL,
+                                          seq INTEGER NOT NULL, pushed INTEGER NOT NULL DEFAULT 0,
+                                          PRIMARY KEY (tbl, uuid)) WITHOUT ROWID;
+            CREATE TABLE sync_state (key TEXT PRIMARY KEY, value BLOB);
+        """)
+        for t in SyncStore.tables {
+            let n = t.name, k = t.key
+            let gen = n == "currency_rates" ? "'rate-' || NEW.currency" : "lower(hex(randomblob(16)))"
+            try db.exec("ALTER TABLE \(n) ADD COLUMN uuid TEXT;")
+            let hasUpdated = try db.prepare("SELECT COUNT(*) FROM pragma_table_info('\(n)') WHERE name = 'updated_at';")
+            if try hasUpdated.step(), hasUpdated.int(0) == 0 {
+                try db.exec("ALTER TABLE \(n) ADD COLUMN updated_at INTEGER;")
+            }
+            try db.exec("""
+                UPDATE \(n) SET uuid = \(n == "currency_rates" ? "'rate-' || currency" : "lower(hex(randomblob(16)))") WHERE uuid IS NULL;
+                UPDATE \(n) SET updated_at = strftime('%s', 'now') WHERE updated_at IS NULL;
+                CREATE UNIQUE INDEX idx_\(n)_uuid ON \(n)(uuid);
+
+                CREATE TRIGGER sync_\(n)_ai AFTER INSERT ON \(n)
+                WHEN (SELECT applying FROM sync_flags WHERE id = 1) = 0
+                BEGIN
+                    UPDATE \(n) SET uuid = COALESCE(NEW.uuid, \(gen)),
+                                    updated_at = COALESCE(NEW.updated_at, strftime('%s', 'now'))
+                     WHERE \(k) = NEW.\(k);
+                    INSERT OR REPLACE INTO sync_outbox (tbl, uuid, seq)
+                    SELECT '\(n)', uuid, (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_outbox) FROM \(n) WHERE \(k) = NEW.\(k);
+                    DELETE FROM sync_tombstones WHERE tbl = '\(n)' AND uuid = (SELECT uuid FROM \(n) WHERE \(k) = NEW.\(k));
+                END;
+
+                CREATE TRIGGER sync_\(n)_au AFTER UPDATE ON \(n)
+                WHEN (SELECT applying FROM sync_flags WHERE id = 1) = 0
+                BEGIN
+                    -- An explicit clock (store code, tests) is kept; anything else is stamped now.
+                    UPDATE \(n) SET updated_at = CASE WHEN NEW.updated_at IS OLD.updated_at THEN strftime('%s', 'now') ELSE NEW.updated_at END
+                     WHERE \(k) = NEW.\(k);
+                    INSERT OR REPLACE INTO sync_outbox (tbl, uuid, seq)
+                    VALUES ('\(n)', NEW.uuid, (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_outbox));
+                END;
+
+                CREATE TRIGGER sync_\(n)_ad AFTER DELETE ON \(n)
+                WHEN (SELECT applying FROM sync_flags WHERE id = 1) = 0
+                BEGIN
+                    INSERT OR REPLACE INTO sync_tombstones (tbl, uuid, deleted_at, seq, pushed)
+                    VALUES ('\(n)', OLD.uuid, strftime('%s', 'now'), (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_tombstones), 0);
+                    DELETE FROM sync_outbox WHERE tbl = '\(n)' AND uuid = OLD.uuid;
+                END;
+            """)
+        }
     }
 }

@@ -180,5 +180,16 @@ enum SeedData {
 
             try transactions.bulkInsert(samples)
         }
+        try stampSeedUUIDs(db)
+    }
+
+    /// Seed rows get deterministic sync uuids so two fresh installs that
+    /// both seeded merge into one set of defaults instead of duplicating
+    /// them when they first sync. Only valid right after seeding an empty
+    /// database, when every row is a seed row.
+    static func stampSeedUUIDs(_ db: Database) throws {
+        for t in SyncStore.tables where t.key == "id" {
+            try db.exec("UPDATE \(t.name) SET uuid = 'seed-\(t.name)-' || id;")
+        }
     }
 }

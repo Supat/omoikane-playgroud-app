@@ -73,7 +73,7 @@ conditions*. Three reasons we went with raw `import SQLite3`:
 
 ### Schema (`Omoikane.swiftpm/Database/Schema.swift`)
 
-`Schema.latestVersion` is **12**. Migrations are applied in order by `Schema.migrate`, each in its own transaction, tracked in `schema_version`.
+`Schema.latestVersion` is **13**. Migrations are applied in order by `Schema.migrate`, each in its own transaction, tracked in `schema_version`.
 
 - `transactions` — append-heavy fact table. Money in **minor units** as `Int64`
   (yen as integer; multiply by 100 for currencies with sub-units). Derived
@@ -145,6 +145,17 @@ conditions*. Three reasons we went with raw `import SQLite3`:
 - V12: `is_reimbursable` on transactions and schedules, the twin of
   `is_essential` (expense only in the UI, inherited by posted rows, not in
   `monthly_summaries`). Marks spending someone else will pay back.
+- V13: iCloud sync bookkeeping. Every table in `SyncStore.tables` gets
+  `uuid` (record name on the wire; `rate-<currency>` for rates, random hex
+  otherwise, `seed-<table>-<id>` for seed rows so two fresh installs merge)
+  and `updated_at` (last-writer-wins clock). Triggers fill both, queue
+  inserts/updates in `sync_outbox` and deletes in `sync_tombstones`, and
+  are silenced while `sync_flags.applying = 1` (how remote rows are applied
+  without echoing). `payees.name` lost its UNIQUE. Stores never touch
+  `uuid`/`updated_at`; an explicit `updated_at` change is kept (tests), any
+  other UPDATE is stamped now. Tombstones stay 30 days after pushing so a
+  stale edit cannot resurrect a deleted row. `sync_state` holds the zone
+  change token; `AppState.restore` clears it.
 - `Schema.rebuildSummaries(_:)` — recompute the summary table from scratch.
   Exposed in Settings as a self-heal / sanity check.
 
@@ -152,7 +163,8 @@ conditions*. Three reasons we went with raw `import SQLite3`:
 
 ```
 Database/Database.swift          sqlite3 wrapper, WAL/pragmas, prepared statements
-Database/Schema.swift            DDL + triggers + migrations V1–V12
+Database/Schema.swift            DDL + triggers + migrations V1–V13
+Database/SyncStore.swift         SQLite half of iCloud sync: outbox → records, apply with last-writer-wins, tombstones, change token
 Database/TransactionStore.swift  CRUD on transactions
 Database/CategoryAccountStore.swift  CRUD on categories + accounts, balances
 Database/SummaryStore.swift      reads monthly_summaries for dashboard/reports
@@ -165,6 +177,7 @@ Database/SeedData.swift          first-launch defaults + sample transactions
 Models/Models.swift, Money.swift domain structs, minor-unit money helpers
 State/AppState.swift             @Observable; owns DB + stores; bumps `dataVersion`
 State/BackupStore.swift          dated SQLite copies in …/Omoikane/Backups (online backup API), auto cadence in UserDefaults
+State/CloudSync.swift            CloudKit half of iCloud sync: private zone "Ledger", pull then push, token, silent-push subscription
 App/Omoikane.swift               WindowGroup, owns tab selection, ⌘1–⌘5 / ⌃Tab commands
 Views/ContentView.swift          five-tab root (see below)
 ```
@@ -181,7 +194,7 @@ Mutating helpers on `AppState` serialize through `db.sync { … }` and bump
 | Accounts | `AccountsView` → `AccountDetailView` → `ReconciliationSheet` | account management, balances, reconciliation statements |
 | Transactions | `TransactionsView` | account list → per-account transaction list; landscape split view with inline `TransactionEntryView`, portrait uses the `TransactionEditor` sheet. The entry form handles splits (one row per line, shared `split_group`), payee, asset/liability transfer extras and Repeat (creates a schedule) |
 | Reports | `ReportsView` | aggregate queries over `monthly_summaries` |
-| Settings | `SettingsView` → `CategoriesView`, `SchedulesView`, `PayeesView`, `BackupsView` | home currency, rates, Manage (Categories and Budget: sub-categories, per-category monthly budgets, an overall monthly spending limit in UserDefaults visualised against the allocated budgets; scheduled transactions; payees), backups (auto/manual/restore/share), rebuild summaries, delete all transactions, Money Pro import |
+| Settings | `SettingsView` → `CategoriesView`, `SchedulesView`, `PayeesView`, `BackupsView` | home currency, rates, Manage (Categories and Budget: sub-categories, per-category monthly budgets, an overall monthly spending limit in UserDefaults visualised against the allocated budgets; scheduled transactions; payees), backups (auto/manual/restore/share), iCloud sync (toggle, status, Sync now ⌘⇧S), rebuild summaries, delete all transactions, Money Pro import |
 
 Entity management (add/edit/archive/delete) lives only in its dedicated
 surface: Accounts tab, or Settings › Manage for categories, schedules and
@@ -248,11 +261,25 @@ so it stays as-is. If you add new top-level types, sanity-check against
   shape can't be served by `monthly_summaries`, add a covering index on
   `transactions` first; only add a new materialized table if profiling shows
   the index isn't enough.
-- **Adding a column to `transactions`** → write a `migrateToV13` in
-  `Schema.swift`, add the `current < 13` block to `Schema.migrate`, bump
+- **Adding a column to `transactions`** → write a `migrateToV14` in
+  `Schema.swift`, add the `current < 14` block to `Schema.migrate`, bump
   `latestVersion`, and update both insert/update bind sites in `TransactionStore`.
   If the column feeds `monthly_summaries`, also extend the `WHEN` clause of the
   `tx_au` trigger.
+- **iCloud sync** → `CloudSync` runs pull-then-push on launch, on scene
+  activation, 3 s after any `bump()` (debounced) and on CloudKit's silent
+  push (`AppDelegate` in App/Omoikane.swift). One record per row: type =
+  table, name = uuid, fields = columns with foreign keys as uuids and a
+  `nulls` list naming NULL columns (absent keys are left alone on apply).
+  Push conflicts compare `updated_at` with the server copy. Home currency
+  and the spending limit go through `NSUbiquitousKeyValueStore`. Needs the
+  iCloud + push entitlements (`Omoikane/Omoikane.entitlements`, Xcode
+  project only; the Playground build has no capability for it, so the
+  toggle must stay off there). `tools/sync-check/main.swift` is a macOS
+  harness that syncs two databases through an in-memory zone; run it after
+  touching `SyncStore` or the V13 triggers. Adding a synced table: append
+  to `SyncStore.tables` in dependency order and give it the V13 treatment
+  in a new migration.
 - **Changing the importer** → `tools/moneypro-import/main.swift` is a macOS
   dry run that compiles the app's own `Database`, `Schema` and
   `MoneyProImport` sources and runs them against a real `.back` file; the

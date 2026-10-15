@@ -61,6 +61,7 @@ struct ContentView: View {
             if phase == .active {
                 try? app.postDueSchedules()
                 app.autoBackupIfDue()
+                app.cloud.scheduleSync(after: 0)
             }
         }
     }

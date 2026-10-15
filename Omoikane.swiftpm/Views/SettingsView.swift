@@ -98,6 +98,25 @@ struct SettingsView: View {
                     .font(.footnote)
             }
 
+            Section {
+                Toggle("Sync with iCloud", isOn: Binding(get: { app.cloud.enabled }, set: { app.setCloudSyncEnabled($0) }))
+                LabeledContent("Status", value: app.cloud.status)
+                LabeledContent("Last sync", value: app.cloud.lastSync.map { Formatters.mediumDate.string(from: $0) + " " + Formatters.shortTime.string(from: $0) } ?? "Never")
+                LabeledContent("Waiting to upload", value: "\(app.cloud.pendingCount())")
+                Button {
+                    Task { await app.cloud.syncNow() }
+                } label: {
+                    Label("Sync now", systemImage: "arrow.triangle.2.circlepath.icloud")
+                }
+                .keyboardShortcut("s", modifiers: [.command, .shift])
+                .disabled(!app.cloud.enabled || app.cloud.isSyncing)
+            } header: {
+                Text("iCloud")
+            } footer: {
+                Text("Keeps the ledger the same on every device signed into your iCloud account. Changes upload a few seconds after you make them and download when the app opens, returns to the foreground, or is told about a change. Home currency and the spending limit follow too. Needs the Xcode build with the iCloud capability; the Swift Playground build cannot use it.")
+                    .font(.footnote)
+            }
+
             Section("Database") {
                 LabeledContent("Transactions", value: "\(transactionCount)")
                 LabeledContent("Location", value: app.db.url.lastPathComponent)

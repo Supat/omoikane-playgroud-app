@@ -43,6 +43,8 @@
 		B100000000000000000034 /* CategoryGlyphPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000034 /* CategoryGlyphPicker.swift */; };
 		B100000000000000000035 /* BackupStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000035 /* BackupStore.swift */; };
 		B100000000000000000036 /* Omoikane.icon in Resources */ = {isa = PBXBuildFile; fileRef = F100000000000000000036 /* Omoikane.icon */; };
+		B100000000000000000037 /* SyncStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000037 /* SyncStore.swift */; };
+		B100000000000000000038 /* CloudSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000038 /* CloudSync.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -82,6 +84,9 @@
 		F100000000000000000034 /* CategoryGlyphPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CategoryGlyphPicker.swift; path = Omoikane.swiftpm/Views/CategoryGlyphPicker.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000035 /* BackupStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BackupStore.swift; path = Omoikane.swiftpm/State/BackupStore.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000036 /* Omoikane.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = Omoikane.icon; path = Omoikane/Omoikane.icon; sourceTree = SOURCE_ROOT; };
+		F100000000000000000037 /* SyncStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SyncStore.swift; path = Omoikane.swiftpm/Database/SyncStore.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000038 /* CloudSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CloudSync.swift; path = Omoikane.swiftpm/State/CloudSync.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000039 /* Omoikane.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = Omoikane.entitlements; path = Omoikane/Omoikane.entitlements; sourceTree = SOURCE_ROOT; };
 		F1000000000000000000FF /* Omoikane.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Omoikane.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -162,6 +167,7 @@
 				F100000000000000000020 /* CurrencyStore.swift */,
 				F100000000000000000021 /* StatementStore.swift */,
 				F100000000000000000035 /* BackupStore.swift */,
+				F100000000000000000038 /* CloudSync.swift */,
 				F100000000000000000028 /* PayeeStore.swift */,
 				F100000000000000000029 /* ScheduleStore.swift */,
 				F100000000000000000027 /* MoneyProImport.swift */,
@@ -198,6 +204,7 @@
 			isa = PBXGroup;
 			children = (
 				F100000000000000000013 /* Assets.xcassets */,
+				F100000000000000000039 /* Omoikane.entitlements */,
 				F100000000000000000036 /* Omoikane.icon */,
 			);
 			name = Resources;
@@ -299,6 +306,8 @@
 				B100000000000000000020 /* CurrencyStore.swift in Sources */,
 				B100000000000000000021 /* StatementStore.swift in Sources */,
 				B100000000000000000035 /* BackupStore.swift in Sources */,
+				B100000000000000000037 /* SyncStore.swift in Sources */,
+				B100000000000000000038 /* CloudSync.swift in Sources */,
 				B100000000000000000028 /* PayeeStore.swift in Sources */,
 				B100000000000000000029 /* ScheduleStore.swift in Sources */,
 				B100000000000000000027 /* MoneyProImport.swift in Sources */,
@@ -441,6 +450,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = Omoikane;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
+				CODE_SIGN_ENTITLEMENTS = Omoikane/Omoikane.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
@@ -449,6 +459,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIBackgroundModes = "remote-notification";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
@@ -471,6 +482,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = Omoikane;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
+				CODE_SIGN_ENTITLEMENTS = Omoikane/Omoikane.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
@@ -479,6 +491,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIBackgroundModes = "remote-notification";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";

@@ -21,6 +21,8 @@ enum DatabaseError: Error, CustomStringConvertible {
 
 final class Database {
     private var handle: OpaquePointer?
+    /// For `sqlite3_changes` and friends; never close or reconfigure it.
+    var rawHandle: OpaquePointer? { handle }
     private let serial = DispatchQueue(label: "omoikane.db", qos: .userInitiated)
 
     let url: URL
@@ -206,6 +208,10 @@ final class Statement {
         else { sqlite3_bind_null(raw, i) }
         return self
     }
+    @discardableResult func bind(_ v: Data, at i: Int32) -> Statement {
+        v.withUnsafeBytes { sqlite3_bind_blob(raw, i, $0.baseAddress, Int32(v.count), SQLITE_TRANSIENT) }
+        return self
+    }
     @discardableResult func bindNull(at i: Int32) -> Statement {
         sqlite3_bind_null(raw, i); return self
     }
@@ -243,4 +249,15 @@ final class Statement {
         sqlite3_column_type(raw, c) == SQLITE_NULL ? nil : sqlite3_column_int64(raw, c)
     }
     func isNull(_ c: Int32) -> Bool { sqlite3_column_type(raw, c) == SQLITE_NULL }
+    func blob(_ c: Int32) -> Data? {
+        guard let p = sqlite3_column_blob(raw, c) else { return nil }
+        return Data(bytes: p, count: Int(sqlite3_column_bytes(raw, c)))
+    }
+
+    // MARK: Column metadata (for generic row readers such as SyncStore)
+
+    var columnCount: Int32 { sqlite3_column_count(raw) }
+    func columnName(_ c: Int32) -> String { String(cString: sqlite3_column_name(raw, c)) }
+    /// SQLITE_INTEGER / SQLITE_FLOAT / SQLITE_TEXT / SQLITE_NULL / SQLITE_BLOB of the current row's value.
+    func columnType(_ c: Int32) -> Int32 { sqlite3_column_type(raw, c) }
 }
