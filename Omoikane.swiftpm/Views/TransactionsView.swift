@@ -27,19 +27,14 @@ struct TransactionsView: View {
                         .foregroundStyle(.secondary)
                 }
             } else {
-                let groups = accounts.splitForDisplay()
-                if !groups.payment.isEmpty {
-                    Section("Payment Accounts") {
-                        ForEach(groups.payment) { a in row(for: a) }
-                    }
-                }
-                if !groups.credit.isEmpty {
+                let groups = accounts.displayGroups()
+                ForEach(groups, id: \.title) { group in
                     Section {
-                        ForEach(groups.credit) { a in row(for: a) }
+                        ForEach(group.accounts) { a in row(for: a) }
                     } header: {
-                        Text("Credit Cards")
+                        Text(group.title)
                     } footer: {
-                        Text("Tap an account to view its transactions.")
+                        if group.title == groups.last?.title { Text("Tap an account to view its transactions.") }
                     }
                 }
             }

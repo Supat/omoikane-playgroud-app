@@ -270,37 +270,6 @@ final class TransactionStore {
         }
     }
 
-    struct LoanBalance: Identifiable, Hashable {
-        var payee: String
-        var currency: String
-        var lentMinor: Int64
-        var borrowedMinor: Int64
-        var id: String { "\(payee)|\(currency)" }
-    }
-
-    /// Outstanding loans per payee and currency. Lend − repayments received,
-    /// borrow − repayments made. Rows where both are zero are dropped.
-    func loanBalances() throws -> [LoanBalance] {
-        let s = try db.prepare("""
-            SELECT COALESCE(p.name, '(no payee)'), t.currency,
-                   SUM(CASE WHEN t.loan_role = 'lend' THEN t.amount_minor
-                            WHEN t.loan_role = 'repay' AND t.kind = 'income' THEN -t.amount_minor ELSE 0 END),
-                   SUM(CASE WHEN t.loan_role = 'borrow' THEN t.amount_minor
-                            WHEN t.loan_role = 'repay' AND t.kind = 'expense' THEN -t.amount_minor ELSE 0 END)
-              FROM transactions t LEFT JOIN payees p ON p.id = t.payee_id
-             WHERE t.loan_role IS NOT NULL
-             GROUP BY 1, 2
-            HAVING 3 <> 0 OR 4 <> 0
-             ORDER BY 1, 2;
-        """)
-        var out: [LoanBalance] = []
-        while try s.step() {
-            let row = LoanBalance(payee: s.string(0), currency: s.string(1), lentMinor: s.int64(2), borrowedMinor: s.int64(3))
-            if row.lentMinor != 0 || row.borrowedMinor != 0 { out.append(row) }
-        }
-        return out
-    }
-
     func count() throws -> Int {
         let s = try db.prepare("SELECT COUNT(*) FROM transactions;")
         if try s.step() { return s.int(0) }

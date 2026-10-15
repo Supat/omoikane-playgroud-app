@@ -49,7 +49,13 @@ struct TransactionEntryView: View {
     @State private var payeeId: Int64? = nil
     @State private var addingPayee = false
     @State private var newPayeeName = ""
-    @State private var loanRole: LoanRole? = nil
+    /// Transfers into a liability account only (a loan repayment): the
+    /// interest part is posted as a separate expense from the same account.
+    @State private var interestText: String = ""
+    @State private var interestCategoryId: Int64? = nil
+    /// Transfers out of an asset account only: write the remaining value off
+    /// after the sale so the asset lands on zero.
+    @State private var soldEntirely: Bool = false
     @State private var isEssential: Bool = false
     /// New entries only: also create a schedule that repeats this entry.
     @State private var repeatFrequency: ScheduleFrequency? = nil
@@ -178,6 +184,34 @@ struct TransactionEntryView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    if let transferRole {
+                        Text(transferRole).font(.footnote).foregroundStyle(.secondary)
+                    }
+                    if !isEditing, toAccount?.kind == .liability {
+                        HStack {
+                            Text("Interest")
+                            Spacer()
+                            NumberPadField(text: $interestText, placeholder: "0",
+                                           font: NumberPadField.monospaced(.body), alignment: .right)
+                            Text(fromCurrency).foregroundStyle(.secondary)
+                        }
+                        if interestMinor > 0 {
+                            VStack(alignment: .leading, spacing: 0) {
+                                HStack {
+                                    Text("Interest category")
+                                    Spacer()
+                                    Text(categoryPath(for: interestCategoryId)).foregroundStyle(.secondary).lineLimit(1)
+                                }
+                                .padding(.horizontal, 16).padding(.top, 10)
+                                CategoryGlyphPicker(categories: categories.filter { $0.kind == .expense && !$0.isArchived },
+                                                    selection: $interestCategoryId)
+                            }
+                            .listRowInsets(EdgeInsets())
+                        }
+                    }
+                    if !isEditing, fromAccount?.kind == .asset {
+                        Toggle("Sold entirely", isOn: $soldEntirely)
+                    }
                 } else {
                     if !isSplit {
                         VStack(alignment: .leading, spacing: 0) {
@@ -199,12 +233,6 @@ struct TransactionEntryView: View {
                         ForEach(payees) { p in Text(p.name).tag(Int64?.some(p.id)) }
                     }
                     Button("New payee…") { addingPayee = true }
-                    Picker("Loan", selection: $loanRole) {
-                        Text("None").tag(LoanRole?.none)
-                        ForEach(allowedLoanRoles, id: \.self) { r in
-                            Text(r.displayName).tag(LoanRole?.some(r))
-                        }
-                    }
                 }
             }
 
@@ -355,7 +383,6 @@ struct TransactionEntryView: View {
             Button("Cancel", role: .cancel) { newPayeeName = "" }
         }
         .onChange(of: kind) { _, _ in
-            if let r = loanRole, !allowedLoanRoles.contains(r) { loanRole = nil }
             if kind == .transfer { splitLines = [] }
             if kind != .transfer {
                 if let id = categoryId,
@@ -394,35 +421,33 @@ struct TransactionEntryView: View {
         kind == .transfer && fromCurrency != toCurrency
     }
 
-    /// Picker content split into "Payment Accounts" / "Credit Cards"
-    /// sections, mirroring the grouping used elsewhere in the app.
+    /// Picker content in the same groups as the Accounts tab.
     @ViewBuilder
     private func accountPickerOptions(from list: [Account]) -> some View {
-        let groups = list.splitForDisplay()
-        if !groups.payment.isEmpty {
-            Section("Payment Accounts") {
-                ForEach(groups.payment) { a in
-                    Label("\(a.name) (\(a.currency))", systemImage: a.kind.sfSymbol).tag(a.id)
-                }
-            }
-        }
-        if !groups.credit.isEmpty {
-            Section("Credit Cards") {
-                ForEach(groups.credit) { a in
+        ForEach(list.displayGroups(), id: \.title) { group in
+            Section(group.title) {
+                ForEach(group.accounts) { a in
                     Label("\(a.name) (\(a.currency))", systemImage: a.kind.sfSymbol).tag(a.id)
                 }
             }
         }
     }
 
-    /// Lend is money going out, borrow is money coming in; repayment goes
-    /// either way, so the kind decides which roles make sense.
-    private var allowedLoanRoles: [LoanRole] {
-        switch kind {
-        case .expense:  return [.lend, .repay]
-        case .income:   return [.borrow, .repay]
-        case .transfer: return []
+    /// What a transfer touching an asset or liability account amounts to.
+    private var transferRole: String? {
+        guard kind == .transfer, let from = fromAccount, let to = toAccount else { return nil }
+        switch (from.kind, to.kind) {
+        case (_, .asset):     return "Asset purchase: \(to.name) gains this value."
+        case (.asset, _):     return "Asset sale: \(from.name) loses this value."
+        case (.liability, _): return "Borrowing: \(from.name) is owed this much more."
+        case (_, .liability): return "Repayment: reduces what \(to.name) is owed. Interest is posted as an expense."
+        default:              return nil
         }
+    }
+
+    private var interestMinor: Int64 {
+        guard !isEditing, toAccount?.kind == .liability else { return 0 }
+        return Money.parseMinor(interestText, currency: fromCurrency) ?? 0
     }
 
     private var splitTotalMinor: Int64 {
@@ -464,7 +489,7 @@ struct TransactionEntryView: View {
             if isCrossCurrencyTransfer {
                 guard let cp = Money.parseMinor(counterpartyAmountText, currency: toCurrency), cp > 0 else { return false }
             }
-            return true
+            return interestMinor == 0 || interestCategoryId != nil
         }
         return isSplit || categoryId != nil   // split lines carry their own categories
     }
@@ -510,7 +535,6 @@ struct TransactionEntryView: View {
         clearedNow = (tx.clearedAt != nil)
         counterpartyClearedNow = (tx.counterpartyClearedAt != nil)
         payeeId = tx.payeeId
-        loanRole = tx.loanRole
         isEssential = tx.isEssential
         if let g = tx.splitGroup, let rows = try? app.transactions.listGroup(g), rows.count > 1 {
             splitLines = rows.map { SplitLine(categoryId: $0.categoryId, amountText: Money.formatMinorText($0.amountMinor, currency: $0.currency)) }
@@ -568,7 +592,6 @@ struct TransactionEntryView: View {
                 template.tags = tags
                 template.updatedAt = now
                 template.payeeId = payeeId
-                template.loanRole = loanRole
                 template.isEssential = kind == .expense && isEssential
                 applyClearingToggles(to: &template, now: now)
                 let lines: [Transaction] = isSplit
@@ -596,7 +619,6 @@ struct TransactionEntryView: View {
                 updated.tags = tags
                 updated.updatedAt = now
                 updated.payeeId = payeeId
-                updated.loanRole = loanRole
                 updated.isEssential = kind == .expense && isEssential
                 applyClearingToggles(to: &updated, now: now)
                 try app.updateTransaction(updated)
@@ -617,10 +639,26 @@ struct TransactionEntryView: View {
                     updatedAt: now
                 )
                 tx.payeeId = payeeId
-                tx.loanRole = loanRole
                 tx.isEssential = kind == .expense && isEssential
                 applyClearingToggles(to: &tx, now: now)
                 try app.addTransaction(tx)
+                // ponytail: the interest row stands alone; editing the
+                // repayment later doesn't show it. Link via split_group if
+                // that ever matters.
+                if interestMinor > 0, let icat = interestCategoryId {
+                    var interest = tx
+                    interest.kind = .expense
+                    interest.amountMinor = interestMinor
+                    interest.categoryId = icat
+                    interest.counterpartyAccountId = nil
+                    interest.counterpartyAmountMinor = nil
+                    interest.counterpartyClearedAt = nil
+                    interest.note = (interest.note.map { $0 + " · " } ?? "") + "Interest"
+                    try app.addTransaction(interest)
+                }
+                if soldEntirely, kind == .transfer, fromAccount?.kind == .asset {
+                    try app.adjustBalance(accountId: acct, to: 0, on: occurredOn)
+                }
             }
             if transaction == nil, let freq = repeatFrequency {
                 let sc = Schedule(
@@ -653,7 +691,9 @@ struct TransactionEntryView: View {
                 counterpartyClearedNow = false
                 clearedNow = fromAccount?.clearsEntriesByDefault ?? false
                 payeeId = nil
-                loanRole = nil
+                interestText = ""
+                interestCategoryId = nil
+                soldEntirely = false
                 isEssential = false
                 repeatFrequency = nil
                 splitLines = []

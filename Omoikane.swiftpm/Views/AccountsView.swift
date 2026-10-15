@@ -22,24 +22,27 @@ struct AccountsView: View {
                 Text("No accounts yet. Tap + to create one.")
                     .foregroundStyle(.secondary)
             } else {
-                let groups = accounts.splitForDisplay()
-                if !groups.payment.isEmpty {
-                    Section("Payment Accounts") {
-                        ForEach(groups.payment) { a in
+                Section {
+                    LabeledContent("Net worth") {
+                        Formatters.moneyText(homeTotal(of: accounts), currency: app.homeCurrency)
+                            .foregroundStyle(homeTotal(of: accounts) >= 0 ? Color.primary : .red)
+                    }
+                } footer: {
+                    Text("Active accounts converted to \(app.homeCurrency); assets add, credit cards and liabilities subtract.")
+                }
+                ForEach(accounts.displayGroups(), id: \.title) { group in
+                    Section {
+                        ForEach(group.accounts) { a in
                             row(for: a)
                                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                     rowActions(for: a)
                                 }
                         }
-                    }
-                }
-                if !groups.credit.isEmpty {
-                    Section("Credit Cards") {
-                        ForEach(groups.credit) { a in
-                            row(for: a)
-                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                    rowActions(for: a)
-                                }
+                    } header: {
+                        HStack {
+                            Text(group.title)
+                            Spacer()
+                            Formatters.moneyText(homeTotal(of: group.accounts), currency: app.homeCurrency)
                         }
                     }
                 }
@@ -138,6 +141,12 @@ struct AccountsView: View {
         }
     }
 
+    /// Signed balances rolled up to the home currency; accounts without a
+    /// rate are left out.
+    private func homeTotal(of list: [Account]) -> Int64 {
+        app.sumToHome(list.map { (balanceByAccount[$0.id] ?? 0, $0.currency) })
+    }
+
     private func reload() {
         do {
             // One round trip; partition in memory.
@@ -201,7 +210,7 @@ struct AddAccountSheet: View {
                     }
                 }
                 CurrencyPicker(title: "Currency", selection: $currency)
-                LabeledContent(kind == .credit ? "Initial balance owed" : "Initial balance") {
+                LabeledContent(kind.isDebt ? "Initial balance owed" : kind == .asset ? "Current value" : "Initial balance") {
                     NumberPadField(
                         text: $initialBalanceText,
                         placeholder: "0",
@@ -246,7 +255,7 @@ struct AddAccountSheet: View {
                     Button("Add") {
                         // Debt is stored negative; the sheet asks for the positive amount owed.
                         let entered = Money.parseMinor(initialBalanceText, currency: currency) ?? 0
-                        let minor = kind == .credit ? -entered : entered
+                        let minor = kind.isDebt ? -entered : entered
                         do {
                             _ = try app.addAccount(
                                 name: name, kind: kind,

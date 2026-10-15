@@ -26,7 +26,7 @@ enum CategoryKind: String, CaseIterable, Codable, Hashable {
 }
 
 enum AccountKind: String, CaseIterable, Codable, Hashable {
-    case cash, bank, credit, investment, other
+    case cash, bank, credit, investment, other, asset, liability
 
     var displayName: String {
         switch self {
@@ -35,6 +35,8 @@ enum AccountKind: String, CaseIterable, Codable, Hashable {
         case .credit:     return "Credit"
         case .investment: return "Investment"
         case .other:      return "Other"
+        case .asset:      return "Asset"
+        case .liability:  return "Liability"
         }
     }
 
@@ -45,8 +47,26 @@ enum AccountKind: String, CaseIterable, Codable, Hashable {
         case .credit:     return "creditcard"
         case .investment: return "chart.line.uptrend.xyaxis"
         case .other:      return "tray.full"
+        case .asset:      return "cube"
+        case .liability:  return "scalemass"
         }
     }
+
+    /// Balance is money owed: stored negative, entered and reconciled as a
+    /// positive "owed" figure. Credit cards and loans.
+    var isDebt: Bool { self == .credit || self == .liability }
+
+    /// Display group on the Accounts tab and in account pickers, in order:
+    /// payment accounts, credit cards, assets, liabilities.
+    var displayGroup: String {
+        switch self {
+        case .credit:    return "Credit Cards"
+        case .asset:     return "Assets"
+        case .liability: return "Liabilities"
+        default:         return "Payment Accounts"
+        }
+    }
+    static let displayGroups = ["Payment Accounts", "Credit Cards", "Assets", "Liabilities"]
 }
 
 /// Renamed from `Category` to avoid clash with the ObjC-runtime `Category`
@@ -104,6 +124,17 @@ struct Account: Identifiable, Hashable {
     var statementClosingDay: Int? = nil
     /// Credit accounts only. Available credit = limit + balance (debt is negative).
     var creditLimitMinor: Int64? = nil
+}
+
+extension Array where Element == Account {
+    /// Non-empty display groups in `AccountKind.displayGroups` order; row
+    /// order inside each group is preserved.
+    func displayGroups() -> [(title: String, accounts: [Account])] {
+        AccountKind.displayGroups.compactMap { title in
+            let rows = filter { $0.kind.displayGroup == title }
+            return rows.isEmpty ? nil : (title, rows)
+        }
+    }
 }
 
 struct Payee: Identifiable, Hashable {

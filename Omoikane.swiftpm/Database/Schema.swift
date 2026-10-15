@@ -29,7 +29,7 @@ enum BalanceSQL {
 }
 
 enum Schema {
-    static let latestVersion = 9
+    static let latestVersion = 10
 
     static func migrate(_ db: Database) throws {
         try db.exec("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY);")
@@ -95,6 +95,16 @@ enum Schema {
             try db.transaction {
                 try migrateToV9(db)
                 try db.exec("INSERT INTO schema_version(version) VALUES (9);")
+            }
+        }
+        if current < 10 {
+            // Table rebuild: FK enforcement must be off, and that pragma is a
+            // no-op inside a transaction, so it brackets this one.
+            try db.exec("PRAGMA foreign_keys = OFF;")
+            defer { try? db.exec("PRAGMA foreign_keys = ON;") }
+            try db.transaction {
+                try migrateToV10(db)
+                try db.exec("INSERT INTO schema_version(version) VALUES (10);")
             }
         }
     }
@@ -562,5 +572,38 @@ enum Schema {
                  GROUP BY year_month, category_id, account_id, currency, kind;
             """)
         }
+    }
+}
+
+extension Schema {
+    /// V10: `accounts.kind` gains `asset` and `liability` (Money Pro's
+    /// "Other Assets" / "Other Liabilities"). Buying an asset, selling one,
+    /// taking a loan and repaying it are plain transfers to and from these
+    /// accounts, so nothing else in the schema changes. SQLite can't widen
+    /// a CHECK in place, hence the copy.
+    static func migrateToV10(_ db: Database) throws {
+        try db.exec("""
+            CREATE TABLE accounts_v10 (
+                id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+                name                      TEXT    NOT NULL,
+                kind                      TEXT    NOT NULL CHECK(kind IN ('cash','bank','credit','investment','other','asset','liability')),
+                currency                  TEXT    NOT NULL DEFAULT 'JPY',
+                initial_balance_minor     INTEGER NOT NULL DEFAULT 0,
+                is_archived               INTEGER NOT NULL DEFAULT 0,
+                sort_order                INTEGER NOT NULL DEFAULT 0,
+                clears_entries_by_default INTEGER NOT NULL DEFAULT 0,
+                statement_closing_day     INTEGER,
+                credit_limit_minor        INTEGER
+            );
+        """)
+        try db.exec("""
+            INSERT INTO accounts_v10
+            SELECT id, name, kind, currency, initial_balance_minor, is_archived, sort_order,
+                   clears_entries_by_default, statement_closing_day, credit_limit_minor
+              FROM accounts;
+        """)
+        try db.exec("DROP TABLE accounts;")
+        try db.exec("ALTER TABLE accounts_v10 RENAME TO accounts;")
+        try db.exec("CREATE INDEX idx_acc_archived ON accounts(is_archived, sort_order);")
     }
 }

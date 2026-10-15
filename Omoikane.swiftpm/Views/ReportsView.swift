@@ -21,7 +21,6 @@ struct ReportsView: View {
     @State private var byAccount: [GroupedSummary] = []
     @State private var totals: SummaryStore.CurrencyTotals = .init()
     @State private var availableCurrencies: [String] = []
-    @State private var loans: [TransactionStore.LoanBalance] = []
     @State private var budgetRows: [BudgetLine] = []
 
     var body: some View {
@@ -127,33 +126,6 @@ struct ReportsView: View {
                                     .font(.subheadline.weight(.medium))
                                     .foregroundStyle(totalIncome >= totalTarget ? .green : .primary)
                             }
-                        }
-                    }
-                }
-
-                section("Loans") {
-                    if loans.isEmpty {
-                        Text("No open loans. Mark an entry as Lend, Borrow or Repayment in the entry form.")
-                            .foregroundStyle(.secondary)
-                            .font(.subheadline)
-                    } else {
-                        ForEach(loans) { row in
-                            HStack {
-                                Text(row.payee)
-                                Spacer()
-                                if row.lentMinor != 0 {
-                                    Text("owed to you \(Formatters.money(row.lentMinor, currency: row.currency))")
-                                        .moneyStyle()
-                                        .foregroundStyle(row.lentMinor > 0 ? .green : .secondary)
-                                }
-                                if row.borrowedMinor != 0 {
-                                    Text("you owe \(Formatters.money(row.borrowedMinor, currency: row.currency))")
-                                        .moneyStyle()
-                                        .foregroundStyle(row.borrowedMinor > 0 ? .red : .secondary)
-                                }
-                            }
-                            .font(.subheadline)
-                            .monospacedDigit()
                         }
                     }
                 }
@@ -353,7 +325,6 @@ struct ReportsView: View {
             }
             totals      = try app.summaries.totals(fromYM: win.start, toYM: win.end)
             availableCurrencies = try app.summaries.distinctCurrencies(fromYM: win.start, toYM: win.end)
-            loans = try app.transactions.loanBalances()
             // Budgets always roll up to the home currency, regardless of the currency filter.
             let cats = try app.categories.list()
             let allCats = try app.categories.list(includeArchived: true)

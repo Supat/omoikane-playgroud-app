@@ -73,7 +73,7 @@ conditions*. Three reasons we went with raw `import SQLite3`:
 
 ### Schema (`Omoikane.swiftpm/Database/Schema.swift`)
 
-`Schema.latestVersion` is **9**. Migrations are applied in order by `Schema.migrate`, each in its own transaction, tracked in `schema_version`.
+`Schema.latestVersion` is **10**. Migrations are applied in order by `Schema.migrate`, each in its own transaction, tracked in `schema_version`.
 
 - `transactions` — append-heavy fact table. Money in **minor units** as `Int64`
   (yen as integer; multiply by 100 for currencies with sub-units). Derived
@@ -102,8 +102,9 @@ conditions*. Three reasons we went with raw `import SQLite3`:
 - `currency_rates` (V2) — rate to the home currency for every non-home
   currency. The home currency itself lives in `UserDefaults` via `AppState`.
 - V6 (the rest of Money Pro's model, minimal): `payees` +
-  `transactions.payee_id`; `transactions.loan_role` (`lend` / `borrow` /
-  `repay`, outstanding per payee is a query in `TransactionStore`);
+  `transactions.payee_id`; `transactions.loan_role` (legacy, always NULL
+  since V10: loans are liability accounts now; the column and the model
+  field stay so old rows still read);
   `categories.budget_minor` (monthly, home currency; a parent counts
   `max(own, Σ sub-category budgets)` via `effectiveBudgetMinor(in:)`, so
   setting an umbrella figure never shrinks the total; for income categories it is a monthly income target, shown
@@ -118,6 +119,21 @@ conditions*. Three reasons we went with raw `import SQLite3`:
   straight from the fact table for the month.
 - V8: `schedules.is_essential` — posted rows inherit it.
 - V9: `schedules.day_of_month` anchors monthly/yearly cadence (no drift to the 28th); fixes V4's UTC-midnight `occurred_at` backfill to local midnight. `TransactionStore.update` keeps the stored day key when the instant is unchanged, so a time-zone change cannot move rows.
+- V10: `accounts.kind` adds `asset` and `liability` (table rebuilt to widen
+  the CHECK; FK pragma toggled around that one migration). Money Pro's
+  Asset Purchase / Asset Sale / Liability Acquisition / Discharge of
+  Liability are **not** transaction kinds: they are plain transfers to or
+  from an asset/liability account, so reports never count a loan
+  repayment as spending. `AccountKind.isDebt` (credit + liability) drives
+  every sign flip (balance owed is stored negative); `displayGroup` /
+  `[Account].displayGroups()` drive the four sections (Payment Accounts,
+  Credit Cards, Assets, Liabilities) on Accounts, Transactions and in
+  account pickers. The entry form adds, for new transfers only: an
+  Interest amount + category when the target is a liability (posted as a
+  separate, unlinked expense row) and a "Sold entirely" toggle when the
+  source is an asset (`adjustBalance(…, to: 0, on:)` writes the rest off
+  under Balance adjustment). The Accounts tab shows a home-currency net
+  worth and per-group totals.
 - `Schema.rebuildSummaries(_:)` — recompute the summary table from scratch.
   Exposed in Settings as a self-heal / sanity check.
 
@@ -125,7 +141,7 @@ conditions*. Three reasons we went with raw `import SQLite3`:
 
 ```
 Database/Database.swift          sqlite3 wrapper, WAL/pragmas, prepared statements
-Database/Schema.swift            DDL + triggers + migrations V1–V9
+Database/Schema.swift            DDL + triggers + migrations V1–V10
 Database/TransactionStore.swift  CRUD on transactions
 Database/CategoryAccountStore.swift  CRUD on categories + accounts, balances
 Database/SummaryStore.swift      reads monthly_summaries for dashboard/reports
@@ -152,7 +168,7 @@ Mutating helpers on `AppState` serialize through `db.sync { … }` and bump
 |---|---|---|
 | Dashboard | `DashboardView` + `MonthCalendar` (UICalendarView) | summary cards, essential split, month calendar with daily spend, budgets, charts |
 | Accounts | `AccountsView` → `AccountDetailView` → `ReconciliationSheet` | account management, balances, reconciliation statements |
-| Transactions | `TransactionsView` | account list → per-account transaction list; landscape split view with inline `TransactionEntryView`, portrait uses the `TransactionEditor` sheet. The entry form handles splits (one row per line, shared `split_group`), payee, loan role and Repeat (creates a schedule) |
+| Transactions | `TransactionsView` | account list → per-account transaction list; landscape split view with inline `TransactionEntryView`, portrait uses the `TransactionEditor` sheet. The entry form handles splits (one row per line, shared `split_group`), payee, asset/liability transfer extras and Repeat (creates a schedule) |
 | Reports | `ReportsView` | aggregate queries over `monthly_summaries` |
 | Settings | `SettingsView` → `CategoriesView`, `SchedulesView`, `PayeesView`, `BackupsView` | home currency, rates, Manage (Categories and Budget: sub-categories, per-category monthly budgets, an overall monthly spending limit in UserDefaults visualised against the allocated budgets; scheduled transactions; payees), backups (auto/manual/restore/share), rebuild summaries, delete all transactions, Money Pro import |
 
@@ -221,8 +237,8 @@ so it stays as-is. If you add new top-level types, sanity-check against
   shape can't be served by `monthly_summaries`, add a covering index on
   `transactions` first; only add a new materialized table if profiling shows
   the index isn't enough.
-- **Adding a column to `transactions`** → write a `migrateToV10` in
-  `Schema.swift`, add the `current < 10` block to `Schema.migrate`, bump
+- **Adding a column to `transactions`** → write a `migrateToV11` in
+  `Schema.swift`, add the `current < 11` block to `Schema.migrate`, bump
   `latestVersion`, and update both insert/update bind sites in `TransactionStore`.
   If the column feeds `monthly_summaries`, also extend the `WHEN` clause of the
   `tx_au` trigger.

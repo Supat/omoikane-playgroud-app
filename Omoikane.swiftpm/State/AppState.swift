@@ -206,7 +206,7 @@ final class AppState {
     /// Post an income or expense that moves the account to `newBalanceMinor`.
     /// Uses (and lazily creates) a "Balance adjustment" category of the
     /// matching kind so the correction is visible and reportable.
-    func adjustBalance(accountId: Int64, to newBalanceMinor: Int64) throws {
+    func adjustBalance(accountId: Int64, to newBalanceMinor: Int64, on date: Date = Date()) throws {
         try db.sync {
             guard let acct = try accounts.get(id: accountId) else { return }
             let delta = newBalanceMinor - (try accounts.balanceMinor(accountId: accountId))
@@ -218,7 +218,7 @@ final class AppState {
                 ?? categories.insert(name: "Balance adjustment", kind: catKind, icon: "equal.circle")
             let now = Date()
             var tx = Transaction(
-                id: 0, occurredOn: now, amountMinor: abs(delta), currency: acct.currency,
+                id: 0, occurredOn: date, amountMinor: abs(delta), currency: acct.currency,
                 kind: kind, categoryId: catId, accountId: accountId,
                 counterpartyAccountId: nil, counterpartyAmountMinor: nil,
                 note: "Balance adjustment", tags: [], createdAt: now, updatedAt: now

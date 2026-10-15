@@ -89,7 +89,7 @@ struct ReconciliationSheet: View {
             DatePicker("Statement date", selection: $statementDate, displayedComponents: .date)
 
             HStack {
-                Text(account.kind == .credit ? "Balance owed" : "Statement balance")
+                Text(account.kind.isDebt ? "Balance owed" : "Statement balance")
                 Spacer()
                 NumberPadField(
                     text: $balanceText,
@@ -99,7 +99,7 @@ struct ReconciliationSheet: View {
                 .frame(maxWidth: 160)
                 Text(account.currency).foregroundStyle(.secondary)
             }
-            if account.kind == .credit {
+            if account.kind.isDebt {
                 Text("Enter the positive amount you owe; we record it as a negative balance internally.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -235,7 +235,7 @@ struct ReconciliationSheet: View {
         // Credit accounts: user enters a positive "owed" → store as negative.
         // Other kinds: store as-is (positive = positive balance).
         guard let unsigned = Money.parseMinor(balanceText, currency: account.currency) else { return nil }
-        return account.kind == .credit ? -unsigned : unsigned
+        return account.kind.isDebt ? -unsigned : unsigned
     }
 
     /// Cleared balance for this account *as of when the user opened this
@@ -457,7 +457,7 @@ struct ReconciliationSheet: View {
 
     private func formatMinorToInputText(_ minor: Int64) -> String {
         // Display unsigned for credit (user reads "$843"); signed otherwise.
-        let display = account.kind == .credit ? -minor : minor
+        let display = account.kind.isDebt ? -minor : minor
         let digits = Money.fractionDigits(for: account.currency)
         if digits == 0 { return String(display) }
         let scale = pow(10.0, Double(digits))

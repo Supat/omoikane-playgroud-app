@@ -256,7 +256,7 @@ private struct StatementRow: View {
                 }
                 Spacer()
                 // Credit cards: show the positive amount owed, as the sheet does.
-                Formatters.moneyText(account.kind == .credit ? -statement.statementBalanceMinor : statement.statementBalanceMinor,
+                Formatters.moneyText(account.kind.isDebt ? -statement.statementBalanceMinor : statement.statementBalanceMinor,
                                      currency: statement.currency)
                     .monospacedDigit()
                 Image(systemName: statement.status == .reconciled ? "checkmark.seal.fill" : "clock")
