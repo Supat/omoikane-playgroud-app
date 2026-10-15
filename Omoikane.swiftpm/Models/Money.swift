@@ -103,6 +103,13 @@ enum YearMonth {
         Date().yearMonthKey
     }
 
+    /// "Oct 2026" for a YYYYMM key.
+    static func label(_ key: Int) -> String {
+        let (y, m) = components(key)
+        let d = Calendar.current.date(from: DateComponents(year: y, month: m, day: 1)) ?? Date()
+        return d.formatted(.dateTime.month(.abbreviated).year())
+    }
+
     /// First day of the month for a "YYYY-MM" or "YYYYMM" label. Lets charts
     /// use a real date axis instead of truncated string labels.
     static func date(fromLabel label: String) -> Date {

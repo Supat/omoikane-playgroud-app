@@ -5,6 +5,10 @@ struct ReportsView: View {
     @Environment(AppState.self) private var app
 
     @State private var monthsBack: Int = 6
+    /// Last month of the reporting window. Defaults to the current month;
+    /// pinning it elsewhere makes every section treat that month as "now".
+    @State private var anchorYM: Int = YearMonth.current()
+    private var isPinned: Bool { anchorYM != YearMonth.current() }
     @State private var kind: TransactionKind = .expense
     /// nil = "All currencies → home rollup". Non-nil = isolate one currency.
     @State private var currencyFilter: String? = nil
@@ -173,6 +177,7 @@ struct ReportsView: View {
         .task(id: app.dataVersion) { reload() }
         .task(id: app.rateVersion) { reload() }
         .onChange(of: monthsBack)     { _, _ in reload() }
+        .onChange(of: anchorYM)       { _, _ in reload() }
         .onChange(of: kind)           { _, _ in reload() }
         .onChange(of: currencyFilter) { _, _ in reload() }
     }
@@ -201,6 +206,30 @@ struct ReportsView: View {
                 }
             }
             .pickerStyle(.menu)
+
+            // Pinned month: the window ends here instead of at today.
+            HStack(spacing: 12) {
+                Label(isPinned ? "Pinned to \(YearMonth.label(anchorYM))" : "Ending \(YearMonth.label(anchorYM))",
+                      systemImage: isPinned ? "pin.fill" : "calendar")
+                    .foregroundStyle(isPinned ? Color.accentColor : .secondary)
+                Spacer()
+                if isPinned {
+                    Button("Current month") { anchorYM = YearMonth.current() }
+                        .keyboardShortcut("0", modifiers: .command)
+                }
+                Stepper(value: $anchorYM, in: 200001 ... 209912, step: 1) {
+                    EmptyView()
+                }
+                .labelsHidden()
+                .accessibilityLabel("Pinned month")
+                .accessibilityValue(YearMonth.label(anchorYM))
+                .onChange(of: anchorYM) { _, newValue in
+                    let (y, m) = YearMonth.components(newValue)
+                    if m < 1  { anchorYM = YearMonth.key(year: y - 1, month: 12) }
+                    if m > 12 { anchorYM = YearMonth.key(year: y + 1, month: 1) }
+                }
+            }
+            .font(.subheadline)
         }
     }
 
@@ -285,7 +314,7 @@ struct ReportsView: View {
     // MARK: - Logic
 
     private func reload() {
-        let win = YearMonth.window(endingAt: YearMonth.current(), monthsBack: monthsBack)
+        let win = YearMonth.window(endingAt: anchorYM, monthsBack: monthsBack)
         do {
             byMonth     = try app.summaries.byMonth(fromYM: win.start, toYM: win.end, kind: kind, currency: currencyFilter)
             byCategory  = try app.summaries.byCategory(fromYM: win.start, toYM: win.end, kind: kind, currency: currencyFilter)

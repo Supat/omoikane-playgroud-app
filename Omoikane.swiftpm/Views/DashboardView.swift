@@ -487,13 +487,6 @@ struct DashboardView: View {
         }
     }
 
-    private func monthLabel(_ key: Int) -> String {
-        let (y, m) = YearMonth.components(key)
-        var comps = DateComponents()
-        comps.year = y; comps.month = m; comps.day = 1
-        if let d = Calendar.current.date(from: comps) {
-            return Formatters.monthLabel.string(from: d)
-        }
-        return String(format: "%04d-%02d", y, m)
-    }
+    private func monthLabel(_ key: Int) -> String { YearMonth.label(key) }
+ }
 }

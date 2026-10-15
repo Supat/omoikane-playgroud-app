@@ -163,7 +163,8 @@ swallows arrow keys before the List sees them.
 Shortcut vocabulary, keep it consistent: ⌘N new, ⌘F search, ⌘R reconcile
 (open the sheet, toggle reconciliation mode, or reopen a statement depending
 on the screen), Space ticks the selected row in reconciliation mode,
-⌘⇧A archive, ⌘U unarchive, ⌘⌫ delete, ⌘⇧B adjust balance. Every swipe action has one of these
+⌘⇧A archive, ⌘U unarchive, ⌘⌫ delete, ⌘⇧B adjust balance, ⌘0 back to the
+current month when Reports is pinned. Every swipe action has one of these
 twins, either on the keyboard-selected row or in the entity's detail
 surface (account detail screen, category editor sheet). The delete path
 always goes through the shared `*ManagementAlerts` modifier so the
