@@ -174,11 +174,19 @@ struct ScheduleEditor: View {
                             }
                         }
                     } else {
-                        Picker("Category", selection: $categoryId) {
-                            ForEach(availableCategories) { c in
-                                Text(c.name).tag(Int64?.some(c.id))
+                        VStack(alignment: .leading, spacing: 0) {
+                            HStack {
+                                Text("Category")
+                                Spacer()
+                                Text(categoryPath)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
                             }
+                            .padding(.horizontal, 16)
+                            .padding(.top, 10)
+                            CategoryGlyphPicker(categories: availableCategories, selection: $categoryId)
                         }
+                        .listRowInsets(EdgeInsets())
                         Picker("Payee", selection: $payeeId) {
                             Text("None").tag(Int64?.none)
                             ForEach(payees) { p in Text(p.name).tag(Int64?.some(p.id)) }
@@ -238,6 +246,14 @@ struct ScheduleEditor: View {
     private var isCrossCurrency: Bool { kind == .transfer && fromCurrency != toCurrency }
     private var availableCategories: [LedgerCategory] {
         categories.filter { $0.kind == (kind == .income ? .income : .expense) }
+    }
+    private var categoryPath: String {
+        guard let id = categoryId ?? availableCategories.first?.id,
+              let c = categories.first(where: { $0.id == id }) else { return "" }
+        if let p = c.parentId, let parent = categories.first(where: { $0.id == p }) {
+            return "\(parent.name) › \(c.name)"
+        }
+        return c.name
     }
     private var canSave: Bool {
         guard (Money.parseMinor(amountText, currency: fromCurrency) ?? 0) > 0, accountId != nil else { return false }
