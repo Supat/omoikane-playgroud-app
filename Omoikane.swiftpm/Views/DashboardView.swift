@@ -261,11 +261,11 @@ struct DashboardView: View {
             .map { StackedShareBar.Slice(name: $0.name, amount: $0.amount, color: $0.color) }
             .sorted { $0.amount > $1.amount }
     }
+    /// Capacity when no spending limit is set: the parents' effective
+    /// budgets summed, the same figure Categories and Budget calls Budgeted.
     private var spendCapacityFromBudgets: Int64 {
-        let expenseRows = budgets.filter { $0.category.kind == .expense }
-        let budgetedIds = Set(expenseRows.map { $0.category.id })
-        return expenseRows
-            .filter { r in r.category.parentId.map { !budgetedIds.contains($0) } ?? true }
+        budgets
+            .filter { $0.category.kind == .expense && $0.category.parentId == nil }
             .reduce(Int64(0)) { $0 + $1.budgetMinor }
     }
 
