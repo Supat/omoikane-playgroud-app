@@ -135,6 +135,27 @@ struct CategoriesView: View {
                 LabeledContent("Income targets") {
                     Formatters.moneyText(expectedIncomeMinor, currency: app.homeCurrency)
                 }
+                // Spending limit plotted against expected income: how much of
+                // what you plan to earn you plan to spend.
+                if let limit = app.monthlySpendingLimitMinor, limit > 0 {
+                    let expected = expectedIncomeMinor
+                    let share = Double(limit) / Double(expected)
+                    let overshoot = limit > expected
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Limit against income targets")
+                            Spacer()
+                            Text("\(Int((share * 100).rounded()))%")
+                                .moneyStyle()
+                                .font(.subheadline)
+                                .foregroundStyle(overshoot ? .red : (share > 0.85 ? .orange : .secondary))
+                        }
+                        ProgressView(value: min(share, 1))
+                            .tint(overshoot ? .red : (share > 0.85 ? .orange : .accentColor))
+                            .accessibilityLabel("Spending limit as a share of income targets")
+                            .accessibilityValue("\(Int((share * 100).rounded())) percent")
+                    }
+                }
                 if let line = incomeVersusOutgo {
                     Text(line.text)
                         .moneyStyle()
