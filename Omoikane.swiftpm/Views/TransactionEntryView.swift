@@ -92,7 +92,7 @@ struct TransactionEntryView: View {
 
     var body: some View {
         Form {
-            if let tx = transaction, tx.isClearedAny {
+            if let tx = transaction, tx.statementId != nil || tx.counterpartyStatementId != nil {
                 Section {
                     HStack(spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill")
@@ -469,7 +469,7 @@ struct TransactionEntryView: View {
             }
             return true
         }
-        return categoryId != nil
+        return isSplit || categoryId != nil   // split lines carry their own categories
     }
 
     private func loadReferences() {
@@ -477,6 +477,10 @@ struct TransactionEntryView: View {
             categories = try app.categories.list()
             accounts = try app.accounts.list()
             payees = try app.payees.list()
+            // Needs the accounts (for the to-currency) before it can be formatted.
+            if let cp = transaction?.counterpartyAmountMinor {
+                counterpartyAmountText = formatMinorToText(cp, currency: toCurrency)
+            }
             if accountId == nil {
                 if let pre = initialAccountId,
                    accounts.contains(where: { $0.id == pre }) {
@@ -500,10 +504,6 @@ struct TransactionEntryView: View {
         guard let tx = transaction else { return }
         kind = tx.kind
         amountText = formatMinorToText(tx.amountMinor, currency: tx.currency)
-        if let cp = tx.counterpartyAmountMinor {
-            // We need toCurrency to format; defer formatting until accounts load.
-            counterpartyAmountText = String(cp)
-        }
         occurredOn = tx.occurredOn
         categoryId = tx.categoryId
         accountId = tx.accountId
@@ -534,6 +534,8 @@ struct TransactionEntryView: View {
         if kind == .transfer {
             // Transfers carry no visible category; the column is NOT NULL.
             cat = categories.first?.id ?? 0
+        } else if isSplit {
+            cat = splitLines.first?.categoryId ?? categoryId ?? 0   // lines override per row
         } else {
             guard let chosen = categoryId else { return }
             cat = chosen
@@ -563,8 +565,8 @@ struct TransactionEntryView: View {
                 template.currency = fromCurrency
                 template.occurredOn = occurredOn
                 template.accountId = acct
-                template.counterpartyAccountId = nil
-                template.counterpartyAmountMinor = nil
+                template.counterpartyAccountId = (kind == .transfer) ? counterpartyAccountId : nil
+                template.counterpartyAmountMinor = cpAmount
                 template.note = note.isEmpty ? nil : note
                 template.tags = tags
                 template.updatedAt = now

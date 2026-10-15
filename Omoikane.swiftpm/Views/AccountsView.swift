@@ -160,19 +160,20 @@ struct AccountsView: View {
 /// reference it so the alert text can adapt to the situation.
 struct AccountDeletePrompt: Identifiable {
     let account: Account
-    let refs: (fromLeg: Int, toLeg: Int, statements: Int)
+    let refs: (fromLeg: Int, toLeg: Int, statements: Int, schedules: Int)
     var id: Int64 { account.id }
 
     var totalTxRefs: Int { refs.fromLeg + refs.toLeg }
-    var isBlocked: Bool { totalTxRefs > 0 || refs.statements > 0 }
+    var isBlocked: Bool { totalTxRefs > 0 || refs.statements > 0 || refs.schedules > 0 }
 
     var message: String {
         if isBlocked {
             let tx = "\(totalTxRefs) transaction\(totalTxRefs == 1 ? "" : "s")"
             let st = "\(refs.statements) reconciliation statement\(refs.statements == 1 ? "" : "s")"
-            return "Still referenced by \(tx) and \(st). Hard delete would break referential integrity, so archive instead — it hides the account from pickers without touching history."
+            let sc = "\(refs.schedules) schedule\(refs.schedules == 1 ? "" : "s")"
+            return "Still referenced by \(tx), \(st) and \(sc). Hard delete would break referential integrity, so archive instead — it hides the account from pickers without touching history."
         } else {
-            return "No transactions or statements reference this account, so it's safe to delete. This cannot be undone."
+            return "No transactions, statements or schedules reference this account, so it's safe to delete. This cannot be undone."
         }
     }
 }

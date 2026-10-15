@@ -46,6 +46,16 @@ final class TransactionStore {
 
     func update(_ tx: Transaction) throws {
         let now = Int64(Date().timeIntervalSince1970)
+        // If the instant didn't change, keep the stored day key: re-deriving
+        // it in a different time zone would silently move the row to another
+        // day or month.
+        let newAt = Int64(tx.occurredOn.timeIntervalSince1970)
+        var dayKey = Int64(tx.occurredOn.dayKey)
+        var ym = Int64(tx.occurredOn.yearMonthKey)
+        let cur = try db.prepare("SELECT occurred_on, year_month, occurred_at FROM transactions WHERE id = ?;")
+        cur.bind(tx.id, at: 1)
+        if try cur.step(), cur.int64(2) == newAt { dayKey = cur.int64(0); ym = cur.int64(1) }
+        cur.reset()
         let s = try db.prepare("""
             UPDATE transactions
                SET occurred_on = ?, year_month = ?, occurred_at = ?,
@@ -58,9 +68,9 @@ final class TransactionStore {
                    split_group = ?, payee_id = ?, loan_role = ?, is_essential = ?
              WHERE id = ?;
         """)
-        s.bind(Int64(tx.occurredOn.dayKey),                   at: 1)
-        s.bind(Int64(tx.occurredOn.yearMonthKey),             at: 2)
-        s.bind(Int64(tx.occurredOn.timeIntervalSince1970),    at: 3)
+        s.bind(dayKey,                                        at: 1)
+        s.bind(ym,                                            at: 2)
+        s.bind(newAt,                                         at: 3)
         s.bind(tx.amountMinor,                                at: 4)
         s.bind(tx.currency,                                   at: 5)
         s.bind(tx.kind.rawValue,                              at: 6)
@@ -118,6 +128,13 @@ final class TransactionStore {
         """)
         s2.bind(stmtId, at: 1)
         try s2.step()
+    }
+
+    /// Delete a whole split group (one logical transaction).
+    func deleteGroup(_ group: Int64) throws {
+        let s = try db.prepare("DELETE FROM transactions WHERE split_group = ?;")
+        s.bind(group, at: 1)
+        try s.step()
     }
 
     func delete(id: Int64) throws {

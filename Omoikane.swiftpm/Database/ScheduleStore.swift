@@ -10,7 +10,7 @@ final class ScheduleStore {
 
     private static let columns = """
         SELECT id, kind, amount_minor, category_id, account_id, counterparty_account_id,
-               counterparty_amount_minor, payee_id, note, frequency, interval, next_due, end_on, is_essential
+               counterparty_amount_minor, payee_id, note, frequency, interval, next_due, end_on, is_essential, day_of_month
     """
 
     func list() throws -> [Schedule] {
@@ -24,8 +24,8 @@ final class ScheduleStore {
     func insert(_ sc: Schedule) throws -> Int64 {
         let s = try db.prepare("""
             INSERT INTO schedules (kind, amount_minor, category_id, account_id, counterparty_account_id,
-                                   counterparty_amount_minor, payee_id, note, frequency, interval, next_due, end_on, is_essential)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);
+                                   counterparty_amount_minor, payee_id, note, frequency, interval, next_due, end_on, is_essential, day_of_month)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?);
         """)
         bind(s, sc)
         try s.step()
@@ -37,11 +37,11 @@ final class ScheduleStore {
             UPDATE schedules
                SET kind = ?, amount_minor = ?, category_id = ?, account_id = ?, counterparty_account_id = ?,
                    counterparty_amount_minor = ?, payee_id = ?, note = ?, frequency = ?, interval = ?,
-                   next_due = ?, end_on = ?, is_essential = ?
+                   next_due = ?, end_on = ?, is_essential = ?, day_of_month = ?
              WHERE id = ?;
         """)
         bind(s, sc)
-        s.bind(sc.id, at: 14)
+        s.bind(sc.id, at: 15)
         try s.step()
     }
 
@@ -89,7 +89,7 @@ final class ScheduleStore {
                     if acct?.clearsEntriesByDefault == true { tx.clearedAt = now }
                     _ = try transactions.insert(tx)
                     posted += 1
-                    sc.nextDue = Self.advance(sc.nextDue, frequency: sc.frequency, interval: sc.interval)
+                    sc.nextDue = Self.advance(sc.nextDue, frequency: sc.frequency, interval: sc.interval, dayOfMonth: sc.dayOfMonth)
                 }
                 if let end = sc.endOn, sc.nextDue.dayKey > end.dayKey {
                     try delete(id: sc.id)
@@ -101,8 +101,18 @@ final class ScheduleStore {
         return posted
     }
 
-    static func advance(_ date: Date, frequency: ScheduleFrequency, interval: Int) -> Date {
-        Calendar.current.date(byAdding: frequency.calendarComponent, value: max(1, interval), to: date) ?? date
+    /// Next occurrence. Monthly/yearly re-anchor to `dayOfMonth` (clamped to
+    /// the target month's length) so Jan 31 → Feb 28 → Mar 31, not Mar 28.
+    static func advance(_ date: Date, frequency: ScheduleFrequency, interval: Int, dayOfMonth: Int? = nil) -> Date {
+        let cal = Calendar.current
+        let step = max(1, interval)
+        guard let moved = cal.date(byAdding: frequency.calendarComponent, value: step, to: date) else { return date }
+        guard frequency == .monthly || frequency == .yearly else { return moved }
+        let anchor = dayOfMonth ?? cal.component(.day, from: date)
+        var comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: moved)
+        let days = cal.range(of: .day, in: .month, for: moved)?.count ?? 28
+        comps.day = min(max(1, anchor), days)
+        return cal.date(from: comps) ?? moved
     }
 
     private func bind(_ s: Statement, _ sc: Schedule) {
@@ -119,6 +129,7 @@ final class ScheduleStore {
         s.bind(Int64(sc.nextDue.dayKey), at: 11)
         s.bind(sc.endOn.map { Int64($0.dayKey) }, at: 12)
         s.bind(sc.isEssential ? 1 : 0, at: 13)
+        s.bind(Int64(sc.dayOfMonth ?? Calendar.current.component(.day, from: sc.nextDue)), at: 14)
     }
 
     private static func read(_ s: Statement) -> Schedule {
@@ -136,7 +147,8 @@ final class ScheduleStore {
             interval: s.int(10),
             nextDue: Date.from(dayKey: s.int(11)),
             endOn: s.optionalInt64(12).map { Date.from(dayKey: Int($0)) },
-            isEssential: s.int(13) != 0
+            isEssential: s.int(13) != 0,
+            dayOfMonth: s.optionalInt64(14).map(Int.init)
         )
     }
 }

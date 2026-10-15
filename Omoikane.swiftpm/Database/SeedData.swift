@@ -6,10 +6,26 @@ import Foundation
 /// Includes one USD account so the multi-currency UI is not invisible on a
 /// fresh install — the user sees per-currency dashboard rows immediately.
 enum SeedData {
+    /// `day` of the month containing `monthStart`, clamped to that month.
+    /// (Calendar.date(bySetting:) searches forward and lands in the next month.)
+    static func day(_ day: Int, in monthStart: Date) -> Date? {
+        let cal = Calendar.current
+        var c = cal.dateComponents([.year, .month], from: monthStart)
+        let days = cal.range(of: .day, in: .month, for: monthStart)?.count ?? 28
+        c.day = min(day, days); c.hour = 12
+        return cal.date(from: c)
+    }
+
+    static let seededKey = "omoikane.seeded"
+
     static func seedIfNeeded(db: Database, homeCurrency: String = "JPY", addSampleTransactions: Bool = true) throws {
-        let countStmt = try db.prepare("SELECT COUNT(*) FROM categories;")
+        // Seed exactly once per install: a flag, and never over existing data
+        // (deleting everything later must not conjure the samples back).
+        guard !UserDefaults.standard.bool(forKey: seededKey) else { return }
+        let countStmt = try db.prepare("SELECT (SELECT COUNT(*) FROM categories) + (SELECT COUNT(*) FROM accounts);")
         var existing = 0
         if try countStmt.step() { existing = countStmt.int(0) }
+        UserDefaults.standard.set(true, forKey: seededKey)
         guard existing == 0 else { return }
 
         let categories = CategoryStore(db: db)
@@ -69,7 +85,7 @@ enum SeedData {
                 guard let monthStart = cal.date(byAdding: .month, value: -monthsAgo, to: today) else { continue }
 
                 // JPY: Salary on the 25th
-                if let pay = cal.date(bySetting: .day, value: 25, of: monthStart) {
+                if let pay = Self.day(25, in: monthStart) {
                     samples.append(Transaction(
                         id: 0, occurredOn: pay, amountMinor: 320_000, currency: "JPY",
                         kind: .income, categoryId: salary, accountId: bank,
@@ -78,7 +94,7 @@ enum SeedData {
                     ))
                 }
                 // JPY: Rent on the 1st
-                if let rentDay = cal.date(bySetting: .day, value: 1, of: monthStart) {
+                if let rentDay = Self.day(1, in: monthStart) {
                     samples.append(Transaction(
                         id: 0, occurredOn: rentDay, amountMinor: 90_000, currency: "JPY",
                         kind: .expense, categoryId: rent, accountId: bank,
@@ -87,7 +103,7 @@ enum SeedData {
                     ))
                 }
                 // JPY: Utilities mid-month
-                if let utilDay = cal.date(bySetting: .day, value: 15, of: monthStart) {
+                if let utilDay = Self.day(15, in: monthStart) {
                     samples.append(Transaction(
                         id: 0, occurredOn: utilDay, amountMinor: 12_500, currency: "JPY",
                         kind: .expense, categoryId: utilities, accountId: bank,
@@ -105,7 +121,7 @@ enum SeedData {
                 ]
                 for (idx, weekly) in weeklyAmounts.enumerated() {
                     let day = 4 + idx * 7
-                    guard let d = cal.date(bySetting: .day, value: day, of: monthStart) else { continue }
+                    guard let d = Self.day(day, in: monthStart) else { continue }
                     samples.append(Transaction(
                         id: 0, occurredOn: d, amountMinor: weekly.0, currency: "JPY",
                         kind: .expense, categoryId: groceries, accountId: cash,
@@ -144,7 +160,7 @@ enum SeedData {
 
                 // USD: a couple of foreign-currency entries so the dashboard
                 // shows a multi-currency rollup.
-                if let d = cal.date(bySetting: .day, value: 10, of: monthStart) {
+                if let d = Self.day(10, in: monthStart) {
                     samples.append(Transaction(
                         id: 0, occurredOn: d, amountMinor: 4_500, currency: "USD", // $45.00
                         kind: .expense, categoryId: dining, accountId: usdBank,
@@ -152,7 +168,7 @@ enum SeedData {
                         note: "Coffee meeting", tags: [], createdAt: now, updatedAt: now
                     ))
                 }
-                if let d = cal.date(bySetting: .day, value: 18, of: monthStart) {
+                if let d = Self.day(18, in: monthStart) {
                     samples.append(Transaction(
                         id: 0, occurredOn: d, amountMinor: 12_000, currency: "USD", // $120.00
                         kind: .expense, categoryId: travel, accountId: usdBank,

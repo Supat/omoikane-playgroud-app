@@ -18,6 +18,9 @@ struct ReconciliationSheet: View {
     // Statement form
     @State private var statementId: Int64? = nil
     @State private var statementDate: Date = Date()
+    /// Date of the newest reconciled statement before this one; rows dated
+    /// on or before it are "outstanding from before the last statement".
+    @State private var previousStatementDate: Date? = nil
     @State private var balanceText: String = ""
     @State private var note: String = ""
     @State private var statusLoaded: StatementStatus? = nil
@@ -67,14 +70,14 @@ struct ReconciliationSheet: View {
             }
             .task { initialLoad() }
             .onChange(of: statementDate) { _, _ in reloadRows() }
-            .alert("Outstanding entries from before \(formattedStatementDate)",
+            .alert("Outstanding entries from before \(formattedPreviousDate)",
                    isPresented: $confirmFinishLeftovers) {
                 Button("Continue", action: finishConfirmed)
                     .keyboardShortcut(.defaultAction)
                 Button("Cancel", role: .cancel) { }
                     .keyboardShortcut(.cancelAction)
             } message: {
-                Text("\(leftoversCount) item\(leftoversCount == 1 ? "" : "s") dated on or before \(formattedStatementDate) will remain uncleared. Continue anyway?")
+                Text("\(leftoversCount) item\(leftoversCount == 1 ? "" : "s") dated on or before the last statement (\(formattedPreviousDate)) will remain uncleared. Continue anyway?")
             }
         }
     }
@@ -118,9 +121,9 @@ struct ReconciliationSheet: View {
                 Section {
                     ForEach(priorRows) { tx in row(tx) }
                 } header: {
-                    Text("Outstanding from prior periods")
+                    Text("Outstanding from before \(formattedPreviousDate)")
                 } footer: {
-                    Text("These were dated on or before the statement date but never cleared. Pre-ticked.")
+                    Text("Dated on or before the last reconciled statement but never cleared. Pre-ticked.")
                         .font(.footnote)
                 }
             }
@@ -236,11 +239,17 @@ struct ReconciliationSheet: View {
         return sum
     }
 
+    private var priorBoundaryKey: Int? { previousStatementDate?.dayKey }
     private var priorRows: [Transaction] {
-        rows.filter { $0.occurredOn.dayKey <= statementDate.dayKey - 1 }
+        guard let k = priorBoundaryKey else { return [] }
+        return rows.filter { $0.occurredOn.dayKey <= k }
     }
     private var periodRows: [Transaction] {
-        rows.filter { $0.occurredOn.dayKey > statementDate.dayKey - 1 }
+        guard let k = priorBoundaryKey else { return rows }
+        return rows.filter { $0.occurredOn.dayKey > k }
+    }
+    private var formattedPreviousDate: String {
+        previousStatementDate.map { Formatters.mediumDate.string(from: $0) } ?? ""
     }
 
     private var formattedStatementDate: String {
@@ -292,7 +301,8 @@ struct ReconciliationSheet: View {
         let cal = Calendar.current
         var comps = cal.dateComponents([.year, .month, .day], from: date)
         comps.day = day
-        if let candidate = cal.date(from: comps), candidate >= date {
+        // Compare by day so the closing day itself still counts as this month.
+        if let candidate = cal.date(from: comps), candidate.dayKey >= date.dayKey {
             return candidate
         }
         // Roll to next month.
@@ -315,10 +325,19 @@ struct ReconciliationSheet: View {
         do {
             var f = TransactionFilter()
             f.accountIdAnyLeg = account.id
-            f.clearedOnly = false
             f.occurredOnAtMost = statementDate.dayKey
-            f.limit = 2_000
-            rows = try app.transactions.list(f)
+            // Uncleared rows, plus rows this very statement cleared so they
+            // can be unticked after Save & keep open or Reopen.
+            rows = try app.transactions.list(f).filter { tx in
+                let mine = tx.accountId == account.id
+                let clearedAt = mine ? tx.clearedAt : tx.counterpartyClearedAt
+                let sid = mine ? tx.statementId : tx.counterpartyStatementId
+                return clearedAt == nil || (statementId != nil && sid == statementId)
+            }
+            previousStatementDate = try app.statements.list(accountId: account.id)
+                .filter { $0.status == .reconciled && $0.id != statementId && $0.statementDate.dayKey < statementDate.dayKey }
+                .map(\.statementDate)
+                .max()
 
             // For an existing statement, pre-tick rows already cleared *by* this statement.
             if let sid = statementId {

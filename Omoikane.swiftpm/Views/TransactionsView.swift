@@ -641,8 +641,7 @@ struct AccountTransactionsView: View {
             let (fromYM, toYM) = periodFilter.yearMonthRange()
             f.fromYearMonth = fromYM
             f.toYearMonth = toYM
-            f.limit = 500
-            rows = try app.transactions.list(f)
+            rows = try app.transactions.list(f)   // no cap: the header total sums these rows
             categoriesById = Dictionary(uniqueKeysWithValues: try app.categories.list(includeArchived: true).map { ($0.id, $0) })
             accountsById = Dictionary(uniqueKeysWithValues: try app.accounts.list(includeArchived: true).map { ($0.id, $0) })
         } catch {

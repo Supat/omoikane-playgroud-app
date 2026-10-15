@@ -255,7 +255,9 @@ private struct StatementRow: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Formatters.moneyText(statement.statementBalanceMinor, currency: statement.currency)
+                // Credit cards: show the positive amount owed, as the sheet does.
+                Formatters.moneyText(account.kind == .credit ? -statement.statementBalanceMinor : statement.statementBalanceMinor,
+                                     currency: statement.currency)
                     .monospacedDigit()
                 Image(systemName: statement.status == .reconciled ? "checkmark.seal.fill" : "clock")
                     .foregroundStyle(statement.status == .reconciled ? .green : .orange)

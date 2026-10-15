@@ -265,6 +265,13 @@ final class SummaryStore {
         return out
     }
 
+    /// Rows of every kind in a month window (for the Dashboard count card).
+    func transactionCount(fromYM: Int, toYM: Int) throws -> Int {
+        let s = try db.prepare("SELECT COALESCE(SUM(transaction_count), 0) FROM monthly_summaries WHERE year_month BETWEEN ? AND ?;")
+        s.bind(Int64(fromYM), at: 1).bind(Int64(toYM), at: 2)
+        return try s.step() ? s.int(0) : 0
+    }
+
     func distinctCurrencies(fromYM: Int? = nil, toYM: Int? = nil) throws -> [String] {
         var sql = "SELECT DISTINCT currency FROM monthly_summaries"
         var binds: [(Statement, Int32) -> Void] = []

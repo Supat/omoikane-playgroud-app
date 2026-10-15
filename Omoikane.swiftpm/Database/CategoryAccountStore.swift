@@ -90,18 +90,13 @@ final class CategoryStore {
     /// Count rows that would be broken by hard-deleting this category. Used
     /// by the UI to (a) decide whether deletion is even possible and
     /// (b) explain the impact to the user.
-    func referenceCount(for id: Int64) throws -> (transactions: Int, children: Int) {
-        let txStmt = try db.prepare("SELECT COUNT(*) FROM transactions WHERE category_id = ?;")
-        txStmt.bind(id, at: 1)
-        _ = try txStmt.step()
-        let txCount = txStmt.int(0)
-
-        let childStmt = try db.prepare("SELECT COUNT(*) FROM categories WHERE parent_id = ?;")
-        childStmt.bind(id, at: 1)
-        _ = try childStmt.step()
-        let childCount = childStmt.int(0)
-
-        return (transactions: txCount, children: childCount)
+    func referenceCount(for id: Int64) throws -> (transactions: Int, children: Int, schedules: Int) {
+        func count(_ sql: String) throws -> Int {
+            let s = try db.prepare(sql); s.bind(id, at: 1); _ = try s.step(); return s.int(0)
+        }
+        return (transactions: try count("SELECT COUNT(*) FROM transactions WHERE category_id = ?;"),
+                children:     try count("SELECT COUNT(*) FROM categories WHERE parent_id = ?;"),
+                schedules:    try count("SELECT COUNT(*) FROM schedules WHERE category_id = ?;"))
     }
 
     /// Hard delete. SQLite FK enforcement (`PRAGMA foreign_keys = ON`) will
@@ -260,23 +255,14 @@ final class AccountStore {
     /// Used by the UI to (a) decide whether deletion is even possible and
     /// (b) explain the impact to the user. We split transaction references
     /// into the two legs so the message can name them precisely.
-    func referenceCount(for id: Int64) throws -> (fromLeg: Int, toLeg: Int, statements: Int) {
-        let fromStmt = try db.prepare("SELECT COUNT(*) FROM transactions WHERE account_id = ?;")
-        fromStmt.bind(id, at: 1)
-        _ = try fromStmt.step()
-        let fromCount = fromStmt.int(0)
-
-        let toStmt = try db.prepare("SELECT COUNT(*) FROM transactions WHERE counterparty_account_id = ?;")
-        toStmt.bind(id, at: 1)
-        _ = try toStmt.step()
-        let toCount = toStmt.int(0)
-
-        let stmtStmt = try db.prepare("SELECT COUNT(*) FROM statements WHERE account_id = ?;")
-        stmtStmt.bind(id, at: 1)
-        _ = try stmtStmt.step()
-        let statementCount = stmtStmt.int(0)
-
-        return (fromLeg: fromCount, toLeg: toCount, statements: statementCount)
+    func referenceCount(for id: Int64) throws -> (fromLeg: Int, toLeg: Int, statements: Int, schedules: Int) {
+        func count(_ sql: String) throws -> Int {
+            let s = try db.prepare(sql); s.bind(id, at: 1); _ = try s.step(); return s.int(0)
+        }
+        return (fromLeg:    try count("SELECT COUNT(*) FROM transactions WHERE account_id = ?;"),
+                toLeg:      try count("SELECT COUNT(*) FROM transactions WHERE counterparty_account_id = ?;"),
+                statements: try count("SELECT COUNT(*) FROM statements WHERE account_id = ?;"),
+                schedules:  try count("SELECT COUNT(*) FROM schedules WHERE account_id = ?1 OR counterparty_account_id = ?1;"))
     }
 
     /// Hard delete. SQLite FK enforcement (`PRAGMA foreign_keys = ON`) will

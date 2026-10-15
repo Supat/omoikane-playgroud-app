@@ -75,7 +75,7 @@ struct ReportsView: View {
                     if categoryRows.isEmpty {
                         Text("—").foregroundStyle(.secondary)
                     } else {
-                        Chart(categoryRows.prefix(10), id: \.name) { row in
+                        Chart(categoryRows.prefix(10)) { row in
                             BarMark(
                                 x: .value("Total", Double(row.minor)),
                                 y: .value("Category", row.name)
@@ -118,8 +118,12 @@ struct ReportsView: View {
                             .foregroundStyle(.secondary)
                             .font(.subheadline)
                     } else {
-                        let totalBudget = budgetRows.reduce(Int64(0)) { $0 + $1.budgetMinor }
-                        let totalSpent = budgetRows.reduce(Int64(0)) { $0 + $1.spentMinor }
+                        // A parent's budget covers its children: a child whose parent is
+                        // budgeted is shown but not counted twice in the total.
+                        let budgetedIds = Set(budgetRows.map { $0.category.id })
+                        let counted = budgetRows.filter { r in r.category.parentId.map { !budgetedIds.contains($0) } ?? true }
+                        let totalBudget = counted.reduce(Int64(0)) { $0 + $1.budgetMinor }
+                        let totalSpent = counted.reduce(Int64(0)) { $0 + $1.spentMinor }
                         ForEach(budgetRows) { row in
                             let over = row.spentMinor > row.budgetMinor
                             VStack(alignment: .leading, spacing: 4) {
@@ -331,10 +335,13 @@ struct ReportsView: View {
         )
     }
 
-    private struct CategoryRow: Hashable { let name: String; let minor: Int64 }
+    private struct CategoryRow: Hashable, Identifiable { let id: Int64; let name: String; let minor: Int64 }
+    @State private var categoryLabels: [Int64: String] = [:]
 
     private var categoryRows: [CategoryRow] {
-        var bucket: [String: Int64] = [:]
+        // Keyed by category id, not name: "Other" exists under several parents.
+        var bucket: [Int64: Int64] = [:]
+        var names: [Int64: String] = [:]
         for row in byCategory {
             let amount: Int64?
             if currencyFilter != nil {
@@ -342,10 +349,10 @@ struct ReportsView: View {
             } else {
                 amount = app.convertedToHome(row.totalMinor, from: row.currency)
             }
-            if let a = amount { bucket[row.key, default: 0] += a }
+            if let a = amount { bucket[row.keyId, default: 0] += a; names[row.keyId] = row.key }
         }
         return bucket
-            .map { CategoryRow(name: $0.key, minor: $0.value) }
+            .map { CategoryRow(id: $0.key, name: categoryLabels[$0.key] ?? names[$0.key] ?? "—", minor: $0.value) }
             // Net mixes signs: rank by magnitude so the biggest movers lead.
             .sorted { mode == .net ? abs($0.minor) > abs($1.minor) : $0.minor > $1.minor }
     }
@@ -382,6 +389,11 @@ struct ReportsView: View {
             loans = try app.transactions.loanBalances()
             // Budgets always roll up to the home currency, regardless of the currency filter.
             let cats = try app.categories.list()
+            let allCats = try app.categories.list(includeArchived: true)
+            categoryLabels = Dictionary(uniqueKeysWithValues: allCats.map { c in
+                let parent = c.parentId.flatMap { pid in allCats.first { $0.id == pid }?.name }
+                return (c.id, parent.map { "\($0) › \(c.name)" } ?? c.name)
+            })
             let spentRows = try app.summaries.byCategory(fromYM: win.start, toYM: win.end, kind: .expense)
             budgetRows = cats.compactMap { c -> BudgetRow? in
                 guard let monthly = c.budgetMinor else { return nil }

@@ -312,20 +312,21 @@ struct CategoriesView: View {
 /// so the alert text can adapt to the situation.
 struct CategoryDeletePrompt: Identifiable {
     let category: LedgerCategory
-    let refs: (transactions: Int, children: Int)
+    let refs: (transactions: Int, children: Int, schedules: Int)
     var id: Int64 { category.id }
 
     var isBlocked: Bool {
-        refs.transactions > 0 || refs.children > 0
+        refs.transactions > 0 || refs.children > 0 || refs.schedules > 0
     }
 
     var message: String {
         if isBlocked {
             let tx = "\(refs.transactions) transaction\(refs.transactions == 1 ? "" : "s")"
             let ch = "\(refs.children) sub-categor\(refs.children == 1 ? "y" : "ies")"
-            return "Still referenced by \(tx) and \(ch). Hard delete would break referential integrity, so archive instead — it hides the category from pickers without touching history."
+            let sc = "\(refs.schedules) schedule\(refs.schedules == 1 ? "" : "s")"
+            return "Still referenced by \(tx), \(ch) and \(sc). Hard delete would break referential integrity, so archive instead — it hides the category from pickers without touching history."
         } else {
-            return "No transactions or sub-categories reference this category, so it's safe to delete. This cannot be undone."
+            return "No transactions, sub-categories or schedules reference this category, so it's safe to delete. This cannot be undone."
         }
     }
 }
@@ -508,8 +509,12 @@ struct CategoryEditor: View {
     /// (a category cannot be its own parent) and any of its descendants
     /// (we enforce a two-level hierarchy at the UI: only top-level items
     /// can be parents).
+    /// Top-level, same kind, not self. A category that has sub-categories
+    /// cannot itself be nested: the UI shows two levels only.
     private var eligibleParents: [LedgerCategory] {
-        allCategories.filter { c in
+        let hasChildren = existing.map { me in allCategories.contains { $0.parentId == me.id } } ?? false
+        if hasChildren { return [] }
+        return allCategories.filter { c in
             c.kind == kind &&
             c.parentId == nil &&
             c.id != existing?.id

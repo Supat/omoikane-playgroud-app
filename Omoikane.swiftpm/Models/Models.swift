@@ -132,6 +132,9 @@ struct Schedule: Identifiable, Hashable {
     var nextDue: Date
     var endOn: Date?
     var isEssential: Bool = false
+    /// Anchor for monthly/yearly cadence (1...31). Kept separately so a
+    /// schedule on the 31st survives short months.
+    var dayOfMonth: Int? = nil
 }
 
 /// Which leg of a transaction is being cleared. For non-transfers there is

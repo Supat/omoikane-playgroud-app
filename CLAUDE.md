@@ -73,7 +73,7 @@ conditions*. Three reasons we went with raw `import SQLite3`:
 
 ### Schema (`Omoikane.swiftpm/Database/Schema.swift`)
 
-`Schema.latestVersion` is **8**. Migrations are applied in order by `Schema.migrate`, each in its own transaction, tracked in `schema_version`.
+`Schema.latestVersion` is **9**. Migrations are applied in order by `Schema.migrate`, each in its own transaction, tracked in `schema_version`.
 
 - `transactions` — append-heavy fact table. Money in **minor units** as `Int64`
   (yen as integer; multiply by 100 for currencies with sub-units). Derived
@@ -112,6 +112,7 @@ conditions*. Three reasons we went with raw `import SQLite3`:
   Expense only in the UI; not in `monthly_summaries`. The Dashboard reads it
   straight from the fact table for the month.
 - V8: `schedules.is_essential` — posted rows inherit it.
+- V9: `schedules.day_of_month` anchors monthly/yearly cadence (no drift to the 28th); fixes V4's UTC-midnight `occurred_at` backfill to local midnight. `TransactionStore.update` keeps the stored day key when the instant is unchanged, so a time-zone change cannot move rows.
 - `Schema.rebuildSummaries(_:)` — recompute the summary table from scratch.
   Exposed in Settings as a self-heal / sanity check.
 
@@ -119,7 +120,7 @@ conditions*. Three reasons we went with raw `import SQLite3`:
 
 ```
 Database/Database.swift          sqlite3 wrapper, WAL/pragmas, prepared statements
-Database/Schema.swift            DDL + triggers + migrations V1–V8
+Database/Schema.swift            DDL + triggers + migrations V1–V9
 Database/TransactionStore.swift  CRUD on transactions
 Database/CategoryAccountStore.swift  CRUD on categories + accounts, balances
 Database/SummaryStore.swift      reads monthly_summaries for dashboard/reports
@@ -210,8 +211,8 @@ so it stays as-is. If you add new top-level types, sanity-check against
   shape can't be served by `monthly_summaries`, add a covering index on
   `transactions` first; only add a new materialized table if profiling shows
   the index isn't enough.
-- **Adding a column to `transactions`** → write a `migrateToV9` in
-  `Schema.swift`, add the `current < 9` block to `Schema.migrate`, bump
+- **Adding a column to `transactions`** → write a `migrateToV10` in
+  `Schema.swift`, add the `current < 10` block to `Schema.migrate`, bump
   `latestVersion`, and update both insert/update bind sites in `TransactionStore`.
   If the column feeds `monthly_summaries`, also extend the `WHEN` clause of the
   `tx_au` trigger.

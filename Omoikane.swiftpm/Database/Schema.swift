@@ -19,7 +19,7 @@ import Foundation
 /// "spending by category in May 2026 for the credit card account" is a small index
 /// range scan over the summary table.
 enum Schema {
-    static let latestVersion = 8
+    static let latestVersion = 9
 
     static func migrate(_ db: Database) throws {
         try db.exec("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY);")
@@ -79,6 +79,12 @@ enum Schema {
             try db.transaction {
                 try migrateToV8(db)
                 try db.exec("INSERT INTO schema_version(version) VALUES (8);")
+            }
+        }
+        if current < 9 {
+            try db.transaction {
+                try migrateToV9(db)
+                try db.exec("INSERT INTO schema_version(version) VALUES (9);")
             }
         }
     }
@@ -513,6 +519,23 @@ enum Schema {
     /// V8: schedules carry `is_essential` so posted rows inherit it.
     private static func migrateToV8(_ db: Database) throws {
         try db.exec("ALTER TABLE schedules ADD COLUMN is_essential INTEGER NOT NULL DEFAULT 0;")
+    }
+
+    /// V9: two fixes.
+    /// - `schedules.day_of_month` anchors monthly/yearly schedules so a
+    ///   "31st" schedule returns to the 31st after February instead of
+    ///   drifting to the 28th. Backfilled from `next_due`.
+    /// - V4 backfilled `occurred_at` as UTC midnight of the day key, which
+    ///   is the previous local day west of UTC. Rows still sitting exactly on
+    ///   a UTC midnight are moved to local midnight of their stored day.
+    private static func migrateToV9(_ db: Database) throws {
+        try db.exec("ALTER TABLE schedules ADD COLUMN day_of_month INTEGER;")
+        try db.exec("UPDATE schedules SET day_of_month = CAST(strftime('%d', next_due * 86400, 'unixepoch') AS INTEGER);")
+        try db.exec("""
+            UPDATE transactions
+               SET occurred_at = CAST(strftime('%s', date(occurred_on * 86400, 'unixepoch'), 'utc') AS INTEGER)
+             WHERE occurred_at % 86400 = 0 AND occurred_at > 0;
+        """)
     }
 
     /// Recompute monthly_summaries from scratch. Useful after bulk imports that

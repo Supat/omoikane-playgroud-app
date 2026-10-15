@@ -176,8 +176,16 @@ final class AppState {
         bump()
     }
 
+    /// Deleting one line of a split deletes the logical transaction (the
+    /// whole group); remove single lines from the editor instead.
     func deleteTransaction(id: Int64) throws {
-        try db.sync { try transactions.delete(id: id) }
+        try db.sync {
+            if let g = try transactions.get(id: id)?.splitGroup {
+                try transactions.deleteGroup(g)
+            } else {
+                try transactions.delete(id: id)
+            }
+        }
         bump()
     }
 

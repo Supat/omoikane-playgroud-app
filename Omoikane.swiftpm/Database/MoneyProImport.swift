@@ -49,7 +49,7 @@ enum MoneyProImport {
         }
         while i < data.endIndex,
               let name = line(),
-              let size = line().flatMap(Int.init),
+              let size = line().flatMap(Int.init), size >= 0,
               i + size <= data.endIndex {
             let blob = data[i..<(i + size)]
             i += size
@@ -90,11 +90,11 @@ enum MoneyProImport {
         DELETE FROM transactions;
         DELETE FROM statements;
         DELETE FROM monthly_summaries;
+        DELETE FROM schedules;   -- before categories/accounts/payees: FKs point at them
+        DELETE FROM payees;
         DELETE FROM categories;
         DELETE FROM accounts;
         DELETE FROM currency_rates;
-        DELETE FROM schedules;
-        DELETE FROM payees;
 
         CREATE TEMP TABLE cur_scale AS
         SELECT key AS cur, CASE WHEN key IN ('JPY','KRW','VND','IDR') THEN 1 ELSE 100 END AS scale

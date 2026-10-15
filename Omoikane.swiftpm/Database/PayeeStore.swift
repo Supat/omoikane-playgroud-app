@@ -37,8 +37,12 @@ final class PayeeStore {
         try s.step()
     }
 
+    /// Transactions plus schedules that point at this payee.
     func referenceCount(for id: Int64) throws -> Int {
-        let s = try db.prepare("SELECT COUNT(*) FROM transactions WHERE payee_id = ?;")
+        let s = try db.prepare("""
+            SELECT (SELECT COUNT(*) FROM transactions WHERE payee_id = ?1)
+                 + (SELECT COUNT(*) FROM schedules WHERE payee_id = ?1);
+        """)
         s.bind(id, at: 1)
         return try s.step() ? s.int(0) : 0
     }

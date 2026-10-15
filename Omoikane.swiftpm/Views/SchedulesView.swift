@@ -313,7 +313,8 @@ struct ScheduleEditor: View {
             interval: interval,
             nextDue: nextDue,
             endOn: hasEnd ? endOn : nil,
-            isEssential: kind == .expense && isEssential
+            isEssential: kind == .expense && isEssential,
+            dayOfMonth: Calendar.current.component(.day, from: nextDue)
         )
         do {
             if schedule == nil { try app.addSchedule(sc) } else { try app.updateSchedule(sc) }

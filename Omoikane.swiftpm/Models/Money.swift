@@ -28,7 +28,7 @@ struct Money: Hashable, CustomStringConvertible {
         let cleaned = text.replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)
         // Decimal, not Double: Double loses integer precision past 2^53,
         // which a 15-digit amount in a 2-decimal currency exceeds.
-        guard !cleaned.isEmpty,
+        guard cleaned.contains(where: \.isNumber),   // "." alone is not an amount
               var scaled = Decimal(string: cleaned, locale: Locale(identifier: "en_US_POSIX"))
         else { return nil }
         scaled *= pow(Decimal(10), fractionDigits(for: currency))

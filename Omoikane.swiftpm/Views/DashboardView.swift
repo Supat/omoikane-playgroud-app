@@ -29,6 +29,7 @@ struct DashboardView: View {
         var id: Int64 { category.id }
     }
     @State private var categoryNames: [Int64: String] = [:]
+    @State private var categoryParents: [Int64: Int64] = [:]
     @State private var accountsById: [Int64: Account] = [:]
 
     struct BudgetRow: Identifiable {
@@ -311,7 +312,7 @@ struct DashboardView: View {
                 )
                 StatCard(
                     title: "Transactions",
-                    value: "\(byCategory.reduce(0) { $0 + $1.count })",
+                    value: "\(monthTransactionCount)",
                     tint: .blue,
                     sfSymbol: "list.number"
                 )
@@ -405,7 +406,7 @@ struct DashboardView: View {
             if categoryRows.isEmpty {
                 EmptyStateView(title: "No expenses", message: "Add an expense to see a breakdown.", sfSymbol: "chart.pie")
             } else {
-                ForEach(categoryRows.prefix(8), id: \.name) { row in
+                ForEach(categoryRows.prefix(8)) { row in
                     HStack {
                         Text(row.name)
                         Spacer()
@@ -493,17 +494,23 @@ struct DashboardView: View {
 
     private struct LabeledMinor: Hashable { let label: String; let minor: Int64 }
 
-    private struct CategoryRow: Hashable { let name: String; let minor: Int64 }
+    private struct CategoryRow: Hashable, Identifiable { let id: Int64; let name: String; let minor: Int64 }
+    @State private var monthTransactionCount: Int = 0
 
     private var categoryRows: [CategoryRow] {
-        var bucket: [String: Int64] = [:]
+        // Keyed by category id: same-named categories under different parents stay apart.
+        var bucket: [Int64: Int64] = [:]
         for row in byCategory {
             if let h = app.convertedToHome(row.totalMinor, from: row.currency) {
-                bucket[row.key, default: 0] += h
+                bucket[row.keyId, default: 0] += h
             }
         }
         return bucket
-            .map { CategoryRow(name: $0.key, minor: $0.value) }
+            .map { id, minor in
+                let name = categoryNames[id] ?? "—"
+                let parent = categoryParents[id].flatMap { categoryNames[$0] }
+                return CategoryRow(id: id, name: parent.map { "\($0) › \(name)" } ?? name, minor: minor)
+            }
             .sorted { $0.minor > $1.minor }
     }
 
@@ -519,7 +526,10 @@ struct DashboardView: View {
             topAccounts = try app.summaries.netByAccount(fromYM: ymKey, toYM: ymKey)
             essentialByCurrency = try app.summaries.essentialExpense(fromYM: ymKey, toYM: ymKey)
             dailyTotals = try app.summaries.dailyExpense(yearMonth: ymKey).mapValues { sumToHome($0) }
-            categoryNames = Dictionary(uniqueKeysWithValues: try app.categories.list(includeArchived: true).map { ($0.id, $0.name) })
+            let allCats = try app.categories.list(includeArchived: true)
+            categoryNames = Dictionary(uniqueKeysWithValues: allCats.map { ($0.id, $0.name) })
+            categoryParents = Dictionary(uniqueKeysWithValues: allCats.compactMap { c in c.parentId.map { (c.id, $0) } })
+            monthTransactionCount = try app.summaries.transactionCount(fromYM: ymKey, toYM: ymKey)
             accountsById = Dictionary(uniqueKeysWithValues: try app.accounts.list(includeArchived: true).map { ($0.id, $0) })
             if let day = selectedDay, Date.from(dayKey: day).yearMonthKey != ymKey { selectedDay = nil }
             loadDayRows()
