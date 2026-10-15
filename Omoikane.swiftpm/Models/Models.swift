@@ -110,6 +110,9 @@ struct Transaction: Identifiable, Hashable {
     var counterpartyClearedAt: Date? = nil
     /// Statement that cleared the to-account leg (transfers only).
     var counterpartyStatementId: Int64? = nil
+    /// Rows sharing a group are one logical transaction split across
+    /// categories (V5). nil for ordinary single-category rows.
+    var splitGroup: Int64? = nil
 
     /// Amount with sign — useful for net-flow math (income positive, expense negative).
     var signedAmountMinor: Int64 {

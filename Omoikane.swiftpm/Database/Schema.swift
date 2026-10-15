@@ -19,7 +19,7 @@ import Foundation
 /// "spending by category in May 2026 for the credit card account" is a small index
 /// range scan over the summary table.
 enum Schema {
-    static let latestVersion = 4
+    static let latestVersion = 5
 
     static func migrate(_ db: Database) throws {
         try db.exec("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY);")
@@ -55,6 +55,12 @@ enum Schema {
             try db.transaction {
                 try migrateToV4(db)
                 try db.exec("INSERT INTO schema_version(version) VALUES (4);")
+            }
+        }
+        if current < 5 {
+            try db.transaction {
+                try migrateToV5(db)
+                try db.exec("INSERT INTO schema_version(version) VALUES (5);")
             }
         }
     }
@@ -426,6 +432,16 @@ enum Schema {
         // Index for ORDER BY within a day (rows sharing occurred_on now
         // get a stable sub-day ordering).
         try db.exec("CREATE INDEX idx_tx_occurred_at ON transactions(occurred_at);")
+    }
+
+    /// V5: split transactions, borrowed from Money Pro's split child table.
+    /// Rows sharing a non-null `split_group` are one logical transaction
+    /// split across categories. Each row still carries its own amount, so
+    /// balances, summaries, and clearing need no change.
+    /// ponytail: grouping only, no split editor — add one when splits get
+    /// created in-app rather than only by the Money Pro importer.
+    private static func migrateToV5(_ db: Database) throws {
+        try db.exec("ALTER TABLE transactions ADD COLUMN split_group INTEGER;")
     }
 
     /// Recompute monthly_summaries from scratch. Useful after bulk imports that

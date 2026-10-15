@@ -104,6 +104,17 @@ final class AppState {
         rateVersion &+= 1
     }
 
+    // MARK: - Import
+
+    /// Replaces the whole ledger with the contents of a Money Pro backup.
+    func importMoneyPro(from url: URL) throws -> MoneyProImport.Summary {
+        let summary = try db.sync { try MoneyProImport.run(db: db, backupURL: url) }
+        if let home = summary.homeCurrency { homeCurrency = home }
+        try refreshRates()
+        bump()
+        return summary
+    }
+
     // MARK: - Mutation helpers (bump dataVersion + serialize)
 
     /// Plain insert wrapper. The auto-clear *default* (per-account

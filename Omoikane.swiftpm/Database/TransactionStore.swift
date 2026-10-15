@@ -13,8 +13,8 @@ final class TransactionStore {
                  category_id, account_id, counterparty_account_id,
                  counterparty_amount_minor, note, tags, created_at, updated_at,
                  cleared_at, statement_id,
-                 counterparty_cleared_at, counterparty_statement_id)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
+                 counterparty_cleared_at, counterparty_statement_id, split_group)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
         """)
         bindInsert(s, tx, now: now)
         try s.step()
@@ -31,8 +31,8 @@ final class TransactionStore {
                      category_id, account_id, counterparty_account_id,
                      counterparty_amount_minor, note, tags, created_at, updated_at,
                      cleared_at, statement_id,
-                     counterparty_cleared_at, counterparty_statement_id)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
+                     counterparty_cleared_at, counterparty_statement_id, split_group)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
             """)
             for tx in items {
                 s.reset()
@@ -52,7 +52,8 @@ final class TransactionStore {
                    counterparty_account_id = ?, counterparty_amount_minor = ?,
                    note = ?, tags = ?, updated_at = ?,
                    cleared_at = ?, statement_id = ?,
-                   counterparty_cleared_at = ?, counterparty_statement_id = ?
+                   counterparty_cleared_at = ?, counterparty_statement_id = ?,
+                   split_group = ?
              WHERE id = ?;
         """)
         s.bind(Int64(tx.occurredOn.dayKey),                   at: 1)
@@ -72,7 +73,8 @@ final class TransactionStore {
         s.bind(tx.statementId,                                at: 15)
         s.bind(tx.counterpartyClearedAt.map { Int64($0.timeIntervalSince1970) }, at: 16)
         s.bind(tx.counterpartyStatementId,                    at: 17)
-        s.bind(tx.id,                                         at: 18)
+        s.bind(tx.splitGroup,                                 at: 18)
+        s.bind(tx.id,                                         at: 19)
         try s.step()
     }
 
@@ -228,7 +230,7 @@ final class TransactionStore {
                counterparty_account_id, counterparty_amount_minor,
                note, tags, created_at, updated_at,
                cleared_at, statement_id,
-               counterparty_cleared_at, counterparty_statement_id
+               counterparty_cleared_at, counterparty_statement_id, split_group
     """
 
     private func bindInsert(_ s: Statement, _ tx: Transaction, now: Int64) {
@@ -250,6 +252,7 @@ final class TransactionStore {
         s.bind(tx.statementId,                                at: 16)
         s.bind(tx.counterpartyClearedAt.map { Int64($0.timeIntervalSince1970) }, at: 17)
         s.bind(tx.counterpartyStatementId,                    at: 18)
+        s.bind(tx.splitGroup,                                 at: 19)
     }
 
     private static func read(_ s: Statement) -> Transaction {
@@ -279,7 +282,8 @@ final class TransactionStore {
             clearedAt: s.optionalInt64(14).map { Date(timeIntervalSince1970: TimeInterval($0)) },
             statementId: s.optionalInt64(15),
             counterpartyClearedAt: s.optionalInt64(16).map { Date(timeIntervalSince1970: TimeInterval($0)) },
-            counterpartyStatementId: s.optionalInt64(17)
+            counterpartyStatementId: s.optionalInt64(17),
+            splitGroup: s.optionalInt64(18)
         )
     }
 

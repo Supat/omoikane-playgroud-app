@@ -73,7 +73,7 @@ conditions*. Three reasons we went with raw `import SQLite3`:
 
 ### Schema (`Omoikane.swiftpm/Database/Schema.swift`)
 
-`Schema.latestVersion` is **4**. Migrations are applied in order by `Schema.migrate`, each in its own transaction, tracked in `schema_version`.
+`Schema.latestVersion` is **5**. Migrations are applied in order by `Schema.migrate`, each in its own transaction, tracked in `schema_version`.
 
 - `transactions` — append-heavy fact table. Money in **minor units** as `Int64`
   (yen as integer; multiply by 100 for currencies with sub-units). Derived
@@ -84,7 +84,9 @@ conditions*. Three reasons we went with raw `import SQLite3`:
   `counterparty_amount_minor`. Per-leg clearing columns (V3):
   `cleared_at` / `statement_id` for the row's own account, and
   `counterparty_cleared_at` / `counterparty_statement_id` for the transfer
-  to-account leg.
+  to-account leg. `split_group` (V5): rows sharing a non-null value are one
+  logical transaction split across categories; each row keeps its own
+  amount, so nothing else cares. Only the importer writes it so far.
 - `categories`, `accounts` — dimension tables. Both support archiving.
   Accounts carry reconciliation policy: `clears_entries_by_default`
   (cash accounts default to 1) and `statement_closing_day`.
@@ -106,12 +108,13 @@ conditions*. Three reasons we went with raw `import SQLite3`:
 
 ```
 Database/Database.swift          sqlite3 wrapper, WAL/pragmas, prepared statements
-Database/Schema.swift            DDL + triggers + migrations V1–V4
+Database/Schema.swift            DDL + triggers + migrations V1–V5
 Database/TransactionStore.swift  CRUD on transactions
 Database/CategoryAccountStore.swift  CRUD on categories + accounts, balances
 Database/SummaryStore.swift      reads monthly_summaries for dashboard/reports
 Database/StatementStore.swift    statements CRUD + atomic finalize/reopen
 Database/CurrencyStore.swift     currency_rates CRUD
+Database/MoneyProImport.swift    Money Pro `.back` importer (replaces the ledger; plain SQL over ATTACH)
 Database/SeedData.swift          first-launch defaults + sample transactions
 Models/Models.swift, Money.swift domain structs, minor-unit money helpers
 State/AppState.swift             @Observable; owns DB + stores; bumps `dataVersion`
@@ -132,7 +135,7 @@ Mutating helpers on `AppState` serialize through `db.sync { … }` and bump
 | Transactions | `TransactionsView` | account list → per-account transaction list; landscape split view with inline `TransactionEntryView`, portrait uses the `TransactionEditor` sheet |
 | Reports | `ReportsView` | aggregate queries over `monthly_summaries` |
 | Categories | `CategoriesView` | expense/income categories with sub-categories |
-| Settings | `SettingsView` | home currency, rates, rebuild summaries |
+| Settings | `SettingsView` | home currency, rates, rebuild summaries, Money Pro import |
 
 Entity management (add/edit/archive/delete) lives only in its dedicated tab.
 Drill-down lists elsewhere are read-only.
@@ -163,10 +166,14 @@ so it stays as-is. If you add new top-level types, sanity-check against
   shape can't be served by `monthly_summaries`, add a covering index on
   `transactions` first; only add a new materialized table if profiling shows
   the index isn't enough.
-- **Adding a column to `transactions`** → write a `migrateToV5` in
-  `Schema.swift`, add the `current < 5` block to `Schema.migrate`, bump
+- **Adding a column to `transactions`** → write a `migrateToV6` in
+  `Schema.swift`, add the `current < 6` block to `Schema.migrate`, bump
   `latestVersion`, and update both insert/update bind sites in `TransactionStore`.
   If the column feeds `monthly_summaries`, also extend the `WHEN` clause of the
   `tx_au` trigger.
+- **Changing the importer** → `tools/moneypro-import/main.swift` is a macOS
+  dry run that compiles the app's own `Database`, `Schema` and
+  `MoneyProImport` sources and runs them against a real `.back` file; the
+  compile command is in its header. Run it before and after.
 - **Adding a new tab** → add a case to `AppTab`, a `NavigationStack` branch in
   `ContentView`, the view file, and a `⌘N` command in `OmoikaneApp`.

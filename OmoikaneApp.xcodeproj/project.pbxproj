@@ -28,6 +28,7 @@
 		B100000000000000000013 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F100000000000000000013 /* Assets.xcassets */; };
 		B100000000000000000020 /* CurrencyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000020 /* CurrencyStore.swift */; };
 		B100000000000000000021 /* StatementStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000021 /* StatementStore.swift */; };
+		B100000000000000000027 /* MoneyProImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000027 /* MoneyProImport.swift */; };
 		B100000000000000000022 /* AccountDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000022 /* AccountDetailView.swift */; };
 		B100000000000000000023 /* ReconciliationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000023 /* ReconciliationSheet.swift */; };
 		B100000000000000000024 /* CategoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000024 /* CategoriesView.swift */; };
@@ -57,6 +58,7 @@
 		F100000000000000000013 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = OmoikaneApp/Assets.xcassets; sourceTree = SOURCE_ROOT; };
 		F100000000000000000020 /* CurrencyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CurrencyStore.swift; path = Omoikane.swiftpm/Database/CurrencyStore.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000021 /* StatementStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = StatementStore.swift; path = Omoikane.swiftpm/Database/StatementStore.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000027 /* MoneyProImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MoneyProImport.swift; path = Omoikane.swiftpm/Database/MoneyProImport.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000022 /* AccountDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AccountDetailView.swift; path = Omoikane.swiftpm/Views/AccountDetailView.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000023 /* ReconciliationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ReconciliationSheet.swift; path = Omoikane.swiftpm/Views/ReconciliationSheet.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000024 /* CategoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CategoriesView.swift; path = Omoikane.swiftpm/Views/CategoriesView.swift; sourceTree = SOURCE_ROOT; };
@@ -136,6 +138,7 @@
 				F10000000000000000000F /* SeedData.swift */,
 				F100000000000000000020 /* CurrencyStore.swift */,
 				F100000000000000000021 /* StatementStore.swift */,
+				F100000000000000000027 /* MoneyProImport.swift */,
 			);
 			name = Database;
 			sourceTree = "<group>";
@@ -262,6 +265,7 @@
 				B10000000000000000000F /* SeedData.swift in Sources */,
 				B100000000000000000020 /* CurrencyStore.swift in Sources */,
 				B100000000000000000021 /* StatementStore.swift in Sources */,
+				B100000000000000000027 /* MoneyProImport.swift in Sources */,
 				B100000000000000000022 /* AccountDetailView.swift in Sources */,
 				B100000000000000000023 /* ReconciliationSheet.swift in Sources */,
 				B100000000000000000010 /* Models.swift in Sources */,

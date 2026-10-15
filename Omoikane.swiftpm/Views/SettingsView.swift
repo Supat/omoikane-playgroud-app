@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @Environment(AppState.self) private var app
@@ -6,6 +7,12 @@ struct SettingsView: View {
     @State private var rebuilding = false
     @State private var lastRebuildTook: TimeInterval?
     @State private var activeCurrencies: [String] = []
+    @State private var showImporter = false
+    @State private var pendingImportURL: URL? = nil
+    @State private var confirmReplace = false
+    @State private var importing = false
+    @State private var importMessage = ""
+    @State private var showImportResult = false
 
     var body: some View {
         // @Bindable lets a Picker bind to a property of an @Observable.
@@ -59,6 +66,24 @@ struct SettingsView: View {
                 }
             }
 
+            Section {
+                Button {
+                    showImporter = true
+                } label: {
+                    HStack {
+                        Label("Import Money Pro backup…", systemImage: "square.and.arrow.down")
+                        Spacer()
+                        if importing { ProgressView() }
+                    }
+                }
+                .disabled(importing)
+            } header: {
+                Text("Import")
+            } footer: {
+                Text("Replaces every account, category, and transaction with the contents of a Money Pro .back file.")
+                    .font(.footnote)
+            }
+
             Section("About") {
                 LabeledContent("App", value: "Omoikane")
                 LabeledContent("Schema version", value: "\(Schema.latestVersion)")
@@ -67,6 +92,37 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .task(id: app.dataVersion) { reload() }
         .task(id: app.rateVersion) { reload() }
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.item]) { result in
+            if case .success(let url) = result {
+                pendingImportURL = url
+                confirmReplace = true
+            }
+        }
+        .confirmationDialog("Replace all data?", isPresented: $confirmReplace, titleVisibility: .visible) {
+            Button("Replace and Import", role: .destructive) { runImport() }
+            Button("Cancel", role: .cancel) { pendingImportURL = nil }
+        } message: {
+            Text("Everything currently in Omoikane is deleted first. This cannot be undone.")
+        }
+        .alert("Import", isPresented: $showImportResult) {
+            Button("OK") {}
+        } message: {
+            Text(importMessage)
+        }
+    }
+
+    private func runImport() {
+        guard let url = pendingImportURL else { return }
+        pendingImportURL = nil
+        importing = true
+        do {
+            let s = try app.importMoneyPro(from: url)
+            importMessage = "Imported \(s.accounts) accounts, \(s.categories) categories, and \(s.transactions) transactions."
+        } catch {
+            importMessage = error.localizedDescription
+        }
+        importing = false
+        showImportResult = true
     }
 
     private var foreignCurrencies: [String] {

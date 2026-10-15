@@ -466,6 +466,12 @@ struct AccountTransactionsView: View {
                             .font(.caption)
                             .accessibilityLabel("Cleared")
                     }
+                    if tx.splitGroup != nil {
+                        Image(systemName: "square.split.2x1")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                            .accessibilityLabel("Part of a split")
+                    }
                     Text(cat?.name ?? "—").font(.body)
                 }
                 HStack(spacing: 6) {
