@@ -73,6 +73,7 @@ struct CategoryGlyphPicker: View {
     private func categoryTile(_ c: LedgerCategory, hasChildren: Bool) -> some View {
         let drillsIn = hasChildren && browsingParentId == nil
         tile(icon: c.icon ?? "tag", label: c.name, selected: selection == c.id, hasChildren: drillsIn,
+             tint: c.displayColor(in: categories),
              accessibility: drillsIn ? "\(c.name), has sub-categories" : c.name) {
             selection = c.id
             if drillsIn { withAnimation(.snappy) { browsingParentId = c.id } }
@@ -82,11 +83,12 @@ struct CategoryGlyphPicker: View {
 
     @ViewBuilder
     private func tile(icon: String, label: String, selected: Bool, hasChildren: Bool,
-                      accessibility: String, action: @escaping () -> Void) -> some View {
+                      tint: Color? = nil, accessibility: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.title2)
+                    .foregroundStyle(tint ?? .primary)
                     .frame(width: 48, height: 48)
                     // Plain fill, not glass: a strip of glass tiles stutters while scrolling.
                     .background(

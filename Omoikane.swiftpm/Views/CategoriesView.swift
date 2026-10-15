@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 /// "Categories" tab. Two sections (Expense / Income); each renders top-level
 /// categories with their sub-categories indented underneath. Tap any row to
@@ -75,6 +76,60 @@ struct CategoriesView: View {
         }
     }
 
+    /// One segment per budgeted expense category that counts toward the
+    /// allocation (parent, or child of an unbudgeted parent), in its colour.
+    private struct BudgetSlice: Identifiable {
+        var name: String
+        var amount: Int64
+        var color: Color
+        var id: String { name }
+    }
+    private var budgetSlices: [BudgetSlice] {
+        let all = categories + archivedCategories
+        return categories
+            .filter { $0.kind == .expense && $0.budgetMinor != nil }
+            .filter { c in c.parentId.map { pid in categories.first { $0.id == pid }?.budgetMinor == nil } ?? true }
+            .map { c in
+                let parent = c.parentId.flatMap { pid in categories.first { $0.id == pid }?.name }
+                return BudgetSlice(name: parent.map { "\($0) › \(c.name)" } ?? c.name,
+                                   amount: c.budgetMinor ?? 0,
+                                   color: c.displayColor(in: all))
+            }
+            .sorted { $0.amount > $1.amount }
+    }
+
+    /// Stacked bar: each budgeted category's share of the limit in its own
+    /// colour, with the unallocated remainder (or the overshoot) at the end.
+    @ViewBuilder
+    private func budgetCompositionBar(limit: Int64, allocated: Int64) -> some View {
+        let slices = budgetSlices
+        let rest = max(limit - allocated, 0)
+        let over = max(allocated - limit, 0)
+        let domainMax = Double(max(limit, allocated))
+        let names = slices.map(\.name) + (rest > 0 ? ["Unallocated"] : []) + (over > 0 ? ["Over the limit"] : [])
+        let colors = slices.map(\.color) + (rest > 0 ? [Color.secondary.opacity(0.3)] : []) + (over > 0 ? [Color.red] : [])
+        Chart {
+            ForEach(slices) { sl in
+                BarMark(x: .value("Budget", Double(sl.amount)), y: .value("", "Budgets"))
+                    .foregroundStyle(by: .value("Category", sl.name))
+            }
+            if rest > 0 {
+                BarMark(x: .value("Budget", Double(rest)), y: .value("", "Budgets"))
+                    .foregroundStyle(by: .value("Category", "Unallocated"))
+            }
+            if over > 0 {
+                BarMark(x: .value("Budget", Double(over)), y: .value("", "Budgets"))
+                    .foregroundStyle(by: .value("Category", "Over the limit"))
+            }
+        }
+        .chartForegroundStyleScale(domain: names, range: colors)
+        .chartXScale(domain: 0 ... max(domainMax, 1))
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
+        .chartLegend(position: .bottom, alignment: .leading, spacing: 6)
+        .frame(height: 28 + CGFloat((names.count + 2) / 3) * 22)
+    }
+
     /// Income targets compared with the spending limit (or, without one,
     /// the allocated budgets). nil when there is nothing to compare against.
     private var incomeVersusOutgo: (text: String, short: Bool)? {
@@ -115,8 +170,7 @@ struct CategoriesView: View {
                             .moneyStyle()
                             .foregroundStyle(over ? .red : .primary)
                     }
-                    ProgressView(value: Double(min(allocated, limit)), total: Double(limit))
-                        .tint(over ? .red : .accentColor)
+                    budgetCompositionBar(limit: limit, allocated: allocated)
                         .accessibilityLabel("Budgets against the spending limit")
                         .accessibilityValue(over ? "Over the limit" : "\(Int(Double(allocated) / Double(limit) * 100)) percent allocated")
                     Text(over
@@ -206,7 +260,7 @@ struct CategoriesView: View {
             } label: {
                 HStack {
                     Image(systemName: c.icon ?? "tag")
-                        .foregroundStyle(c.kind == .income ? .green : .red)
+                        .foregroundStyle(c.displayColor(in: categories + archivedCategories))
                         .leadingIcon()
                     Text(c.name)
                     Spacer()
@@ -238,7 +292,7 @@ struct CategoriesView: View {
                     .font(.caption)
                     .frame(width: 16)
                 Image(systemName: c.icon ?? "tag")
-                    .foregroundStyle(c.kind == .income ? .green : .red)
+                    .foregroundStyle(c.displayColor(in: categories + archivedCategories))
                     .leadingIcon()
                 Text(c.name)
                 Spacer()
@@ -291,7 +345,7 @@ struct CategoriesView: View {
         Button { editingCategory = c } label: {
             HStack {
                 Image(systemName: c.icon ?? "tag")
-                    .foregroundStyle(c.kind == .income ? .green : .red)
+                    .foregroundStyle(c.displayColor(in: categories + archivedCategories))
                     .leadingIcon()
                 Text(c.name)
                 Spacer()
@@ -414,6 +468,8 @@ struct CategoryEditor: View {
     @State private var icon: String
     @State private var parentId: Int64?
     @State private var budgetText: String
+    @State private var hasColor: Bool
+    @State private var pickedColor: Color
     @State private var pickingGlyph = false
     @State private var allCategories: [LedgerCategory] = []
     @State private var saveError: String?
@@ -429,6 +485,8 @@ struct CategoryEditor: View {
         _icon = State(initialValue: existing.icon ?? "tag")
         _parentId = State(initialValue: existing.parentId)
         _budgetText = State(initialValue: existing.budgetMinor.map { String($0) } ?? "")
+        _hasColor = State(initialValue: existing.ownColor != nil)
+        _pickedColor = State(initialValue: existing.ownColor ?? (existing.kind == .income ? .green : .red))
     }
 
     init(initialKind: CategoryKind, initialParent: LedgerCategory?) {
@@ -440,6 +498,8 @@ struct CategoryEditor: View {
         _icon = State(initialValue: "tag")
         _parentId = State(initialValue: initialParent?.id)
         _budgetText = State(initialValue: "")
+        _hasColor = State(initialValue: false)
+        _pickedColor = State(initialValue: initialKind == .income ? .green : .red)
     }
 
     var body: some View {
@@ -470,6 +530,13 @@ struct CategoryEditor: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityHint("Choose a symbol")
+                if parentId == nil {
+                    // Parent categories carry a colour; sub-categories inherit it.
+                    Toggle("Custom color", isOn: $hasColor)
+                    if hasColor {
+                        ColorPicker("Color", selection: $pickedColor, supportsOpacity: false)
+                    }
+                }
                 LabeledContent(kind == .expense ? "Monthly budget (\(app.homeCurrency))" : "Monthly income target (\(app.homeCurrency))") {
                     NumberPadField(text: $budgetText, placeholder: "None", alignment: .right)
                         .frame(maxWidth: 160)
@@ -582,13 +649,16 @@ struct CategoryEditor: View {
             if var copy = existing {
                 copy.name = name
                 copy.icon = icon.isEmpty ? nil : icon
+                copy.color = (parentId == nil && hasColor) ? pickedColor.hexString : nil
                 copy.parentId = parentId
                 copy.budgetMinor = budget
                 // kind is intentionally not edited (see disabled picker).
                 try app.updateCategory(copy)
             } else {
                 _ = try app.db.sync {
-                    try app.categories.insert(name: name, kind: kind, icon: icon.isEmpty ? nil : icon, parentId: parentId, budgetMinor: budget)
+                    try app.categories.insert(name: name, kind: kind, icon: icon.isEmpty ? nil : icon,
+                                              color: (parentId == nil && hasColor) ? pickedColor.hexString : nil,
+                                              parentId: parentId, budgetMinor: budget)
                 }
                 app.bump()
             }

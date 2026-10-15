@@ -101,6 +101,34 @@ extension Text {
     func moneyStyle() -> Text { fontDesign(.monospaced).monospacedDigit() }
 }
 
+extension Color {
+    /// "#RRGGBB" → Color; nil for anything else.
+    init?(hex: String) {
+        var h = hex.trimmingCharacters(in: .whitespaces)
+        if h.hasPrefix("#") { h.removeFirst() }
+        guard h.count == 6, let v = UInt32(h, radix: 16) else { return nil }
+        self.init(red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255, blue: Double(v & 0xFF) / 255)
+    }
+
+    /// Color → "#RRGGBB" in sRGB.
+    var hexString: String {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        UIColor(self).getRed(&r, green: &g, blue: &b, alpha: &a)
+        return String(format: "#%02X%02X%02X", Int(round(r * 255)), Int(round(g * 255)), Int(round(b * 255)))
+    }
+}
+
+extension LedgerCategory {
+    /// Assigned colour, or the kind's default. Children inherit the parent's
+    /// colour via `displayColor(in:)`.
+    var ownColor: Color? { color.flatMap(Color.init(hex:)) }
+    func displayColor(in all: [LedgerCategory]) -> Color {
+        if let c = ownColor { return c }
+        if let p = parentId, let parent = all.first(where: { $0.id == p }), let c = parent.ownColor { return c }
+        return kind == .income ? .green : .red
+    }
+}
+
 extension View {
     /// Fixed-width slot for a row's leading symbol so titles line up no
     /// matter how wide the glyph is.

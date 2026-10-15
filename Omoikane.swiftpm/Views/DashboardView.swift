@@ -252,7 +252,8 @@ struct DashboardView: View {
                     let isIncome = row.category.kind == .income
                     // Expense: past the budget is bad (red). Income: reaching the target is good (green).
                     let over = row.spentHome > limit
-                    let tone: Color = isIncome ? (row.spentHome >= limit ? .green : .accentColor) : (over ? .red : .accentColor)
+                    let base = row.category.ownColor ?? .accentColor
+                    let tone: Color = isIncome ? (row.spentHome >= limit ? .green : base) : (over ? .red : base)
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Label(row.category.name, systemImage: isIncome ? "arrow.down.circle" : "arrow.up.circle")
