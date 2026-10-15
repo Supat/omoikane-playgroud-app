@@ -10,7 +10,7 @@ final class ScheduleStore {
 
     private static let columns = """
         SELECT id, kind, amount_minor, category_id, account_id, counterparty_account_id,
-               counterparty_amount_minor, payee_id, note, frequency, interval, next_due, end_on
+               counterparty_amount_minor, payee_id, note, frequency, interval, next_due, end_on, is_essential
     """
 
     func list() throws -> [Schedule] {
@@ -24,8 +24,8 @@ final class ScheduleStore {
     func insert(_ sc: Schedule) throws -> Int64 {
         let s = try db.prepare("""
             INSERT INTO schedules (kind, amount_minor, category_id, account_id, counterparty_account_id,
-                                   counterparty_amount_minor, payee_id, note, frequency, interval, next_due, end_on)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?);
+                                   counterparty_amount_minor, payee_id, note, frequency, interval, next_due, end_on, is_essential)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);
         """)
         bind(s, sc)
         try s.step()
@@ -37,11 +37,11 @@ final class ScheduleStore {
             UPDATE schedules
                SET kind = ?, amount_minor = ?, category_id = ?, account_id = ?, counterparty_account_id = ?,
                    counterparty_amount_minor = ?, payee_id = ?, note = ?, frequency = ?, interval = ?,
-                   next_due = ?, end_on = ?
+                   next_due = ?, end_on = ?, is_essential = ?
              WHERE id = ?;
         """)
         bind(s, sc)
-        s.bind(sc.id, at: 13)
+        s.bind(sc.id, at: 14)
         try s.step()
     }
 
@@ -85,6 +85,7 @@ final class ScheduleStore {
                         updatedAt: now
                     )
                     tx.payeeId = sc.payeeId
+                    tx.isEssential = sc.kind == .expense && sc.isEssential
                     if acct?.clearsEntriesByDefault == true { tx.clearedAt = now }
                     _ = try transactions.insert(tx)
                     posted += 1
@@ -117,6 +118,7 @@ final class ScheduleStore {
         s.bind(sc.interval, at: 10)
         s.bind(Int64(sc.nextDue.dayKey), at: 11)
         s.bind(sc.endOn.map { Int64($0.dayKey) }, at: 12)
+        s.bind(sc.isEssential ? 1 : 0, at: 13)
     }
 
     private static func read(_ s: Statement) -> Schedule {
@@ -133,7 +135,8 @@ final class ScheduleStore {
             frequency: ScheduleFrequency(rawValue: s.string(9)) ?? .monthly,
             interval: s.int(10),
             nextDue: Date.from(dayKey: s.int(11)),
-            endOn: s.optionalInt64(12).map { Date.from(dayKey: Int($0)) }
+            endOn: s.optionalInt64(12).map { Date.from(dayKey: Int($0)) },
+            isEssential: s.int(13) != 0
         )
     }
 }

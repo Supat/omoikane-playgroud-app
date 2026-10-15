@@ -131,6 +131,7 @@ struct Schedule: Identifiable, Hashable {
     var interval: Int
     var nextDue: Date
     var endOn: Date?
+    var isEssential: Bool = false
 }
 
 /// Which leg of a transaction is being cleared. For non-transfers there is

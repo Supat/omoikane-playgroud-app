@@ -75,7 +75,15 @@ struct SchedulesView: View {
         return HStack {
             Image(systemName: sc.kind.sfSymbol).foregroundStyle(.tint)
             VStack(alignment: .leading, spacing: 2) {
-                Text(sc.kind == .transfer ? "Transfer" : (categories[sc.categoryId]?.name ?? sc.kind.displayName))
+                HStack(spacing: 6) {
+                    if sc.isEssential {
+                        Image(systemName: "lifepreserver")
+                            .foregroundStyle(.orange)
+                            .font(.caption)
+                            .accessibilityLabel("Essential")
+                    }
+                    Text(sc.kind == .transfer ? "Transfer" : (categories[sc.categoryId]?.name ?? sc.kind.displayName))
+                }
                 Text("\(acct?.name ?? "—") · \(sc.cadenceLabel) · next \(Formatters.mediumDate.string(from: sc.nextDue))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -129,6 +137,7 @@ struct ScheduleEditor: View {
     @State private var nextDue = Date()
     @State private var hasEnd = false
     @State private var endOn = Date()
+    @State private var isEssential = false
 
     @State private var categories: [LedgerCategory] = []
     @State private var accounts: [Account] = []
@@ -176,6 +185,11 @@ struct ScheduleEditor: View {
                         }
                     }
                     TextField("Note", text: $note)
+                    if kind == .expense {
+                        Toggle(isOn: $isEssential) {
+                            Label("Essential", systemImage: "lifepreserver")
+                        }
+                    }
                 }
 
                 Section("Repeat") {
@@ -255,6 +269,7 @@ struct ScheduleEditor: View {
             nextDue = sc.nextDue
             hasEnd = sc.endOn != nil
             endOn = sc.endOn ?? sc.nextDue
+            isEssential = sc.isEssential
         } else {
             accountId = accounts.first?.id
             categoryId = availableCategories.first?.id
@@ -279,7 +294,8 @@ struct ScheduleEditor: View {
             frequency: frequency,
             interval: interval,
             nextDue: nextDue,
-            endOn: hasEnd ? endOn : nil
+            endOn: hasEnd ? endOn : nil,
+            isEssential: kind == .expense && isEssential
         )
         do {
             if schedule == nil { try app.addSchedule(sc) } else { try app.updateSchedule(sc) }

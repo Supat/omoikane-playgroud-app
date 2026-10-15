@@ -19,7 +19,7 @@ import Foundation
 /// "spending by category in May 2026 for the credit card account" is a small index
 /// range scan over the summary table.
 enum Schema {
-    static let latestVersion = 7
+    static let latestVersion = 8
 
     static func migrate(_ db: Database) throws {
         try db.exec("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY);")
@@ -73,6 +73,12 @@ enum Schema {
             try db.transaction {
                 try migrateToV7(db)
                 try db.exec("INSERT INTO schema_version(version) VALUES (7);")
+            }
+        }
+        if current < 8 {
+            try db.transaction {
+                try migrateToV8(db)
+                try db.exec("INSERT INTO schema_version(version) VALUES (8);")
             }
         }
     }
@@ -502,6 +508,11 @@ enum Schema {
     /// medicine). A flag the user sets by hand; not in `monthly_summaries`.
     private static func migrateToV7(_ db: Database) throws {
         try db.exec("ALTER TABLE transactions ADD COLUMN is_essential INTEGER NOT NULL DEFAULT 0;")
+    }
+
+    /// V8: schedules carry `is_essential` so posted rows inherit it.
+    private static func migrateToV8(_ db: Database) throws {
+        try db.exec("ALTER TABLE schedules ADD COLUMN is_essential INTEGER NOT NULL DEFAULT 0;")
     }
 
     /// Recompute monthly_summaries from scratch. Useful after bulk imports that

@@ -608,7 +608,8 @@ struct TransactionEntryView: View {
                     counterpartyAmountMinor: cpAmount, payeeId: payeeId,
                     note: note.isEmpty ? nil : note, frequency: freq, interval: 1,
                     nextDue: ScheduleStore.advance(occurredOn, frequency: freq, interval: 1),
-                    endOn: nil
+                    endOn: nil,
+                    isEssential: kind == .expense && isEssential
                 )
                 try app.addSchedule(sc)
             }
