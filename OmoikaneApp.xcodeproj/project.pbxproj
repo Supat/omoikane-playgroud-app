@@ -36,6 +36,7 @@
 		B100000000000000000024 /* CategoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000024 /* CategoriesView.swift */; };
 		B100000000000000000025 /* TransactionEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000025 /* TransactionEntryView.swift */; };
 		B100000000000000000026 /* NumberPadField.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000026 /* NumberPadField.swift */; };
+		B100000000000000000034 /* CategoryGlyphPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000034 /* CategoryGlyphPicker.swift */; };
 		B100000000000000000033 /* MonthCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000033 /* MonthCalendar.swift */; };
 		B100000000000000000032 /* SymbolPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000032 /* SymbolPicker.swift */; };
 		B100000000000000000030 /* SchedulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000030 /* SchedulesView.swift */; };
@@ -72,6 +73,7 @@
 		F100000000000000000024 /* CategoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CategoriesView.swift; path = Omoikane.swiftpm/Views/CategoriesView.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000025 /* TransactionEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TransactionEntryView.swift; path = Omoikane.swiftpm/Views/TransactionEntryView.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000026 /* NumberPadField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = NumberPadField.swift; path = Omoikane.swiftpm/Views/NumberPadField.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000034 /* CategoryGlyphPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CategoryGlyphPicker.swift; path = Omoikane.swiftpm/Views/CategoryGlyphPicker.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000033 /* MonthCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MonthCalendar.swift; path = Omoikane.swiftpm/Views/MonthCalendar.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000032 /* SymbolPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SymbolPicker.swift; path = Omoikane.swiftpm/Views/SymbolPicker.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000030 /* SchedulesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SchedulesView.swift; path = Omoikane.swiftpm/Views/SchedulesView.swift; sourceTree = SOURCE_ROOT; };
@@ -128,6 +130,7 @@
 				F100000000000000000005 /* TransactionEditor.swift */,
 				F100000000000000000025 /* TransactionEntryView.swift */,
 				F100000000000000000026 /* NumberPadField.swift */,
+				F100000000000000000034 /* CategoryGlyphPicker.swift */,
 				F100000000000000000033 /* MonthCalendar.swift */,
 				F100000000000000000032 /* SymbolPicker.swift */,
 				F100000000000000000030 /* SchedulesView.swift */,
@@ -270,6 +273,7 @@
 				B100000000000000000005 /* TransactionEditor.swift in Sources */,
 				B100000000000000000025 /* TransactionEntryView.swift in Sources */,
 				B100000000000000000026 /* NumberPadField.swift in Sources */,
+				B100000000000000000034 /* CategoryGlyphPicker.swift in Sources */,
 				B100000000000000000033 /* MonthCalendar.swift in Sources */,
 				B100000000000000000032 /* SymbolPicker.swift in Sources */,
 				B100000000000000000030 /* SchedulesView.swift in Sources */,

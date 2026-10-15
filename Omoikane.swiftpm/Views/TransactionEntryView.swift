@@ -180,18 +180,19 @@ struct TransactionEntryView: View {
                     }
                 } else {
                     if !isSplit {
-                        Picker("Category", selection: Binding(
-                            get: { categoryId ?? availableCategories.first?.id ?? 0 },
-                            set: { categoryId = $0 }
-                        )) {
-                            ForEach(availableCategories) { c in
-                                if let icon = c.icon {
-                                    Label(c.name, systemImage: icon).tag(c.id)
-                                } else {
-                                    Text(c.name).tag(c.id)
-                                }
+                        VStack(alignment: .leading, spacing: 0) {
+                            HStack {
+                                Text("Category")
+                                Spacer()
+                                Text(selectedCategoryPath)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
                             }
+                            .padding(.horizontal, 16)
+                            .padding(.top, 10)
+                            CategoryGlyphPicker(categories: availableCategories, selection: $categoryId)
                         }
+                        .listRowInsets(EdgeInsets())
                     }
                     Picker("Payee", selection: $payeeId) {
                         Text("None").tag(Int64?.none)
@@ -430,6 +431,16 @@ struct TransactionEntryView: View {
         categoryId = only.categoryId
         amountText = only.amountText
         splitLines = []
+    }
+
+    /// "Food › Groceries" for the current selection, for the row header.
+    private var selectedCategoryPath: String {
+        guard let id = categoryId ?? availableCategories.first?.id,
+              let c = categories.first(where: { $0.id == id }) else { return "" }
+        if let p = c.parentId, let parent = categories.first(where: { $0.id == p }) {
+            return "\(parent.name) › \(c.name)"
+        }
+        return c.name
     }
 
     private var availableCategories: [LedgerCategory] {
