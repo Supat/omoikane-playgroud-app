@@ -488,5 +488,4 @@ struct DashboardView: View {
     }
 
     private func monthLabel(_ key: Int) -> String { YearMonth.label(key) }
- }
 }
