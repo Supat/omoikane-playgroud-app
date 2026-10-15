@@ -43,6 +43,7 @@ struct DashboardView: View {
                 header
                 if !missing.isEmpty { missingRatesBanner }
                 summaryCards
+                limitSection
                 essentialSection
                 calendarSection
                 budgetSection
@@ -162,6 +163,39 @@ struct DashboardView: View {
             guard today > 0 else { return nil }
             let toDate = mine.reduce(Int64(0)) { $0 + (app.convertedToHome($1.amountMinor, from: $1.currency) ?? 0) }
             return DayBudgetRow(category: c, todayHome: today, toDateHome: toDate, budgetMinor: budget)
+        }
+    }
+
+    /// The month's spending against the overall monthly limit from
+    /// Categories and Budget. Hidden until a limit is set.
+    @ViewBuilder
+    private var limitSection: some View {
+        if let limit = app.monthlySpendingLimitMinor, limit > 0 {
+            let spent = homeExpense
+            let over = spent > limit
+            let share = Double(spent) / Double(limit)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("Spending limit (\(app.homeCurrency))").font(.headline)
+                    Spacer()
+                    Text("\(Formatters.money(spent, currency: app.homeCurrency)) / \(Formatters.money(limit, currency: app.homeCurrency))")
+                        .moneyStyle()
+                        .font(.subheadline)
+                        .foregroundStyle(over ? .red : .secondary)
+                }
+                ProgressView(value: min(share, 1))
+                    .tint(over ? .red : (share > 0.85 ? .orange : .accentColor))
+                    .accessibilityLabel("Spending against the monthly limit")
+                    .accessibilityValue(over ? "Over the limit" : "\(Int((share * 100).rounded())) percent used")
+                Text(over
+                     ? "Over the limit by \(Formatters.money(spent - limit, currency: app.homeCurrency))."
+                     : "\(Formatters.money(limit - spent, currency: app.homeCurrency)) left this month.")
+                    .moneyStyle()
+                    .font(.caption)
+                    .foregroundStyle(over ? .red : .secondary)
+            }
+            .padding(12)
+            .glassCard(cornerRadius: 12)
         }
     }
 
