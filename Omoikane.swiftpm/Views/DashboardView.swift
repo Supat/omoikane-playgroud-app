@@ -109,6 +109,39 @@ struct DashboardView: View {
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { calendarHeight = $0 }
     }
 
+    /// Day-list budgets grouped under their parents, parents by name,
+    /// children by name, matching the budgets card.
+    private var dayBudgetGroups: [(parent: DayBudgetRow, children: [DayBudgetRow])] {
+        dayBudgets.filter { $0.category.parentId == nil }
+            .sorted { $0.category.name < $1.category.name }
+            .map { p in (p, dayBudgets.filter { $0.category.parentId == p.category.id }.sorted { $0.category.name < $1.category.name }) }
+    }
+
+    @ViewBuilder
+    private func dayBudgetRow(_ row: DayBudgetRow) -> some View {
+        let over = row.toDateHome > row.budgetMinor
+        let color = row.category.ownColor ?? (row.category.parentId.flatMap { categoryColors[$0] }) ?? .accentColor
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(row.category.name)
+                Text("\(Formatters.money(row.todayHome, currency: app.homeCurrency)) today")
+                    .moneyStyle()
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("\(Formatters.money(row.toDateHome, currency: app.homeCurrency)) / \(Formatters.money(row.budgetMinor, currency: app.homeCurrency))")
+                    .moneyStyle()
+                    .font(.subheadline)
+                    .foregroundStyle(over ? .red : .primary)
+            }
+            ProgressView(value: Double(min(row.toDateHome, row.budgetMinor)), total: Double(max(row.budgetMinor, 1)))
+                .progressViewStyle(.capsule(over ? .red : color))
+                .accessibilityLabel("\(row.category.name) budget through this day")
+                .accessibilityValue(over ? "Over budget" : "\(Int(Double(row.toDateHome) / Double(max(row.budgetMinor, 1)) * 100)) percent used")
+        }
+        .font(.subheadline)
+    }
+
     /// The selected day's entries and budget position; a hint until a day is picked.
     @ViewBuilder
     private var dayPanel: some View {
@@ -122,12 +155,12 @@ struct DashboardView: View {
                         Text("No entries").font(.subheadline).foregroundStyle(.secondary)
                     }
                 }
-                ForEach(dayRows) { tx in
+                ForEach(dayRows.sorted { (categoryPaths[$0.categoryId] ?? "", $0.id) < (categoryPaths[$1.categoryId] ?? "", $1.id) }) { tx in
                     HStack(spacing: 8) {
                         Image(systemName: tx.kind.sfSymbol)
                             .foregroundStyle(tx.kind == .income ? .green : (tx.kind == .expense ? .red : .blue))
                             .font(.caption)
-                        Text(categoryNames[tx.categoryId] ?? tx.kind.displayName)
+                        Text(tx.kind == .transfer ? "Transfer" : (categoryPaths[tx.categoryId] ?? tx.kind.displayName))
                         Text(accountsById[tx.accountId]?.name ?? "")
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -141,27 +174,11 @@ struct DashboardView: View {
                     Divider()
                     Text("Budgets through this day (\(app.homeCurrency))")
                         .font(.subheadline.weight(.medium))
-                    ForEach(dayBudgets) { row in
-                        let over = row.toDateHome > row.budgetMinor
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text(row.category.name)
-                                Text("\(Formatters.money(row.todayHome, currency: app.homeCurrency)) today")
-                                    .moneyStyle()
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                Text("\(Formatters.money(row.toDateHome, currency: app.homeCurrency)) / \(Formatters.money(row.budgetMinor, currency: app.homeCurrency))")
-                                    .moneyStyle()
-                                    .font(.subheadline)
-                                    .foregroundStyle(over ? .red : .primary)
-                            }
-                            ProgressView(value: Double(min(row.toDateHome, row.budgetMinor)), total: Double(max(row.budgetMinor, 1)))
-                                .progressViewStyle(.capsule(over ? .red : .accentColor))
-                                .accessibilityLabel("\(row.category.name) budget through this day")
-                                .accessibilityValue(over ? "Over budget" : "\(Int(Double(row.toDateHome) / Double(max(row.budgetMinor, 1)) * 100)) percent used")
+                    ForEach(dayBudgetGroups, id: \.parent.id) { group in
+                        dayBudgetRow(group.parent)
+                        ForEach(group.children) { row in
+                            dayBudgetRow(row).padding(.leading, 20)
                         }
-                        .font(.subheadline)
                     }
                 }
             }
