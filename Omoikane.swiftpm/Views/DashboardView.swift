@@ -29,7 +29,7 @@ struct DashboardView: View {
         var id: Int64 { category.id }
     }
     @State private var categoryNames: [Int64: String] = [:]
-    @State private var categoryParents: [Int64: Int64] = [:]
+    @State private var categoryPaths: [Int64: String] = [:]
     @State private var categoryColors: [Int64: Color] = [:]
     @State private var accountsById: [Int64: Account] = [:]
 
@@ -75,11 +75,7 @@ struct DashboardView: View {
                 EmptyView()
             }
             .labelsHidden()
-            .onChange(of: ymKey) { _, newValue in
-                let (y, m) = YearMonth.components(newValue)
-                if m < 1  { ymKey = YearMonth.key(year: y - 1, month: 12) }
-                if m > 12 { ymKey = YearMonth.key(year: y + 1, month: 1) }
-            }
+            .onChange(of: ymKey) { _, v in ymKey = YearMonth.normalized(v) }
         }
     }
 
@@ -159,12 +155,11 @@ struct DashboardView: View {
         let expenses = all.filter { $0.kind == .expense && $0.occurredOn.dayKey <= day }
         dayBudgets = cats.compactMap { c -> DayBudgetRow? in
             guard let budget = c.effectiveBudgetMinor(in: cats) else { return nil }
-            let ids = Set([c.id] + cats.filter { $0.parentId == c.id }.map(\.id))
+            let ids = c.familyIds(in: cats)
             let mine = expenses.filter { ids.contains($0.categoryId) }
-            let today = mine.filter { $0.occurredOn.dayKey == day }
-                .reduce(Int64(0)) { $0 + (app.convertedToHome($1.amountMinor, from: $1.currency) ?? 0) }
+            let today = app.sumToHome(mine.filter { $0.occurredOn.dayKey == day }.map { ($0.amountMinor, $0.currency) })
             guard today > 0 else { return nil }
-            let toDate = mine.reduce(Int64(0)) { $0 + (app.convertedToHome($1.amountMinor, from: $1.currency) ?? 0) }
+            let toDate = app.sumToHome(mine.map { ($0.amountMinor, $0.currency) })
             return DayBudgetRow(category: c, todayHome: today, toDateHome: toDate, budgetMinor: budget)
         }
     }
@@ -252,7 +247,7 @@ struct DashboardView: View {
             let parentId = r.category.parentId ?? r.category.id
             // A budgeted parent already includes its children; skip the child rows then.
             if let pid = r.category.parentId, expenseRows.contains(where: { $0.category.id == pid }) { continue }
-            let name = r.category.parentId.flatMap { categoryNames[$0] } ?? r.category.name
+            let name = r.category.parentId.flatMap { categoryNames[$0] } ?? r.category.name   // parent-level label
             let color = (r.category.parentId.flatMap { categoryColors[$0] }) ?? r.category.ownColor ?? .accentColor
             byParent[parentId, default: (name, color, 0)].amount += r.spentHome
         }
@@ -513,13 +508,7 @@ struct DashboardView: View {
     }
 
     private func sumToHome(_ map: [String: Int64]) -> Int64 {
-        var sum: Int64 = 0
-        for (cur, minor) in map {
-            if let h = app.convertedToHome(minor, from: cur) {
-                sum += h
-            }
-        }
-        return sum
+        app.sumToHome(map.map { ($0.value, $0.key) })
     }
 
     private struct PerCurrencyRow: Hashable {
@@ -552,11 +541,7 @@ struct DashboardView: View {
             }
         }
         return bucket
-            .map { id, minor in
-                let name = categoryNames[id] ?? "—"
-                let parent = categoryParents[id].flatMap { categoryNames[$0] }
-                return CategoryRow(id: id, name: parent.map { "\($0) › \(name)" } ?? name, minor: minor)
-            }
+            .map { id, minor in CategoryRow(id: id, name: categoryPaths[id] ?? "—", minor: minor) }
             .sorted { $0.minor > $1.minor }
     }
 
@@ -574,7 +559,7 @@ struct DashboardView: View {
             dailyTotals = try app.summaries.dailyExpense(yearMonth: ymKey).mapValues { sumToHome($0) }
             let allCats = try app.categories.list(includeArchived: true)
             categoryNames = Dictionary(uniqueKeysWithValues: allCats.map { ($0.id, $0.name) })
-            categoryParents = Dictionary(uniqueKeysWithValues: allCats.compactMap { c in c.parentId.map { (c.id, $0) } })
+            categoryPaths = Dictionary(uniqueKeysWithValues: allCats.map { ($0.id, $0.displayPath(in: allCats)) })
             categoryColors = Dictionary(uniqueKeysWithValues: allCats.compactMap { c in c.ownColor.map { (c.id, $0) } })
             monthTransactionCount = try app.summaries.transactionCount(fromYM: ymKey, toYM: ymKey)
             accountsById = Dictionary(uniqueKeysWithValues: try app.accounts.list(includeArchived: true).map { ($0.id, $0) })
@@ -584,11 +569,9 @@ struct DashboardView: View {
             let incomeByCategory = try app.summaries.byCategory(fromYM: ymKey, toYM: ymKey, kind: .income)
             budgets = cats.compactMap { c -> BudgetRow? in
                 guard let budget = c.effectiveBudgetMinor(in: cats) else { return nil }
-                let ids = Set([c.id] + cats.filter { $0.parentId == c.id }.map(\.id))
+                let ids = c.familyIds(in: cats)
                 let source = c.kind == .income ? incomeByCategory : byCategory
-                let spent = source
-                    .filter { ids.contains($0.keyId) }
-                    .reduce(Int64(0)) { $0 + (app.convertedToHome($1.totalMinor, from: $1.currency) ?? 0) }
+                let spent = app.sumToHome(source.filter { ids.contains($0.keyId) }.map { ($0.totalMinor, $0.currency) })
                 return BudgetRow(category: c, budgetMinor: budget, spentHome: spent)
             }
             .sorted { ($0.category.kind == .expense ? 0 : 1, $0.category.name) < ($1.category.kind == .expense ? 0 : 1, $1.category.name) }

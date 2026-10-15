@@ -65,6 +65,17 @@ struct LedgerCategory: Identifiable, Hashable {
 }
 
 extension LedgerCategory {
+    /// "Food › Groceries" for a sub-category, just the name for a parent.
+    func displayPath(in all: [LedgerCategory]) -> String {
+        if let p = parentId, let parent = all.first(where: { $0.id == p }) { return "\(parent.name) › \(name)" }
+        return name
+    }
+
+    /// This category plus its direct sub-categories.
+    func familyIds(in all: [LedgerCategory]) -> Set<Int64> {
+        Set([id] + all.filter { $0.parentId == id }.map(\.id))
+    }
+
     /// The budget a category counts for. A parent counts the larger of its
     /// own budget and its live sub-categories' total, so an umbrella figure
     /// never undercuts the lines beneath it; a sub-category counts its own.
@@ -201,6 +212,26 @@ struct Transaction: Identifiable, Hashable {
 
     /// Did either leg clear? Cheap UI check.
     var isClearedAny: Bool { clearedAt != nil || counterpartyClearedAt != nil }
+
+    /// The side of this row that belongs to `accountId`, with that leg's
+    /// clearing state; nil when the row doesn't touch the account.
+    func leg(for accountId: Int64) -> (leg: TransactionLeg, clearedAt: Date?, statementId: Int64?)? {
+        if self.accountId == accountId { return (.account, clearedAt, statementId) }
+        if counterpartyAccountId == accountId { return (.counterparty, counterpartyClearedAt, counterpartyStatementId) }
+        return nil
+    }
+
+    /// Signed effect on `accountId`'s balance in that account's currency:
+    /// income +, expense −, transfer out −, transfer in + the counterparty
+    /// amount (or the amount when same-currency). The SQL twin is
+    /// `BalanceSQL`. 0 when the row doesn't touch the account.
+    func effect(on accountId: Int64) -> Int64 {
+        guard let l = leg(for: accountId) else { return 0 }
+        switch l.leg {
+        case .account:      return kind == .income ? amountMinor : -amountMinor
+        case .counterparty: return counterpartyAmountMinor ?? amountMinor
+        }
+    }
 }
 
 /// Filter object used by TransactionStore.list and SummaryStore queries.

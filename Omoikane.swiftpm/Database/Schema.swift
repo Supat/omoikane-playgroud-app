@@ -18,6 +18,16 @@ import Foundation
 /// fact table at all. With a few million rows in `transactions`, asking
 /// "spending by category in May 2026 for the credit card account" is a small index
 /// range scan over the summary table.
+/// SQL fragments for the signed-balance rule, the twin of
+/// `Transaction.effect(on:)`. Every balance query composes these so the
+/// rule cannot drift between queries.
+enum BalanceSQL {
+    /// Effect of a row on its own `account_id`.
+    static let ownLeg = "CASE kind WHEN 'income' THEN amount_minor WHEN 'expense' THEN -amount_minor WHEN 'transfer' THEN -amount_minor ELSE 0 END"
+    /// Inbound amount on the `counterparty_account_id` leg of a transfer.
+    static let counterpartyLeg = "COALESCE(counterparty_amount_minor, amount_minor)"
+}
+
 enum Schema {
     static let latestVersion = 9
 

@@ -549,9 +549,7 @@ struct AccountTransactionsView: View {
     /// which shouldn't normally happen since `rows` is filtered by
     /// `accountIdAnyLeg = account.id`.
     private func legClearedAt(for tx: Transaction) -> Date? {
-        if tx.accountId == account.id { return tx.clearedAt }
-        if tx.counterpartyAccountId == account.id { return tx.counterpartyClearedAt }
-        return nil
+        tx.leg(for: account.id)?.clearedAt
     }
 
     /// Flip the cleared state on this account's leg of the row. Toggling
@@ -582,28 +580,10 @@ struct AccountTransactionsView: View {
         catch { print("Toggle clear error: \(error)") }
     }
 
-    /// Net signed total of `rows` from this account's perspective, in
-    /// the account's own currency. Mirrors the sign convention used by
-    /// `AccountStore.balanceMinor`:
-    /// - income on this account → +amount
-    /// - expense on this account → −amount
-    /// - transfer from this account → −amount (outgoing leg)
-    /// - transfer into this account → +counterparty_amount when set,
-    ///   otherwise +amount (incoming leg)
+    /// Net signed total of `rows` from this account's perspective, in the
+    /// account's own currency (`Transaction.effect(on:)`).
     private var periodTotalMinor: Int64 {
-        var total: Int64 = 0
-        for tx in rows {
-            if tx.accountId == account.id {
-                switch tx.kind {
-                case .income:   total += tx.amountMinor
-                case .expense:  total -= tx.amountMinor
-                case .transfer: total -= tx.amountMinor
-                }
-            } else if tx.counterpartyAccountId == account.id {
-                total += tx.counterpartyAmountMinor ?? tx.amountMinor
-            }
-        }
-        return total
+        rows.reduce(Int64(0)) { $0 + $1.effect(on: account.id) }
     }
 
     private var periodTotalColor: Color {

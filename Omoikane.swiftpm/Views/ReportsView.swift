@@ -283,11 +283,7 @@ struct ReportsView: View {
                 .labelsHidden()
                 .accessibilityLabel("Pinned month")
                 .accessibilityValue(YearMonth.label(anchorYM))
-                .onChange(of: anchorYM) { _, newValue in
-                    let (y, m) = YearMonth.components(newValue)
-                    if m < 1  { anchorYM = YearMonth.key(year: y - 1, month: 12) }
-                    if m > 12 { anchorYM = YearMonth.key(year: y + 1, month: 1) }
-                }
+                .onChange(of: anchorYM) { _, v in anchorYM = YearMonth.normalized(v) }
             }
             .font(.subheadline)
         }
@@ -326,7 +322,7 @@ struct ReportsView: View {
     /// Range expense in the home currency, ignoring the currency filter,
     /// since the spending limit is a home-currency figure.
     private var homeExpenseTotal: Int64 {
-        totals.total(for: .expense).reduce(Int64(0)) { $0 + (app.convertedToHome($1.value, from: $1.key) ?? 0) }
+        app.sumToHome(totals.total(for: .expense).map { ($0.value, $0.key) })
     }
 
     private func displayCurrencyTotal(_ k: TransactionKind) -> Int64 {
@@ -413,18 +409,15 @@ struct ReportsView: View {
             // Budgets always roll up to the home currency, regardless of the currency filter.
             let cats = try app.categories.list()
             let allCats = try app.categories.list(includeArchived: true)
-            categoryLabels = Dictionary(uniqueKeysWithValues: allCats.map { c in
-                let parent = c.parentId.flatMap { pid in allCats.first { $0.id == pid }?.name }
-                return (c.id, parent.map { "\($0) › \(c.name)" } ?? c.name)
-            })
+            categoryLabels = Dictionary(uniqueKeysWithValues: allCats.map { ($0.id, $0.displayPath(in: allCats)) })
             let spentRows = try app.summaries.byCategory(fromYM: win.start, toYM: win.end, kind: .expense)
             let earnedRows = try app.summaries.byCategory(fromYM: win.start, toYM: win.end, kind: .income)
             budgetRows = cats.compactMap { c -> BudgetRow? in
                 guard let monthly = c.effectiveBudgetMinor(in: cats) else { return nil }
-                let ids = Set([c.id] + cats.filter { $0.parentId == c.id }.map(\.id))
-                let spent = (c.kind == .income ? earnedRows : spentRows)
+                let ids = c.familyIds(in: cats)
+                let spent = app.sumToHome((c.kind == .income ? earnedRows : spentRows)
                     .filter { ids.contains($0.keyId) }
-                    .reduce(Int64(0)) { $0 + (app.convertedToHome($1.totalMinor, from: $1.currency) ?? 0) }
+                    .map { ($0.totalMinor, $0.currency) })
                 return BudgetRow(category: c, budgetMinor: monthly * Int64(monthsBack), spentMinor: spent)
             }
             .sorted { Double($0.spentMinor) / Double(max($0.budgetMinor, 1)) > Double($1.spentMinor) / Double(max($1.budgetMinor, 1)) }

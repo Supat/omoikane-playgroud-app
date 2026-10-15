@@ -129,6 +129,12 @@ final class AppState {
 
     /// Returns true if every currency in `currencies` is either the home
     /// currency or has a rate set.
+    /// Sum (minor, currency) pairs in home-currency minor units, skipping
+    /// currencies with no rate.
+    func sumToHome(_ pairs: [(minor: Int64, currency: String)]) -> Int64 {
+        pairs.reduce(Int64(0)) { $0 + (convertedToHome($1.minor, from: $1.currency) ?? 0) }
+    }
+
     func haveRatesFor(_ currencies: [String]) -> Bool {
         currencies.allSatisfy { $0 == homeCurrency || rates[$0] != nil }
     }

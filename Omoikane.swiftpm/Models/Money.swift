@@ -103,6 +103,14 @@ enum YearMonth {
         Date().yearMonthKey
     }
 
+    /// Fix a key whose month stepped past 12 or below 1 (Stepper overflow).
+    static func normalized(_ key: Int) -> Int {
+        let (y, m) = components(key)
+        if m < 1  { return self.key(year: y - 1, month: 12) }
+        if m > 12 { return self.key(year: y + 1, month: 1) }
+        return key
+    }
+
     /// "Oct 2026" for a YYYYMM key.
     static func label(_ key: Int) -> String {
         let (y, m) = components(key)

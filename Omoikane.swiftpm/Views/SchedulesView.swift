@@ -249,10 +249,7 @@ struct ScheduleEditor: View {
     }
     private var categoryPath: String {
         guard let id = categoryId, let c = categories.first(where: { $0.id == id }) else { return "Choose a category" }
-        if let p = c.parentId, let parent = categories.first(where: { $0.id == p }) {
-            return "\(parent.name) › \(c.name)"
-        }
-        return c.name
+        return c.displayPath(in: categories)
     }
     private var canSave: Bool {
         guard (Money.parseMinor(amountText, currency: fromCurrency) ?? 0) > 0, accountId != nil else { return false }

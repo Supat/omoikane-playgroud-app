@@ -234,7 +234,7 @@ struct ReconciliationSheet: View {
     private var parsedStatementBalanceMinor: Int64? {
         // Credit accounts: user enters a positive "owed" → store as negative.
         // Other kinds: store as-is (positive = positive balance).
-        guard let unsigned = parseMinor(balanceText, currency: account.currency) else { return nil }
+        guard let unsigned = Money.parseMinor(balanceText, currency: account.currency) else { return nil }
         return account.kind == .credit ? -unsigned : unsigned
     }
 
@@ -270,22 +270,12 @@ struct ReconciliationSheet: View {
     }
 
     private func legFor(_ tx: Transaction) -> TransactionLeg {
-        tx.accountId == account.id ? .account : .counterparty
+        tx.leg(for: account.id)?.leg ?? .account
     }
 
     /// Signed contribution of a transaction's relevant leg to the account's balance.
     private func signedAmount(for tx: Transaction, leg: TransactionLeg) -> Int64 {
-        switch leg {
-        case .account:
-            switch tx.kind {
-            case .income:   return tx.amountMinor
-            case .expense:  return -tx.amountMinor
-            case .transfer: return -tx.amountMinor
-            }
-        case .counterparty:
-            // Inbound transfer leg in *this* account's currency.
-            return tx.counterpartyAmountMinor ?? tx.amountMinor
-        }
+        tx.effect(on: account.id)
     }
 
     // MARK: - Actions
@@ -342,10 +332,8 @@ struct ReconciliationSheet: View {
             // Uncleared rows, plus rows this very statement cleared so they
             // can be unticked after Save & keep open or Reopen.
             rows = try app.transactions.list(f).filter { tx in
-                let mine = tx.accountId == account.id
-                let clearedAt = mine ? tx.clearedAt : tx.counterpartyClearedAt
-                let sid = mine ? tx.statementId : tx.counterpartyStatementId
-                return clearedAt == nil || (statementId != nil && sid == statementId)
+                guard let l = tx.leg(for: account.id) else { return false }
+                return l.clearedAt == nil || (statementId != nil && l.statementId == statementId)
             }
             previousStatementDate = try app.statements.list(accountId: account.id)
                 .filter { $0.status == .reconciled && $0.id != statementId && $0.statementDate.dayKey < statementDate.dayKey }
@@ -466,9 +454,6 @@ struct ReconciliationSheet: View {
 
     // MARK: - Number helpers (mirror TransactionEditor)
 
-    private func parseMinor(_ text: String, currency: String) -> Int64? {
-        Money.parseMinor(text, currency: currency)
-    }
 
     private func formatMinorToInputText(_ minor: Int64) -> String {
         // Display unsigned for credit (user reads "$843"); signed otherwise.

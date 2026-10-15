@@ -280,14 +280,10 @@ enum ClearedBalance {
         let s = try db.prepare("""
             SELECT
                 COALESCE(initial_balance_minor, 0)
-                + COALESCE((SELECT SUM(CASE kind
-                                          WHEN 'income'   THEN amount_minor
-                                          WHEN 'expense'  THEN -amount_minor
-                                          WHEN 'transfer' THEN -amount_minor
-                                          ELSE 0 END)
+                + COALESCE((SELECT SUM(\(BalanceSQL.ownLeg))
                              FROM transactions
                             WHERE account_id = ? AND cleared_at IS NOT NULL), 0)
-                + COALESCE((SELECT SUM(COALESCE(counterparty_amount_minor, amount_minor))
+                + COALESCE((SELECT SUM(\(BalanceSQL.counterpartyLeg))
                              FROM transactions
                             WHERE kind = 'transfer'
                               AND counterparty_account_id = ?

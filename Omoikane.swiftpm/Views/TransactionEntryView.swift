@@ -122,7 +122,7 @@ struct TransactionEntryView: View {
                 HStack {
                     if isSplit {
                         Spacer()
-                        Text(NumberPadField.grouped(formatMinorToText(splitTotalMinor, currency: fromCurrency)))
+                        Text(NumberPadField.grouped(Money.formatMinorText(splitTotalMinor, currency: fromCurrency)))
                             .moneyStyle()
                             .font(.largeTitle)
                             .lineLimit(1)
@@ -426,7 +426,7 @@ struct TransactionEntryView: View {
     }
 
     private var splitTotalMinor: Int64 {
-        splitLines.compactMap { parseMinor($0.amountText, currency: fromCurrency) }.reduce(0, +)
+        splitLines.compactMap { Money.parseMinor($0.amountText, currency: fromCurrency) }.reduce(0, +)
     }
 
     /// One line left is no longer a split: fold it back into the main fields.
@@ -442,10 +442,7 @@ struct TransactionEntryView: View {
 
     private func categoryPath(for id: Int64?) -> String {
         guard let id, let c = categories.first(where: { $0.id == id }) else { return "Choose a category" }
-        if let p = c.parentId, let parent = categories.first(where: { $0.id == p }) {
-            return "\(parent.name) › \(c.name)"
-        }
-        return c.name
+        return c.displayPath(in: categories)
     }
 
     private var availableCategories: [LedgerCategory] {
@@ -456,16 +453,16 @@ struct TransactionEntryView: View {
     private var canSave: Bool {
         if isSplit {
             guard splitLines.allSatisfy({ $0.categoryId != nil
-                                          && (parseMinor($0.amountText, currency: fromCurrency) ?? 0) > 0 })
+                                          && (Money.parseMinor($0.amountText, currency: fromCurrency) ?? 0) > 0 })
             else { return false }
         } else {
-            guard let parsed = parseMinor(amountText, currency: fromCurrency), parsed > 0 else { return false }
+            guard let parsed = Money.parseMinor(amountText, currency: fromCurrency), parsed > 0 else { return false }
         }
         if accountId == nil && accounts.first == nil { return false }
         if kind == .transfer {
             guard counterpartyAccountId != nil, counterpartyAccountId != accountId else { return false }
             if isCrossCurrencyTransfer {
-                guard let cp = parseMinor(counterpartyAmountText, currency: toCurrency), cp > 0 else { return false }
+                guard let cp = Money.parseMinor(counterpartyAmountText, currency: toCurrency), cp > 0 else { return false }
             }
             return true
         }
@@ -479,7 +476,7 @@ struct TransactionEntryView: View {
             payees = try app.payees.list()
             // Needs the accounts (for the to-currency) before it can be formatted.
             if let cp = transaction?.counterpartyAmountMinor {
-                counterpartyAmountText = formatMinorToText(cp, currency: toCurrency)
+                counterpartyAmountText = Money.formatMinorText(cp, currency: toCurrency)
             }
             if accountId == nil {
                 if let pre = initialAccountId,
@@ -503,7 +500,7 @@ struct TransactionEntryView: View {
     private func primeFromExisting() {
         guard let tx = transaction else { return }
         kind = tx.kind
-        amountText = formatMinorToText(tx.amountMinor, currency: tx.currency)
+        amountText = Money.formatMinorText(tx.amountMinor, currency: tx.currency)
         occurredOn = tx.occurredOn
         categoryId = tx.categoryId
         accountId = tx.accountId
@@ -516,7 +513,7 @@ struct TransactionEntryView: View {
         loanRole = tx.loanRole
         isEssential = tx.isEssential
         if let g = tx.splitGroup, let rows = try? app.transactions.listGroup(g), rows.count > 1 {
-            splitLines = rows.map { SplitLine(categoryId: $0.categoryId, amountText: formatMinorToText($0.amountMinor, currency: $0.currency)) }
+            splitLines = rows.map { SplitLine(categoryId: $0.categoryId, amountText: Money.formatMinorText($0.amountMinor, currency: $0.currency)) }
         }
     }
 
@@ -526,7 +523,7 @@ struct TransactionEntryView: View {
             amt = splitTotalMinor
             guard amt > 0 else { return }
         } else {
-            guard let parsed = parseMinor(amountText, currency: fromCurrency), parsed > 0 else { return }
+            guard let parsed = Money.parseMinor(amountText, currency: fromCurrency), parsed > 0 else { return }
             amt = parsed
         }
         let acct = accountId ?? accounts.first?.id ?? 0
@@ -547,7 +544,7 @@ struct TransactionEntryView: View {
             .filter { !$0.isEmpty }
 
         let cpAmount: Int64? = isCrossCurrencyTransfer
-            ? parseMinor(counterpartyAmountText, currency: toCurrency)
+            ? Money.parseMinor(counterpartyAmountText, currency: toCurrency)
             : nil
 
         do {
@@ -578,7 +575,7 @@ struct TransactionEntryView: View {
                     ? splitLines.map { line in
                         var t = template
                         t.categoryId = line.categoryId ?? cat
-                        t.amountMinor = parseMinor(line.amountText, currency: fromCurrency) ?? 0
+                        t.amountMinor = Money.parseMinor(line.amountText, currency: fromCurrency) ?? 0
                         return t
                     }
                     : [{ var t = template; t.categoryId = cat; t.amountMinor = amt; return t }()]
@@ -707,11 +704,5 @@ struct TransactionEntryView: View {
         }
     }
 
-    private func parseMinor(_ text: String, currency: String) -> Int64? {
-        Money.parseMinor(text, currency: currency)
-    }
 
-    private func formatMinorToText(_ minor: Int64, currency: String) -> String {
-        Money.formatMinorText(minor, currency: currency)
-    }
 }

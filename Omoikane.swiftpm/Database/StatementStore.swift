@@ -131,14 +131,8 @@ final class StatementStore {
             // own currency (counterparty_amount_minor falling back to amount_minor).
             let snapStmt = try db.prepare("""
                 SELECT COALESCE(SUM(CASE
-                            WHEN statement_id = ? THEN
-                                CASE kind
-                                    WHEN 'income'   THEN amount_minor
-                                    WHEN 'expense'  THEN -amount_minor
-                                    WHEN 'transfer' THEN -amount_minor
-                                    ELSE 0 END
-                            WHEN counterparty_statement_id = ? THEN
-                                COALESCE(counterparty_amount_minor, amount_minor)
+                            WHEN statement_id = ? THEN \(BalanceSQL.ownLeg)
+                            WHEN counterparty_statement_id = ? THEN \(BalanceSQL.counterpartyLeg)
                             ELSE 0 END), 0),
                        COALESCE(SUM(CASE WHEN statement_id = ? OR counterparty_statement_id = ?
                                           THEN 1 ELSE 0 END), 0)

@@ -245,7 +245,7 @@ struct AddAccountSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
                         // Debt is stored negative; the sheet asks for the positive amount owed.
-                        let entered = parseMinor(initialBalanceText, currency: currency) ?? 0
+                        let entered = Money.parseMinor(initialBalanceText, currency: currency) ?? 0
                         let minor = kind == .credit ? -entered : entered
                         do {
                             _ = try app.addAccount(
@@ -267,9 +267,6 @@ struct AddAccountSheet: View {
         }
     }
 
-    private func parseMinor(_ text: String, currency: String) -> Int64? {
-        Money.parseMinor(text, currency: currency)
-    }
 }
 
 extension AccountDeletePrompt {
