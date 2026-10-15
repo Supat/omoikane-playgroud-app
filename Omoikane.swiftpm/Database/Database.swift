@@ -132,16 +132,19 @@ final class Database {
     /// Callers re-run `Schema.migrate` afterwards in case the copy is older.
     func restore(from url: URL) throws {
         var src: OpaquePointer?
-        guard sqlite3_open_v2(url.path, &src, SQLITE_OPEN_READONLY, nil) == SQLITE_OK, let src else {
+        // Read-write, not read-only: a WAL-mode file needs its -shm sidecar.
+        guard sqlite3_open_v2(url.path, &src, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK, let src else {
             throw DatabaseError.execFailed("Could not open backup.")
         }
         defer { sqlite3_close_v2(src) }
         guard let b = sqlite3_backup_init(handle, "main", src, "main") else {
             throw DatabaseError.execFailed(String(cString: sqlite3_errmsg(handle)))
         }
-        sqlite3_backup_step(b, -1)
+        let stepRC = sqlite3_backup_step(b, -1)
         let rc = sqlite3_backup_finish(b)
-        guard rc == SQLITE_OK else { throw DatabaseError.execFailed("Restore failed (\(rc)).") }
+        guard rc == SQLITE_OK else {
+            throw DatabaseError.execFailed("Restore failed (step \(stepRC), finish \(rc)): \(String(cString: sqlite3_errmsg(handle)))")
+        }
     }
 
     private func transfer(from source: OpaquePointer?, path: String, toPath dest: String) throws {
@@ -156,6 +159,9 @@ final class Database {
         sqlite3_backup_step(b, -1)
         let rc = sqlite3_backup_finish(b)
         guard rc == SQLITE_OK else { throw DatabaseError.execFailed("Backup failed (\(rc)).") }
+        // The copy inherits WAL mode from the live file; make it a single
+        // self-contained file so it can be shared and opened anywhere.
+        sqlite3_exec(dst, "PRAGMA journal_mode = DELETE;", nil, nil, nil)
     }
 
     var lastInsertId: Int64 { sqlite3_last_insert_rowid(handle) }

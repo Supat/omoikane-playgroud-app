@@ -60,11 +60,21 @@ enum BackupStore {
     @discardableResult
     static func backup(db: Database) throws -> URL {
         let dir = try directory(for: db)
-        let stamp = Date().formatted(.iso8601.year().month().day().dateSeparator(.dash).time(includingFractionalSeconds: false).timeSeparator(.omitted))
-            .replacingOccurrences(of: ":", with: "")
-        let url = dir.appendingPathComponent("Omoikane-\(stamp).sqlite")
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")   // fixed pattern regardless of 12/24-hour locale
+        f.dateFormat = "yyyy-MM-dd-HHmmss"             // local time, filename-safe
+        let stamp = f.string(from: Date())
+        var url = dir.appendingPathComponent("Omoikane-\(stamp).sqlite")
+        var n = 2
+        while FileManager.default.fileExists(atPath: url.path) {   // two backups in one second
+            url = dir.appendingPathComponent("Omoikane-\(stamp)-\(n).sqlite"); n += 1
+        }
         try db.sync { try db.copy(to: url) }
-        for old in list(for: db).dropFirst(keepCount) { try? FileManager.default.removeItem(at: old.url) }
+        removeSidecars(of: url)
+        for old in list(for: db).dropFirst(keepCount) {
+            try? FileManager.default.removeItem(at: old.url)
+            removeSidecars(of: old.url)
+        }
         lastBackup = Date()
         return url
     }
@@ -79,5 +89,14 @@ enum BackupStore {
 
     static func delete(_ file: BackupFile) throws {
         try FileManager.default.removeItem(at: file.url)
+        removeSidecars(of: file.url)
+    }
+
+    /// WAL/shm files SQLite may leave next to a copy; the backup itself is
+    /// switched to a rollback journal so they carry nothing.
+    static func removeSidecars(of url: URL) {
+        for suffix in ["-wal", "-shm", "-journal"] {
+            try? FileManager.default.removeItem(at: URL(fileURLWithPath: url.path + suffix))
+        }
     }
 }
