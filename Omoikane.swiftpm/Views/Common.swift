@@ -255,3 +255,23 @@ struct StackedShareBar: View {
         .frame(height: 14 + CGFloat((names.count + 2) / 3) * 22)
     }
 }
+
+/// Determinate progress as a 14pt capsule, matching StackedShareBar.
+/// `tint` is explicit because custom styles can't read `.tint`.
+struct CapsuleProgressStyle: ProgressViewStyle {
+    var tint: Color = .accentColor
+    func makeBody(configuration: Configuration) -> some View {
+        let fraction = min(max(configuration.fractionCompleted ?? 0, 0), 1)
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.secondary.opacity(0.2))
+                Capsule().fill(tint).frame(width: max(geo.size.width * fraction, fraction > 0 ? 14 : 0))
+            }
+        }
+        .frame(height: 14)
+    }
+}
+
+extension ProgressViewStyle where Self == CapsuleProgressStyle {
+    static func capsule(_ tint: Color) -> CapsuleProgressStyle { CapsuleProgressStyle(tint: tint) }
+}

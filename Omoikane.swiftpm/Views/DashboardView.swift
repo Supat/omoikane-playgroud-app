@@ -134,7 +134,7 @@ struct DashboardView: View {
                                     .foregroundStyle(over ? .red : .primary)
                             }
                             ProgressView(value: Double(min(row.toDateHome, row.budgetMinor)), total: Double(max(row.budgetMinor, 1)))
-                                .tint(over ? .red : .accentColor)
+                                .progressViewStyle(.capsule(over ? .red : .accentColor))
                                 .accessibilityLabel("\(row.category.name) budget through this day")
                                 .accessibilityValue(over ? "Over budget" : "\(Int(Double(row.toDateHome) / Double(max(row.budgetMinor, 1)) * 100)) percent used")
                         }
@@ -186,7 +186,7 @@ struct DashboardView: View {
                         .foregroundStyle(over ? .red : .secondary)
                 }
                 ProgressView(value: min(share, 1))
-                    .tint(over ? .red : (share > 0.85 ? .orange : .accentColor))
+                    .progressViewStyle(.capsule(over ? .red : (share > 0.85 ? .orange : .accentColor)))
                     .accessibilityLabel("Spending against the monthly limit")
                     .accessibilityValue(over ? "Over the limit" : "\(Int((share * 100).rounded())) percent used")
                 Text(over
@@ -232,7 +232,7 @@ struct DashboardView: View {
                         .frame(width: 44, alignment: .trailing)
                 }
                 ProgressView(value: share)
-                    .tint(.orange)
+                    .progressViewStyle(.capsule(.orange))
                     .accessibilityLabel("Essential share of spending")
                     .accessibilityValue("\(Int((share * 100).rounded())) percent")
             }
@@ -303,7 +303,7 @@ struct DashboardView: View {
                                 .foregroundStyle(!isIncome && over ? .red : .secondary)
                         }
                         ProgressView(value: Double(min(row.spentHome, limit)), total: Double(max(limit, 1)))
-                            .tint(tone)
+                            .progressViewStyle(.capsule(tone))
                             .accessibilityLabel(isIncome ? "\(row.category.name) income target" : "\(row.category.name) budget")
                             .accessibilityValue(isIncome
                                 ? (row.spentHome >= limit ? "Target reached" : "\(Int(Double(row.spentHome) / Double(max(limit, 1)) * 100)) percent of target")

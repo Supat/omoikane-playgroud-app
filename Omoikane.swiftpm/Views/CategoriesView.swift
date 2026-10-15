@@ -171,7 +171,7 @@ struct CategoriesView: View {
                                 .foregroundStyle(overshoot ? .red : (share > 0.85 ? .orange : .secondary))
                         }
                         ProgressView(value: min(share, 1))
-                            .tint(overshoot ? .red : (share > 0.85 ? .orange : .accentColor))
+                            .progressViewStyle(.capsule(overshoot ? .red : (share > 0.85 ? .orange : .accentColor)))
                             .accessibilityLabel("Spending limit as a share of income targets")
                             .accessibilityValue("\(Int((share * 100).rounded())) percent")
                     }

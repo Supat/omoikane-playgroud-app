@@ -100,7 +100,7 @@ struct ReportsView: View {
                                 .foregroundStyle(over ? .red : .primary)
                         }
                         ProgressView(value: min(share, 1))
-                            .tint(over ? .red : (share > 0.85 ? .orange : .accentColor))
+                            .progressViewStyle(.capsule(over ? .red : (share > 0.85 ? .orange : .accentColor)))
                             .accessibilityLabel("Spending against the limit for the range")
                             .accessibilityValue(over ? "Over the limit" : "\(Int((share * 100).rounded())) percent used")
                         Text(over
@@ -151,7 +151,7 @@ struct ReportsView: View {
                                         .foregroundStyle(bad ? .red : .primary)
                                 }
                                 ProgressView(value: Double(min(row.spentMinor, row.budgetMinor)), total: Double(max(row.budgetMinor, 1)))
-                                    .tint(bad ? .red : (isIncome && reached ? .green : .accentColor))
+                                    .progressViewStyle(.capsule(bad ? .red : (isIncome && reached ? .green : .accentColor)))
                                     .accessibilityLabel(isIncome ? "\(row.category.name) income target" : "\(row.category.name) budget")
                                     .accessibilityValue(isIncome
                                         ? (reached ? "Target reached" : "\(Int(Double(row.spentMinor) / Double(max(row.budgetMinor, 1)) * 100)) percent of target")
