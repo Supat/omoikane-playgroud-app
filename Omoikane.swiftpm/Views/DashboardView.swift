@@ -16,6 +16,7 @@ struct DashboardView: View {
     @State private var essentialByCurrency: [String: Int64] = [:]
     @State private var dailyTotals: [Int: Int64] = [:]
     @State private var selectedDay: Int? = nil
+    @State private var calendarHeight: CGFloat = 0
     @State private var dayRows: [Transaction] = []
     @State private var dayBudgets: [DayBudgetRow] = []
 
@@ -77,11 +78,42 @@ struct DashboardView: View {
     private var calendarSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Calendar (\(app.homeCurrency))").font(.headline)
-            MonthCalendar(yearMonth: $ymKey, selectedDay: $selectedDay,
-                          dailyTotals: dailyTotals, currency: app.homeCurrency)
-                .frame(maxWidth: .infinity)
-            if let day = selectedDay {
-                Divider()
+            // Side by side when there is room for the calendar plus a usable
+            // list; otherwise stacked. ViewThatFits picks the first that fits.
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 16) {
+                    calendar
+                    ScrollView {
+                        dayPanel.frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(minWidth: 300, maxWidth: .infinity)
+                    // Pinned to the calendar's measured height; scrolls inside.
+                    .frame(height: calendarHeight > 0 ? calendarHeight : nil)
+                }
+                VStack(alignment: .leading, spacing: 10) {
+                    calendar.frame(maxWidth: .infinity)
+                    if selectedDay != nil { Divider() }
+                    dayPanel
+                }
+            }
+        }
+        .padding(12)
+        .glassCard(cornerRadius: 12)
+        .onChange(of: selectedDay) { _, _ in loadDayRows() }
+    }
+
+    private var calendar: some View {
+        MonthCalendar(yearMonth: $ymKey, selectedDay: $selectedDay,
+                      dailyTotals: dailyTotals, currency: app.homeCurrency)
+            .fixedSize(horizontal: false, vertical: true)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { calendarHeight = $0 }
+    }
+
+    /// The selected day's entries and budget position; a hint until a day is picked.
+    @ViewBuilder
+    private var dayPanel: some View {
+        if let day = selectedDay {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text(Formatters.mediumDate.string(from: Date.from(dayKey: day)))
                         .font(.subheadline.weight(.medium))
@@ -133,10 +165,11 @@ struct DashboardView: View {
                     }
                 }
             }
+        } else {
+            Text("Select a day to see its entries.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
-        .padding(12)
-        .glassCard(cornerRadius: 12)
-        .onChange(of: selectedDay) { _, _ in loadDayRows() }
     }
 
     private func loadDayRows() {
