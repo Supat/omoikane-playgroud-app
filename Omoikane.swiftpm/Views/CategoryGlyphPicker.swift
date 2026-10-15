@@ -77,9 +77,11 @@ struct CategoryGlyphPicker: View {
                 Image(systemName: icon)
                     .font(.title2)
                     .frame(width: 48, height: 48)
-                    .glassEffect(selected ? .regular.tint(.accentColor.opacity(0.5)).interactive()
-                                          : .regular.interactive(),
-                                 in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    // Plain fill, not glass: a strip of glass tiles stutters while scrolling.
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(selected ? Color.accentColor.opacity(0.25) : Color(.tertiarySystemFill))
+                    )
                     .overlay(alignment: .bottomTrailing) {
                         if hasChildren {
                             Image(systemName: "chevron.right.circle.fill")

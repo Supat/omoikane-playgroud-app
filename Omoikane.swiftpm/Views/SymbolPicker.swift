@@ -76,6 +76,98 @@ struct SymbolPicker: View {
         "info.circle", "xmark.circle", "checkmark.circle", "plus.circle", "minus.circle", "asterisk", "number",
     ]
 
+    /// Human-readable titles. Anything not listed falls back to the name
+    /// with dots as spaces, "fill" dropped and words capitalised.
+    private static let titles: [String: String] = [
+        "tag": "Tag", "banknote": "Cash", "creditcard": "Credit Card", "wallet.pass": "Wallet", "wallet.bifold": "Billfold",
+        "building.columns": "Bank", "yensign.circle": "Yen", "dollarsign.circle": "Dollar", "eurosign.circle": "Euro",
+        "sterlingsign.circle": "Pound", "bitcoinsign.circle": "Bitcoin", "chart.line.uptrend.xyaxis": "Investment",
+        "chart.line.downtrend.xyaxis": "Loss", "chart.pie": "Pie Chart", "chart.bar": "Bar Chart", "percent": "Interest",
+        "arrow.left.arrow.right": "Transfer", "arrow.down.circle": "Income", "arrow.up.circle": "Expense", "gift": "Gift",
+        "equal.circle": "Adjustment", "plusminus.circle": "Plus Minus", "hand.thumbsup": "Thumbs Up", "handbag": "Handbag",
+        "safari": "Compass", "receipt": "Receipt", "list.bullet.clipboard": "Checklist",
+        "fork.knife": "Dining", "fork.knife.circle": "Restaurant", "cup.and.saucer": "Coffee", "mug": "Tea",
+        "takeoutbag.and.cup.and.straw": "Takeout", "carrot": "Groceries", "birthday.cake": "Cake", "wineglass": "Drinks",
+        "waterbottle": "Water", "cart": "Shopping Cart", "basket": "Basket", "frying.pan": "Cooking", "oven": "Oven",
+        "microwave": "Microwave", "refrigerator": "Fridge", "stove": "Stove", "popcorn": "Snacks", "fish": "Fish",
+        "leaf": "Leaf", "drop": "Water Drop", "flame": "Gas", "bag": "Bag",
+        "house": "Home", "building": "Building", "building.2": "Office", "bed.double": "Bedroom", "sofa": "Living Room",
+        "chair": "Chair", "chair.lounge": "Lounge Chair", "table.furniture": "Table", "lamp.desk": "Desk Lamp",
+        "lamp.floor": "Floor Lamp", "lamp.ceiling": "Ceiling Lamp", "lightbulb": "Electricity", "washer": "Laundry",
+        "dryer": "Dryer", "dishwasher": "Dishwasher", "shower": "Shower", "bathtub": "Bath", "toilet": "Toilet",
+        "sink": "Sink", "key": "Key", "lock": "Lock", "lock.open": "Unlocked", "door.left.hand.closed": "Door",
+        "window.vertical.closed": "Window", "wrench.and.screwdriver": "Repairs", "wrench": "Wrench", "hammer": "Hammer",
+        "screwdriver": "Screwdriver", "paintbrush": "Paint", "paintbrush.pointed": "Art Brush", "ruler": "Ruler",
+        "level": "Level", "bolt": "Power", "powerplug": "Plug", "poweroutlet.type.b": "Outlet", "wifi": "Internet",
+        "wifi.router": "Router", "antenna.radiowaves.left.and.right": "Broadcast", "phone": "Phone", "iphone": "Mobile",
+        "ipad": "Tablet", "tv": "Television", "appletv": "TV Box", "homepod": "Smart Speaker", "fan": "Fan",
+        "fan.floor": "Floor Fan", "air.conditioner.horizontal": "Air Conditioner", "thermometer.medium": "Heating",
+        "snowflake": "Cooling", "sun.max": "Sunny", "trash": "Garbage", "spigot": "Tap", "cabinet": "Cabinet",
+        "fireplace": "Fireplace",
+        "tram": "Tram", "train.side.front.car": "Train", "bus": "Bus", "car": "Car", "car.2": "Cars", "fuelpump": "Fuel",
+        "ev.charger": "EV Charging", "bicycle": "Bicycle", "scooter": "Scooter", "motorcycle": "Motorcycle",
+        "airplane": "Flight", "airplane.departure": "Departure", "airplane.arrival": "Arrival", "ferry": "Ferry",
+        "sailboat": "Sailing", "parkingsign": "Parking", "parkingsign.circle": "Parking Lot", "figure.walk": "Walking",
+        "figure.walk.circle": "On Foot", "road.lanes": "Highway", "steeringwheel": "Driving", "tirepressure": "Tyres",
+        "engine.combustion": "Engine", "wrench.adjustable": "Maintenance", "signpost.right": "Signpost", "mappin": "Place",
+        "shippingbox": "Delivery", "tshirt": "Clothing", "shoe": "Shoes", "shoeprints.fill": "Footsteps",
+        "eyeglasses": "Glasses", "sunglasses": "Sunglasses", "watch.analog": "Watch", "applewatch": "Smartwatch",
+        "laptopcomputer": "Laptop", "desktopcomputer": "Desktop", "keyboard": "Keyboard", "computermouse": "Mouse",
+        "headphones": "Headphones", "airpods": "Earbuds", "hifispeaker": "Speaker", "gamecontroller": "Games",
+        "arcade.stick": "Arcade", "book": "Books", "books.vertical": "Library", "magazine": "Magazine",
+        "newspaper": "Newspaper", "pencil": "Stationery", "pencil.and.outline": "Drawing", "paintpalette": "Art",
+        "camera": "Camera", "photo": "Photos", "guitars": "Music Gear", "pianokeys": "Piano", "music.mic": "Karaoke",
+        "puzzlepiece": "Hobby", "puzzlepiece.extension": "Add-on", "scissors": "Haircut", "comb": "Grooming",
+        "backpack": "Backpack", "suitcase": "Luggage", "umbrella": "Umbrella", "gift.circle": "Present",
+        "balloon": "Party", "balloon.2": "Celebration", "party.popper": "Festivity", "teddybear": "Toys",
+        "stroller": "Baby", "figure.and.child.holdinghands": "Child", "figure.2.and.child.holdinghands": "Family",
+        "heart": "Health", "heart.text.square": "Medical Record", "cross.case": "Medical", "cross.vial": "Lab Test",
+        "pills": "Medicine", "pill": "Pill", "bandage": "First Aid", "stethoscope": "Doctor", "syringe": "Vaccine",
+        "medical.thermometer": "Thermometer", "ear": "Hearing", "eye": "Eye Care", "eyebrow": "Brows", "mouth": "Dental",
+        "nose": "Nose", "brain": "Mental Health", "lungs": "Lungs", "facemask": "Mask", "figure.run": "Running",
+        "figure.walk.motion": "Walk", "figure.yoga": "Yoga", "figure.pool.swim": "Swimming", "figure.hiking": "Hiking",
+        "figure.outdoor.cycle": "Cycling", "figure.strengthtraining.traditional": "Gym", "dumbbell": "Fitness",
+        "sportscourt": "Sports", "soccerball": "Football", "basketball": "Basketball", "baseball": "Baseball",
+        "tennis.racket": "Tennis", "figure.golf": "Golf", "figure.skiing.downhill": "Skiing", "sparkles": "Beauty",
+        "hands.and.sparkles": "Cleaning", "hand.raised": "Hand", "person": "Personal", "person.2": "Couple",
+        "person.3": "Group", "person.crop.circle": "Profile", "figure.stand": "Self", "bed.double.circle": "Sleep",
+        "zzz": "Rest", "moon": "Night", "moon.stars": "Late Night",
+        "briefcase": "Work", "graduationcap": "Education", "studentdesk": "School", "doc.text": "Document",
+        "doc.on.doc": "Copies", "folder": "Folder", "envelope": "Mail", "paperplane": "Send", "printer": "Printing",
+        "scanner": "Scanning", "tray": "Inbox", "tray.full": "Archive", "calendar": "Calendar",
+        "calendar.badge.clock": "Scheduled", "clock": "Time", "timer": "Timer", "alarm": "Alarm", "bell": "Reminder",
+        "megaphone": "Advertising", "speaker.wave.2": "Audio", "globe": "International", "globe.asia.australia": "Asia",
+        "network": "Network", "server.rack": "Hosting", "externaldrive": "Storage", "icloud": "Cloud Storage",
+        "cloud": "Cloud", "lock.shield": "Security", "shield": "Insurance", "shield.checkered": "Protection",
+        "checkmark.seal": "Verified", "rosette": "Award", "signature": "Contract", "person.badge.key": "Membership",
+        "person.text.rectangle": "ID Card", "scroll": "Certificate", "text.book.closed": "Textbook",
+        "character.book.closed": "Dictionary", "translate": "Language", "textformat": "Typography",
+        "ticket": "Tickets", "film": "Movies", "film.stack": "Film Library", "theatermasks": "Theatre",
+        "music.note": "Music", "music.note.list": "Playlist", "play.rectangle": "Streaming", "tv.and.mediabox": "Cable",
+        "photo.on.rectangle": "Gallery", "map": "Travel", "binoculars": "Sightseeing", "tent": "Camping", "tent.2": "Campsite",
+        "mountain.2": "Mountains", "beach.umbrella": "Beach", "water.waves": "Sea", "sun.horizon": "Sunset",
+        "cloud.sun": "Weather", "cloud.rain": "Rain", "snowflake.circle": "Winter", "building.columns.circle": "Museum",
+        "fossil.shell": "Souvenir", "globe.europe.africa": "Europe", "globe.americas": "Americas",
+        "bed.double.circle.fill": "Hotel", "fireworks": "Fireworks", "flag": "Flag", "flag.checkered": "Finish",
+        "star": "Favourite", "trophy": "Trophy", "medal": "Medal", "crown": "Premium",
+        "pawprint": "Pets", "dog": "Dog", "cat": "Cat", "bird": "Bird", "hare": "Rabbit", "tortoise": "Tortoise",
+        "ladybug": "Garden", "ant": "Pest Control", "tree": "Trees", "camera.macro": "Plants", "apple.logo": "Apple",
+        "questionmark.circle": "Unknown", "ellipsis.circle": "Other", "circle.grid.2x2": "Grid", "square.grid.2x2": "Apps",
+        "archivebox": "Archive Box", "square.split.2x1": "Split", "arrow.triangle.2.circlepath": "Subscription",
+        "arrow.counterclockwise": "Refund", "lifepreserver": "Essential", "exclamationmark.triangle": "Warning",
+        "info.circle": "Info", "xmark.circle": "Cancelled", "checkmark.circle": "Done", "plus.circle": "Add",
+        "minus.circle": "Remove", "asterisk": "Misc", "number": "Number",
+    ]
+
+    /// Title for any symbol name: the curated title, or a readable form of
+    /// the name itself ("cup.and.saucer.fill" → "Cup And Saucer").
+    static func title(for name: String) -> String {
+        if let t = titles[name] { return t }
+        let base = name.hasSuffix(".fill") ? String(name.dropLast(5)) : name
+        if let t = titles[base] { return name.hasSuffix(".fill") ? "\(t) (filled)" : t }
+        return base.split(separator: ".").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
+    }
+
     /// The curated list minus anything this OS build does not ship.
     static let available: [String] = {
         var seen = Set<String>()
@@ -85,7 +177,7 @@ struct SymbolPicker: View {
     private var filtered: [String] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
         if q.isEmpty { return Self.available }
-        var out = Self.available.filter { $0.contains(q) }
+        var out = Self.available.filter { $0.contains(q) || Self.title(for: $0).lowercased().contains(q) }
         // Exact names outside the curated set still work.
         if !out.contains(q), UIImage(systemName: q) != nil { out.insert(q, at: 0) }
         return out
@@ -104,17 +196,20 @@ struct SymbolPicker: View {
                                 Image(systemName: name)
                                     .font(.title2)
                                     .frame(width: 44, height: 44)
-                                    .glassEffect(name == selection ? .regular.tint(.accentColor.opacity(0.5)).interactive()
-                                                                   : .regular.interactive(),
-                                                 in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                Text(name)
+                                    // Plain fill, not glass: hundreds of glass cells in a
+                                    // scrolling grid stutter.
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                            .fill(name == selection ? Color.accentColor.opacity(0.25) : Color(.tertiarySystemFill))
+                                    )
+                                Text(Self.title(for: name))
                                     .font(.caption2)
                                     .lineLimit(1)
-                                    .truncationMode(.middle)
+                                    .truncationMode(.tail)
                             }
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel(name)
+                        .accessibilityLabel(Self.title(for: name))
                         .accessibilityAddTraits(name == selection ? .isSelected : [])
                     }
                 }
@@ -125,7 +220,7 @@ struct SymbolPicker: View {
                         .padding()
                 }
             }
-            .searchable(text: $query, prompt: "Search symbols")
+            .searchable(text: $query, prompt: "Search glyphs")
             .onSubmit(of: .search) {
                 if let first = filtered.first { selection = first; dismiss() }
             }

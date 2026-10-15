@@ -320,7 +320,7 @@ struct CategoryEditor: View {
                         HStack(spacing: 8) {
                             Image(systemName: icon.isEmpty ? "tag" : icon)
                                 .foregroundStyle(kind == .income ? .green : .red)
-                            Text(icon.isEmpty ? "tag" : icon)
+                            Text(SymbolPicker.title(for: icon.isEmpty ? "tag" : icon))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                             Image(systemName: "chevron.right")

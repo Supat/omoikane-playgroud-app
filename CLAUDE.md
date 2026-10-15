@@ -178,7 +178,11 @@ Surfaces: system chrome is Liquid Glass on its own. Every custom panel uses
 `.glassProminent`. No flat `.background(Color…)` or material fills on cards.
 Don't wrap scrolling card stacks in `GlassEffectContainer`: it is for glass
 shapes that morph into each other, and on a ScrollView of static cards it
-logs "glassEffect() tried to update multiple times per frame".
+logs "glassEffect() tried to update multiple times per frame". Don't put
+glass on cells of a scrolling collection (glyph grid, glyph strip) either;
+it stutters. Those use a plain `tertiarySystemFill` tile.
+Glyphs have titles: `SymbolPicker.title(for:)`; show the title, never the
+raw symbol name.
 
 Amounts on screen always go through `Formatters.moneyText(_:currency:)` or
 `Text.moneyStyle()` (monospaced face + tabular digits). Don't write a bare
