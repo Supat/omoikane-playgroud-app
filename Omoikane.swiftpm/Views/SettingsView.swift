@@ -13,6 +13,7 @@ struct SettingsView: View {
     @State private var importing = false
     @State private var importMessage = ""
     @State private var showImportResult = false
+    @State private var confirmClear = false
 
     var body: some View {
         // @Bindable lets a Picker bind to a property of an @Observable.
@@ -76,6 +77,21 @@ struct SettingsView: View {
                     Text("Last rebuild: \(String(format: "%.0f", lastRebuildTook * 1000)) ms")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+                Button(role: .destructive) {
+                    confirmClear = true
+                } label: {
+                    Label("Delete all transactions…", systemImage: "trash")
+                }
+                .disabled(transactionCount == 0)
+                .confirmationDialog("Delete all \(transactionCount) transactions?", isPresented: $confirmClear, titleVisibility: .visible) {
+                    Button("Delete all transactions", role: .destructive) {
+                        do { try app.clearAllTransactions() }
+                        catch { importMessage = "\(error)"; showImportResult = true }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Accounts, categories, payees, schedules, exchange rates and statements are kept. Balances fall back to each account's opening balance. This cannot be undone.")
                 }
             }
 

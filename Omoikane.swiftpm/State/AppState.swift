@@ -184,6 +184,19 @@ final class AppState {
         bump()
     }
 
+    /// Delete every transaction and the summary cache; accounts, categories,
+    /// payees, schedules, rates and statements stay. Balances fall back to
+    /// each account's opening balance.
+    func clearAllTransactions() throws {
+        try db.sync {
+            try db.transaction {
+                try db.exec("DELETE FROM transactions;")
+                try db.exec("DELETE FROM monthly_summaries;")
+            }
+        }
+        bump()
+    }
+
     // MARK: - Payees & schedules
 
     func findOrCreatePayee(name: String) throws -> Int64? {
