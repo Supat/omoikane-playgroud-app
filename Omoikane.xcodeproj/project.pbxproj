@@ -26,23 +26,23 @@
 		B100000000000000000011 /* Money.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000011 /* Money.swift */; };
 		B100000000000000000012 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000012 /* AppState.swift */; };
 		B100000000000000000013 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F100000000000000000013 /* Assets.xcassets */; };
-		B100000000000000000036 /* Omoikane.icon in Resources */ = {isa = PBXBuildFile; fileRef = F100000000000000000036 /* Omoikane.icon */; };
 		B100000000000000000020 /* CurrencyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000020 /* CurrencyStore.swift */; };
 		B100000000000000000021 /* StatementStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000021 /* StatementStore.swift */; };
-		B100000000000000000035 /* BackupStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000035 /* BackupStore.swift */; };
-		B100000000000000000028 /* PayeeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000028 /* PayeeStore.swift */; };
-		B100000000000000000029 /* ScheduleStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000029 /* ScheduleStore.swift */; };
-		B100000000000000000027 /* MoneyProImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000027 /* MoneyProImport.swift */; };
 		B100000000000000000022 /* AccountDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000022 /* AccountDetailView.swift */; };
 		B100000000000000000023 /* ReconciliationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000023 /* ReconciliationSheet.swift */; };
 		B100000000000000000024 /* CategoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000024 /* CategoriesView.swift */; };
 		B100000000000000000025 /* TransactionEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000025 /* TransactionEntryView.swift */; };
 		B100000000000000000026 /* NumberPadField.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000026 /* NumberPadField.swift */; };
-		B100000000000000000034 /* CategoryGlyphPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000034 /* CategoryGlyphPicker.swift */; };
-		B100000000000000000033 /* MonthCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000033 /* MonthCalendar.swift */; };
-		B100000000000000000032 /* SymbolPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000032 /* SymbolPicker.swift */; };
+		B100000000000000000027 /* MoneyProImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000027 /* MoneyProImport.swift */; };
+		B100000000000000000028 /* PayeeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000028 /* PayeeStore.swift */; };
+		B100000000000000000029 /* ScheduleStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000029 /* ScheduleStore.swift */; };
 		B100000000000000000030 /* SchedulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000030 /* SchedulesView.swift */; };
 		B100000000000000000031 /* PayeesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000031 /* PayeesView.swift */; };
+		B100000000000000000032 /* SymbolPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000032 /* SymbolPicker.swift */; };
+		B100000000000000000033 /* MonthCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000033 /* MonthCalendar.swift */; };
+		B100000000000000000034 /* CategoryGlyphPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000034 /* CategoryGlyphPicker.swift */; };
+		B100000000000000000035 /* BackupStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000035 /* BackupStore.swift */; };
+		B100000000000000000036 /* Omoikane.icon in Resources */ = {isa = PBXBuildFile; fileRef = F100000000000000000036 /* Omoikane.icon */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -65,23 +65,23 @@
 		F100000000000000000011 /* Money.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Money.swift; path = Omoikane.swiftpm/Models/Money.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000012 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppState.swift; path = Omoikane.swiftpm/State/AppState.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000013 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = Omoikane/Assets.xcassets; sourceTree = SOURCE_ROOT; };
-		F100000000000000000036 /* Omoikane.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = Omoikane.icon; path = Omoikane/Omoikane.icon; sourceTree = SOURCE_ROOT; };
 		F100000000000000000020 /* CurrencyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CurrencyStore.swift; path = Omoikane.swiftpm/Database/CurrencyStore.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000021 /* StatementStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = StatementStore.swift; path = Omoikane.swiftpm/Database/StatementStore.swift; sourceTree = SOURCE_ROOT; };
-		F100000000000000000035 /* BackupStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BackupStore.swift; path = Omoikane.swiftpm/State/BackupStore.swift; sourceTree = SOURCE_ROOT; };
-		F100000000000000000028 /* PayeeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PayeeStore.swift; path = Omoikane.swiftpm/Database/PayeeStore.swift; sourceTree = SOURCE_ROOT; };
-		F100000000000000000029 /* ScheduleStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ScheduleStore.swift; path = Omoikane.swiftpm/Database/ScheduleStore.swift; sourceTree = SOURCE_ROOT; };
-		F100000000000000000027 /* MoneyProImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MoneyProImport.swift; path = Omoikane.swiftpm/Database/MoneyProImport.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000022 /* AccountDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AccountDetailView.swift; path = Omoikane.swiftpm/Views/AccountDetailView.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000023 /* ReconciliationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ReconciliationSheet.swift; path = Omoikane.swiftpm/Views/ReconciliationSheet.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000024 /* CategoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CategoriesView.swift; path = Omoikane.swiftpm/Views/CategoriesView.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000025 /* TransactionEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TransactionEntryView.swift; path = Omoikane.swiftpm/Views/TransactionEntryView.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000026 /* NumberPadField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = NumberPadField.swift; path = Omoikane.swiftpm/Views/NumberPadField.swift; sourceTree = SOURCE_ROOT; };
-		F100000000000000000034 /* CategoryGlyphPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CategoryGlyphPicker.swift; path = Omoikane.swiftpm/Views/CategoryGlyphPicker.swift; sourceTree = SOURCE_ROOT; };
-		F100000000000000000033 /* MonthCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MonthCalendar.swift; path = Omoikane.swiftpm/Views/MonthCalendar.swift; sourceTree = SOURCE_ROOT; };
-		F100000000000000000032 /* SymbolPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SymbolPicker.swift; path = Omoikane.swiftpm/Views/SymbolPicker.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000027 /* MoneyProImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MoneyProImport.swift; path = Omoikane.swiftpm/Database/MoneyProImport.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000028 /* PayeeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PayeeStore.swift; path = Omoikane.swiftpm/Database/PayeeStore.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000029 /* ScheduleStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ScheduleStore.swift; path = Omoikane.swiftpm/Database/ScheduleStore.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000030 /* SchedulesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SchedulesView.swift; path = Omoikane.swiftpm/Views/SchedulesView.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000031 /* PayeesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PayeesView.swift; path = Omoikane.swiftpm/Views/PayeesView.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000032 /* SymbolPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SymbolPicker.swift; path = Omoikane.swiftpm/Views/SymbolPicker.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000033 /* MonthCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MonthCalendar.swift; path = Omoikane.swiftpm/Views/MonthCalendar.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000034 /* CategoryGlyphPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CategoryGlyphPicker.swift; path = Omoikane.swiftpm/Views/CategoryGlyphPicker.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000035 /* BackupStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BackupStore.swift; path = Omoikane.swiftpm/State/BackupStore.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000036 /* Omoikane.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = Omoikane.icon; path = Omoikane/Omoikane.icon; sourceTree = SOURCE_ROOT; };
 		F1000000000000000000FF /* Omoikane.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Omoikane.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -446,11 +446,12 @@
 				DEVELOPMENT_ASSET_PATHS = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -475,11 +476,12 @@
 				DEVELOPMENT_ASSET_PATHS = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

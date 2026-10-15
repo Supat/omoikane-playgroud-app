@@ -246,23 +246,29 @@ struct DashboardView: View {
     private var budgetSection: some View {
         if !budgets.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Budgets (\(app.homeCurrency))").font(.headline)
+                Text("Budgets and income targets (\(app.homeCurrency))").font(.headline)
                 ForEach(budgets) { row in
                     let limit = row.category.budgetMinor ?? 0
+                    let isIncome = row.category.kind == .income
+                    // Expense: past the budget is bad (red). Income: reaching the target is good (green).
                     let over = row.spentHome > limit
+                    let tone: Color = isIncome ? (row.spentHome >= limit ? .green : .accentColor) : (over ? .red : .accentColor)
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text(row.category.name)
+                            Label(row.category.name, systemImage: isIncome ? "arrow.down.circle" : "arrow.up.circle")
+                                .labelStyle(.titleAndIcon)
                             Spacer()
                             Text("\(Formatters.money(row.spentHome, currency: app.homeCurrency)) / \(Formatters.money(limit, currency: app.homeCurrency))")
                                 .moneyStyle()
                                 .font(.subheadline)
-                                .foregroundStyle(over ? .red : .secondary)
+                                .foregroundStyle(!isIncome && over ? .red : .secondary)
                         }
                         ProgressView(value: Double(min(row.spentHome, limit)), total: Double(max(limit, 1)))
-                            .tint(over ? .red : .accentColor)
-                            .accessibilityLabel("\(row.category.name) budget")
-                            .accessibilityValue(over ? "Over budget" : "\(Int(Double(row.spentHome) / Double(max(limit, 1)) * 100)) percent")
+                            .tint(tone)
+                            .accessibilityLabel(isIncome ? "\(row.category.name) income target" : "\(row.category.name) budget")
+                            .accessibilityValue(isIncome
+                                ? (row.spentHome >= limit ? "Target reached" : "\(Int(Double(row.spentHome) / Double(max(limit, 1)) * 100)) percent of target")
+                                : (over ? "Over budget" : "\(Int(Double(row.spentHome) / Double(max(limit, 1)) * 100)) percent"))
                     }
                 }
             }
@@ -534,13 +540,16 @@ struct DashboardView: View {
             if let day = selectedDay, Date.from(dayKey: day).yearMonthKey != ymKey { selectedDay = nil }
             loadDayRows()
             let cats = try app.categories.list()
+            let incomeByCategory = try app.summaries.byCategory(fromYM: ymKey, toYM: ymKey, kind: .income)
             budgets = cats.filter { $0.budgetMinor != nil }.map { c in
                 let ids = Set([c.id] + cats.filter { $0.parentId == c.id }.map(\.id))
-                let spent = byCategory
+                let source = c.kind == .income ? incomeByCategory : byCategory
+                let spent = source
                     .filter { ids.contains($0.keyId) }
                     .reduce(Int64(0)) { $0 + (app.convertedToHome($1.totalMinor, from: $1.currency) ?? 0) }
                 return BudgetRow(category: c, spentHome: spent)
             }
+            .sorted { ($0.category.kind == .expense ? 0 : 1, $0.category.name) < ($1.category.kind == .expense ? 0 : 1, $1.category.name) }
         } catch {
             print("Dashboard reload error: \(error)")
         }

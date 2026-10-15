@@ -112,9 +112,9 @@ struct ReportsView: View {
                     }
                 }
 
-                section("Budgets (\(app.homeCurrency), \(monthsBack) month\(monthsBack == 1 ? "" : "s"))") {
+                section("Budgets and income targets (\(app.homeCurrency), \(monthsBack) month\(monthsBack == 1 ? "" : "s"))") {
                     if budgetRows.isEmpty {
-                        Text("No budgets set. Give an expense category a monthly budget in the Categories tab.")
+                        Text("No budgets set. Give a category a monthly budget or income target in Settings › Categories and Budget.")
                             .foregroundStyle(.secondary)
                             .font(.subheadline)
                     } else {
@@ -122,40 +122,63 @@ struct ReportsView: View {
                         // budgeted is shown but not counted twice in the total.
                         let budgetedIds = Set(budgetRows.map { $0.category.id })
                         let counted = budgetRows.filter { r in r.category.parentId.map { !budgetedIds.contains($0) } ?? true }
-                        let totalBudget = counted.reduce(Int64(0)) { $0 + $1.budgetMinor }
-                        let totalSpent = counted.reduce(Int64(0)) { $0 + $1.spentMinor }
+                        let expenseRows = counted.filter { $0.category.kind == .expense }
+                        let incomeRows = counted.filter { $0.category.kind == .income }
+                        let totalBudget = expenseRows.reduce(Int64(0)) { $0 + $1.budgetMinor }
+                        let totalSpent = expenseRows.reduce(Int64(0)) { $0 + $1.spentMinor }
+                        let totalTarget = incomeRows.reduce(Int64(0)) { $0 + $1.budgetMinor }
+                        let totalIncome = incomeRows.reduce(Int64(0)) { $0 + $1.spentMinor }
                         ForEach(budgetRows) { row in
+                            let isIncome = row.category.kind == .income
                             let over = row.spentMinor > row.budgetMinor
+                            let reached = row.spentMinor >= row.budgetMinor
+                            let bad = !isIncome && over
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack {
-                                    Text(row.category.name)
+                                    Label(row.category.name, systemImage: isIncome ? "arrow.down.circle" : "arrow.up.circle")
                                     Spacer()
-                                    Text(over
-                                         ? "over by \(Formatters.money(row.spentMinor - row.budgetMinor, currency: app.homeCurrency))"
-                                         : "\(Formatters.money(row.budgetMinor - row.spentMinor, currency: app.homeCurrency)) left")
+                                    Text(isIncome
+                                         ? (reached ? "target reached, \(Formatters.money(row.spentMinor - row.budgetMinor, currency: app.homeCurrency)) above"
+                                                    : "\(Formatters.money(row.budgetMinor - row.spentMinor, currency: app.homeCurrency)) short")
+                                         : (over ? "over by \(Formatters.money(row.spentMinor - row.budgetMinor, currency: app.homeCurrency))"
+                                                 : "\(Formatters.money(row.budgetMinor - row.spentMinor, currency: app.homeCurrency)) left"))
                                         .moneyStyle()
                                         .font(.caption)
-                                        .foregroundStyle(over ? .red : .secondary)
+                                        .foregroundStyle(bad ? .red : (isIncome && reached ? .green : .secondary))
                                     Text("\(Formatters.money(row.spentMinor, currency: app.homeCurrency)) / \(Formatters.money(row.budgetMinor, currency: app.homeCurrency))")
                                         .moneyStyle()
                                         .font(.subheadline)
-                                        .foregroundStyle(over ? .red : .primary)
+                                        .foregroundStyle(bad ? .red : .primary)
                                 }
                                 ProgressView(value: Double(min(row.spentMinor, row.budgetMinor)), total: Double(max(row.budgetMinor, 1)))
-                                    .tint(over ? .red : .accentColor)
-                                    .accessibilityLabel("\(row.category.name) budget")
-                                    .accessibilityValue(over ? "Over budget" : "\(Int(Double(row.spentMinor) / Double(max(row.budgetMinor, 1)) * 100)) percent used")
+                                    .tint(bad ? .red : (isIncome && reached ? .green : .accentColor))
+                                    .accessibilityLabel(isIncome ? "\(row.category.name) income target" : "\(row.category.name) budget")
+                                    .accessibilityValue(isIncome
+                                        ? (reached ? "Target reached" : "\(Int(Double(row.spentMinor) / Double(max(row.budgetMinor, 1)) * 100)) percent of target")
+                                        : (over ? "Over budget" : "\(Int(Double(row.spentMinor) / Double(max(row.budgetMinor, 1)) * 100)) percent used"))
                             }
                             .padding(.vertical, 4)
                         }
                         Divider()
-                        HStack {
-                            Text("All budgets").font(.subheadline.weight(.medium))
-                            Spacer()
-                            Text("\(Formatters.money(totalSpent, currency: app.homeCurrency)) / \(Formatters.money(totalBudget, currency: app.homeCurrency))")
-                                .moneyStyle()
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(totalSpent > totalBudget ? .red : .primary)
+                        if totalBudget > 0 {
+                            HStack {
+                                Text("All budgets").font(.subheadline.weight(.medium))
+                                Spacer()
+                                Text("\(Formatters.money(totalSpent, currency: app.homeCurrency)) / \(Formatters.money(totalBudget, currency: app.homeCurrency))")
+                                    .moneyStyle()
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(totalSpent > totalBudget ? .red : .primary)
+                            }
+                        }
+                        if totalTarget > 0 {
+                            HStack {
+                                Text("All income targets").font(.subheadline.weight(.medium))
+                                Spacer()
+                                Text("\(Formatters.money(totalIncome, currency: app.homeCurrency)) / \(Formatters.money(totalTarget, currency: app.homeCurrency))")
+                                    .moneyStyle()
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(totalIncome >= totalTarget ? .green : .primary)
+                            }
                         }
                     }
                 }
@@ -395,10 +418,11 @@ struct ReportsView: View {
                 return (c.id, parent.map { "\($0) › \(c.name)" } ?? c.name)
             })
             let spentRows = try app.summaries.byCategory(fromYM: win.start, toYM: win.end, kind: .expense)
+            let earnedRows = try app.summaries.byCategory(fromYM: win.start, toYM: win.end, kind: .income)
             budgetRows = cats.compactMap { c -> BudgetRow? in
                 guard let monthly = c.budgetMinor else { return nil }
                 let ids = Set([c.id] + cats.filter { $0.parentId == c.id }.map(\.id))
-                let spent = spentRows
+                let spent = (c.kind == .income ? earnedRows : spentRows)
                     .filter { ids.contains($0.keyId) }
                     .reduce(Int64(0)) { $0 + (app.convertedToHome($1.totalMinor, from: $1.currency) ?? 0) }
                 return BudgetRow(category: c, budgetMinor: monthly * Int64(monthsBack), spentMinor: spent)

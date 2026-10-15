@@ -66,6 +66,31 @@ struct CategoriesView: View {
         }
     }
 
+    /// Income targets, same parent-covers-child rule as budgets.
+    private var expectedIncomeMinor: Int64 {
+        categories.filter { $0.kind == .income }.reduce(Int64(0)) { sum, c in
+            guard let b = c.budgetMinor else { return sum }
+            if let p = c.parentId, categories.first(where: { $0.id == p })?.budgetMinor != nil { return sum }
+            return sum + b
+        }
+    }
+
+    /// Income targets compared with the spending limit (or, without one,
+    /// the allocated budgets). nil when there is nothing to compare against.
+    private var incomeVersusOutgo: (text: String, short: Bool)? {
+        let limit = app.monthlySpendingLimitMinor ?? 0
+        let reference = limit > 0 ? limit : allocatedBudgetMinor
+        guard reference > 0 else { return nil }
+        let against = limit > 0 ? "limit" : "budgets"
+        let expected = expectedIncomeMinor
+        if expected >= reference {
+            let left = Formatters.money(expected - reference, currency: app.homeCurrency)
+            return ("\(left) expected to remain after the \(against).", false)
+        }
+        let gap = Formatters.money(reference - expected, currency: app.homeCurrency)
+        return ("Income targets fall \(gap) short of the \(against).", true)
+    }
+
     /// Overall monthly limit against what the category budgets add up to.
     @ViewBuilder
     private var limitSection: some View {
@@ -104,6 +129,17 @@ struct CategoriesView: View {
             } else if allocated > 0 {
                 LabeledContent("Budgeted") {
                     Formatters.moneyText(allocated, currency: app.homeCurrency)
+                }
+            }
+            if expectedIncomeMinor > 0 {
+                LabeledContent("Income targets") {
+                    Formatters.moneyText(expectedIncomeMinor, currency: app.homeCurrency)
+                }
+                if let line = incomeVersusOutgo {
+                    Text(line.text)
+                        .moneyStyle()
+                        .font(.caption)
+                        .foregroundStyle(line.short ? .orange : .secondary)
                 }
             }
         } header: {
@@ -413,11 +449,9 @@ struct CategoryEditor: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityHint("Choose a symbol")
-                if kind == .expense {
-                    LabeledContent("Monthly budget (\(app.homeCurrency))") {
-                        NumberPadField(text: $budgetText, placeholder: "None", alignment: .right)
-                            .frame(maxWidth: 160)
-                    }
+                LabeledContent(kind == .expense ? "Monthly budget (\(app.homeCurrency))" : "Monthly income target (\(app.homeCurrency))") {
+                    NumberPadField(text: $budgetText, placeholder: "None", alignment: .right)
+                        .frame(maxWidth: 160)
                 }
 
                 VStack(alignment: .leading, spacing: 0) {
@@ -522,7 +556,7 @@ struct CategoryEditor: View {
     }
 
     private func save() {
-        let budget = kind == .expense ? Money.parseMinor(budgetText, currency: app.homeCurrency) : nil
+        let budget = Money.parseMinor(budgetText, currency: app.homeCurrency)
         do {
             if var copy = existing {
                 copy.name = name

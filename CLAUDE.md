@@ -105,7 +105,8 @@ conditions*. Three reasons we went with raw `import SQLite3`:
   `transactions.payee_id`; `transactions.loan_role` (`lend` / `borrow` /
   `repay`, outstanding per payee is a query in `TransactionStore`);
   `categories.budget_minor` (monthly, home currency, parent covers
-  children); `accounts.credit_limit_minor`; `schedules` (recurring
+  children; for income categories it is a monthly income target, shown
+  green when reached rather than red when exceeded); `accounts.credit_limit_minor`; `schedules` (recurring
   templates, `next_due` is a day key, `ScheduleStore.postDue` inserts real
   rows and advances it; runs at launch and on scene activation).
 - V7: `transactions.is_essential` — user-set flag for unavoidable spending.
