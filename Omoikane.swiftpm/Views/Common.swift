@@ -364,3 +364,40 @@ struct LimitBar: View {
         }
     }
 }
+
+extension View {
+    /// Invisible, hit-testable button carrying a keyboard shortcut. Mounted
+    /// in `.background` so it registers in the responder chain without
+    /// taking layout. (`.allowsHitTesting(false)` would unregister it.)
+    func hiddenShortcut(_ key: KeyEquivalent, modifiers: EventModifiers = .command,
+                        role: ButtonRole? = nil, action: @escaping () -> Void) -> some View {
+        background(
+            Button(role: role, action: action) { EmptyView() }
+                .keyboardShortcut(key, modifiers: modifiers)
+                .frame(width: 1, height: 1)
+                .opacity(0)
+                .accessibilityHidden(true)
+        )
+    }
+
+    /// Keyboard conventions for a `List(selection:)`: Return acts on the
+    /// selected row, Escape clears the selection, ⌘⌫ deletes the row.
+    func keyboardListNavigation<ID: Hashable>(selection: Binding<ID?>,
+                                              onReturn: @escaping (ID) -> Void,
+                                              onDelete: ((ID) -> Void)? = nil) -> some View {
+        self
+            .onKeyPress(.return) {
+                guard let id = selection.wrappedValue else { return .ignored }
+                onReturn(id)
+                return .handled
+            }
+            .onKeyPress(.escape) {
+                guard selection.wrappedValue != nil else { return .ignored }
+                selection.wrappedValue = nil
+                return .handled
+            }
+            .hiddenShortcut(.delete, role: .destructive) {
+                if let id = selection.wrappedValue { onDelete?(id) }
+            }
+    }
+}

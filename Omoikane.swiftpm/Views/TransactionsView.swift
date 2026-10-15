@@ -323,8 +323,10 @@ struct AccountTransactionsView: View {
         }
         .listStyle(.insetGrouped)
         .focused($listFocused)
-        .background(searchShortcut)
-        .background(deleteShortcut)
+        // ⌘F focuses search (`.searchable` has no built-in shortcut on iPad);
+        // ⌘⌫ deletes the keyboard-selected row, same as the full swipe.
+        .hiddenShortcut("f") { listFocused = false; searchFocused = true }
+        .hiddenShortcut(.delete, role: .destructive) { if let id = selectedId { try? app.deleteTransaction(id: id) } }
         .overlay {
             if rows.isEmpty {
                 EmptyStateView(
@@ -438,39 +440,7 @@ struct AccountTransactionsView: View {
         }
     }
 
-    /// Hidden ⌘⌫ binding: delete the keyboard-selected row, same as the
-    /// full swipe. Mounted the same way as `searchShortcut`.
-    private var deleteShortcut: some View {
-        Button(role: .destructive) {
-            if let id = selectedId { try? app.deleteTransaction(id: id) }
-        } label: {
-            EmptyView()
-        }
-        .keyboardShortcut(.delete, modifiers: .command)
-        .frame(width: 1, height: 1)
-        .opacity(0)
-        .accessibilityHidden(true)
-    }
 
-    /// Hidden ⌘F binding. Lives in `.background(...)` so it's mounted but
-    /// occupies no layout space. SwiftUI's `.searchable` does not surface
-    /// a built-in keyboard shortcut on iPad, so we add one explicitly.
-    private var searchShortcut: some View {
-        // Real, hit-testable Button — `.allowsHitTesting(false)` removes the
-        // view from the responder chain, which is exactly where SwiftUI
-        // registers `.keyboardShortcut`, so it must NOT be applied here.
-        // Opacity 0 keeps it invisible; 1×1 keeps it out of the way.
-        Button {
-            listFocused = false
-            searchFocused = true
-        } label: {
-            EmptyView()
-        }
-        .keyboardShortcut("f", modifiers: .command)
-        .frame(width: 1, height: 1)
-        .opacity(0)
-        .accessibilityHidden(true)
-    }
 
     @ViewBuilder
     private func rowView(_ tx: Transaction) -> some View {

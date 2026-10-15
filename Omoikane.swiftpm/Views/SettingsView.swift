@@ -307,11 +307,9 @@ struct BackupsView: View {
         }
         .focused($listFocused)
         .navigationTitle("Backups")
-        .background(deleteShortcut)
-        .onKeyPress(.return) {
-            if let id = selectedId, let f = files.first(where: { $0.url == id }) { restoring = f; return .handled }
-            return .ignored
-        }
+        .keyboardListNavigation(selection: $selectedId,
+                                onReturn: { id in restoring = files.first { $0.url == id } },
+                                onDelete: { id in if let f = files.first(where: { $0.url == id }) { remove(f) } })
         .confirmationDialog("Restore this backup?", isPresented: Binding(get: { restoring != nil }, set: { if !$0 { restoring = nil } }),
                             titleVisibility: .visible, presenting: restoring) { f in
             Button("Replace current data", role: .destructive) {
@@ -329,13 +327,6 @@ struct BackupsView: View {
         .onAppear { listFocused = true; files = BackupStore.list(for: app.db) }
     }
 
-    private var deleteShortcut: some View {
-        Button(role: .destructive) {
-            if let id = selectedId, let f = files.first(where: { $0.url == id }) { remove(f) }
-        } label: { EmptyView() }
-        .keyboardShortcut(.delete, modifiers: .command)
-        .frame(width: 1, height: 1).opacity(0).accessibilityHidden(true)
-    }
 
     private func remove(_ f: BackupStore.BackupFile) {
         do { try BackupStore.delete(f); files = BackupStore.list(for: app.db) }

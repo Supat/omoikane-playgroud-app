@@ -48,18 +48,9 @@ struct PayeesView: View {
                     .accessibilityLabel("New payee")
             }
         }
-        .background(deleteShortcut)
-        .onKeyPress(.return) {
-            if let id = selectedId, let p = payees.first(where: { $0.id == id }) {
-                editing = p
-                return .handled
-            }
-            return .ignored
-        }
-        .onKeyPress(.escape) {
-            if selectedId != nil { selectedId = nil; return .handled }
-            return .ignored
-        }
+        .keyboardListNavigation(selection: $selectedId,
+                                onReturn: { id in editing = payees.first { $0.id == id } },
+                                onDelete: { id in if let p = payees.first(where: { $0.id == id }) { remove(p) } })
         .sheet(item: $editing) { p in PayeeEditor(payee: p) }
         .sheet(isPresented: $adding) { PayeeEditor(payee: nil) }
         .alert("Action failed", isPresented: Binding(get: { actionError != nil }, set: { if !$0 { actionError = nil } }),
@@ -69,15 +60,6 @@ struct PayeesView: View {
         .task(id: app.dataVersion) { payees = (try? app.payees.list(includeArchived: true)) ?? [] }
     }
 
-    private var deleteShortcut: some View {
-        Button(role: .destructive) {
-            if let id = selectedId, let p = payees.first(where: { $0.id == id }) { remove(p) }
-        } label: { EmptyView() }
-        .keyboardShortcut(.delete, modifiers: .command)
-        .frame(width: 1, height: 1)
-        .opacity(0)
-        .accessibilityHidden(true)
-    }
 
     /// Hard delete when unreferenced, archive otherwise.
     private func remove(_ p: Payee) {

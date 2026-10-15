@@ -42,33 +42,15 @@ struct SchedulesView: View {
                     .accessibilityLabel("New schedule")
             }
         }
-        .background(deleteShortcut)
-        .onKeyPress(.return) {
-            if let id = selectedId, let sc = schedules.first(where: { $0.id == id }) {
-                editing = sc
-                return .handled
-            }
-            return .ignored
-        }
-        .onKeyPress(.escape) {
-            if selectedId != nil { selectedId = nil; return .handled }
-            return .ignored
-        }
+        .keyboardListNavigation(selection: $selectedId,
+                                onReturn: { id in editing = schedules.first { $0.id == id } },
+                                onDelete: { id in try? app.deleteSchedule(id: id) })
         .sheet(item: $editing) { sc in ScheduleEditor(schedule: sc) }
         .sheet(isPresented: $adding) { ScheduleEditor(schedule: nil) }
         .task(id: app.dataVersion) { reload() }
         .onAppear { listFocused = true }
     }
 
-    private var deleteShortcut: some View {
-        Button(role: .destructive) {
-            if let id = selectedId { try? app.deleteSchedule(id: id) }
-        } label: { EmptyView() }
-        .keyboardShortcut(.delete, modifiers: .command)
-        .frame(width: 1, height: 1)
-        .opacity(0)
-        .accessibilityHidden(true)
-    }
 
     private func row(_ sc: Schedule) -> some View {
         let acct = accounts[sc.accountId]

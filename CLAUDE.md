@@ -173,7 +173,12 @@ on the screen), Space ticks the selected row in reconciliation mode,
 ⌘⇧A archive, ⌘U unarchive, ⌘⌫ delete, ⌘⇧B adjust balance, ⌘0 back to the
 current month when Reports is pinned. Every swipe action has one of these
 twins, either on the keyboard-selected row or in the entity's detail
-surface (account detail screen, category editor sheet). The delete path
+surface (account detail screen, category editor sheet). Lists use
+`.keyboardListNavigation(selection:onReturn:onDelete:)`; any other hidden
+key binding uses `.hiddenShortcut(_:modifiers:role:action:)` (Common.swift).
+Budget figures come from `BudgetMath` / `BudgetLine` and are drawn by
+`BudgetRowView` and `LimitBar`; the signed-balance rule is
+`Transaction.effect(on:)` in Swift and `BalanceSQL` in queries. The delete path
 always goes through the shared `*ManagementAlerts` modifier so the
 reference-count gate runs no matter where the delete started.
 
