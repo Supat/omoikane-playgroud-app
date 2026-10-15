@@ -55,24 +55,17 @@ struct CategoriesView: View {
         .modifier(CategoryManagementAlerts(deletePrompt: $deletePrompt, actionError: $actionError))
     }
 
-    /// Sum of monthly budgets that actually count: a parent's budget covers
-    /// its children, so a child's own budget is only added when the parent
-    /// has none.
+    /// Sum of monthly budgets that count: one figure per parent, the larger
+    /// of its own budget and its sub-categories' total.
     private var allocatedBudgetMinor: Int64 {
-        categories.filter { $0.kind == .expense }.reduce(Int64(0)) { sum, c in
-            guard let b = c.budgetMinor else { return sum }
-            if let p = c.parentId, categories.first(where: { $0.id == p })?.budgetMinor != nil { return sum }
-            return sum + b
-        }
+        categories.filter { $0.kind == .expense && $0.parentId == nil }
+            .reduce(Int64(0)) { $0 + ($1.effectiveBudgetMinor(in: categories) ?? 0) }
     }
 
     /// Income targets, same parent-covers-child rule as budgets.
     private var expectedIncomeMinor: Int64 {
-        categories.filter { $0.kind == .income }.reduce(Int64(0)) { sum, c in
-            guard let b = c.budgetMinor else { return sum }
-            if let p = c.parentId, categories.first(where: { $0.id == p })?.budgetMinor != nil { return sum }
-            return sum + b
-        }
+        categories.filter { $0.kind == .income && $0.parentId == nil }
+            .reduce(Int64(0)) { $0 + ($1.effectiveBudgetMinor(in: categories) ?? 0) }
     }
 
     /// One segment per parent expense category: its own budget, or, when it
@@ -83,9 +76,7 @@ struct CategoriesView: View {
         return categories
             .filter { $0.kind == .expense && $0.parentId == nil }
             .compactMap { parent in
-                let amount = parent.budgetMinor
-                    ?? categories.filter { $0.parentId == parent.id }.reduce(Int64(0)) { $0 + ($1.budgetMinor ?? 0) }
-                guard amount > 0 else { return nil }
+                guard let amount = parent.effectiveBudgetMinor(in: categories) else { return nil }
                 return StackedShareBar.Slice(name: parent.name, amount: amount, color: parent.displayColor(in: all))
             }
             .sorted { $0.amount > $1.amount }

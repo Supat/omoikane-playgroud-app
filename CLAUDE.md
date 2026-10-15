@@ -104,8 +104,9 @@ conditions*. Three reasons we went with raw `import SQLite3`:
 - V6 (the rest of Money Pro's model, minimal): `payees` +
   `transactions.payee_id`; `transactions.loan_role` (`lend` / `borrow` /
   `repay`, outstanding per payee is a query in `TransactionStore`);
-  `categories.budget_minor` (monthly, home currency, parent covers
-  children; for income categories it is a monthly income target, shown
+  `categories.budget_minor` (monthly, home currency; a parent counts
+  `max(own, Σ sub-category budgets)` via `effectiveBudgetMinor(in:)`, so
+  setting an umbrella figure never shrinks the total; for income categories it is a monthly income target, shown
   green when reached rather than red when exceeded); `categories.color`
   is a "#RRGGBB" set on parent categories only, inherited by children
   (`LedgerCategory.displayColor(in:)`), used for row glyphs, glyph tiles,

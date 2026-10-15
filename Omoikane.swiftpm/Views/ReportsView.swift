@@ -420,7 +420,7 @@ struct ReportsView: View {
             let spentRows = try app.summaries.byCategory(fromYM: win.start, toYM: win.end, kind: .expense)
             let earnedRows = try app.summaries.byCategory(fromYM: win.start, toYM: win.end, kind: .income)
             budgetRows = cats.compactMap { c -> BudgetRow? in
-                guard let monthly = c.budgetMinor else { return nil }
+                guard let monthly = c.effectiveBudgetMinor(in: cats) else { return nil }
                 let ids = Set([c.id] + cats.filter { $0.parentId == c.id }.map(\.id))
                 let spent = (c.kind == .income ? earnedRows : spentRows)
                     .filter { ids.contains($0.keyId) }

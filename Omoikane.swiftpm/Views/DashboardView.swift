@@ -35,6 +35,7 @@ struct DashboardView: View {
 
     struct BudgetRow: Identifiable {
         var category: LedgerCategory
+        var budgetMinor: Int64
         var spentHome: Int64
         var id: Int64 { category.id }
     }
@@ -157,7 +158,7 @@ struct DashboardView: View {
         let cats = (try? app.categories.list()) ?? []
         let expenses = all.filter { $0.kind == .expense && $0.occurredOn.dayKey <= day }
         dayBudgets = cats.compactMap { c -> DayBudgetRow? in
-            guard let budget = c.budgetMinor else { return nil }
+            guard let budget = c.effectiveBudgetMinor(in: cats) else { return nil }
             let ids = Set([c.id] + cats.filter { $0.parentId == c.id }.map(\.id))
             let mine = expenses.filter { ids.contains($0.categoryId) }
             let today = mine.filter { $0.occurredOn.dayKey == day }
@@ -265,7 +266,7 @@ struct DashboardView: View {
         let budgetedIds = Set(expenseRows.map { $0.category.id })
         return expenseRows
             .filter { r in r.category.parentId.map { !budgetedIds.contains($0) } ?? true }
-            .reduce(Int64(0)) { $0 + ($1.category.budgetMinor ?? 0) }
+            .reduce(Int64(0)) { $0 + $1.budgetMinor }
     }
 
     /// Monthly budgets from Categories, spent this month in the home
@@ -286,7 +287,7 @@ struct DashboardView: View {
                     Divider()
                 }
                 ForEach(budgets) { row in
-                    let limit = row.category.budgetMinor ?? 0
+                    let limit = row.budgetMinor
                     let isIncome = row.category.kind == .income
                     // Expense: past the budget is bad (red). Income: reaching the target is good (green).
                     let over = row.spentHome > limit
@@ -581,13 +582,14 @@ struct DashboardView: View {
             loadDayRows()
             let cats = try app.categories.list()
             let incomeByCategory = try app.summaries.byCategory(fromYM: ymKey, toYM: ymKey, kind: .income)
-            budgets = cats.filter { $0.budgetMinor != nil }.map { c in
+            budgets = cats.compactMap { c -> BudgetRow? in
+                guard let budget = c.effectiveBudgetMinor(in: cats) else { return nil }
                 let ids = Set([c.id] + cats.filter { $0.parentId == c.id }.map(\.id))
                 let source = c.kind == .income ? incomeByCategory : byCategory
                 let spent = source
                     .filter { ids.contains($0.keyId) }
                     .reduce(Int64(0)) { $0 + (app.convertedToHome($1.totalMinor, from: $1.currency) ?? 0) }
-                return BudgetRow(category: c, spentHome: spent)
+                return BudgetRow(category: c, budgetMinor: budget, spentHome: spent)
             }
             .sorted { ($0.category.kind == .expense ? 0 : 1, $0.category.name) < ($1.category.kind == .expense ? 0 : 1, $1.category.name) }
         } catch {

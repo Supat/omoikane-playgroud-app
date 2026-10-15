@@ -64,6 +64,19 @@ struct LedgerCategory: Identifiable, Hashable {
     var budgetMinor: Int64? = nil
 }
 
+extension LedgerCategory {
+    /// The budget a category counts for. A parent counts the larger of its
+    /// own budget and its live sub-categories' total, so an umbrella figure
+    /// never undercuts the lines beneath it; a sub-category counts its own.
+    /// nil when there is nothing to count.
+    func effectiveBudgetMinor(in all: [LedgerCategory]) -> Int64? {
+        if parentId != nil { return budgetMinor }
+        let childSum = all.filter { $0.parentId == id && !$0.isArchived }.reduce(Int64(0)) { $0 + ($1.budgetMinor ?? 0) }
+        let eff = max(budgetMinor ?? 0, childSum)
+        return eff > 0 ? eff : nil
+    }
+}
+
 struct Account: Identifiable, Hashable {
     var id: Int64
     var name: String
