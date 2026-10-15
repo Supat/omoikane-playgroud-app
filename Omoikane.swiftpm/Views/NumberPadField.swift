@@ -26,7 +26,7 @@ fileprivate struct NumberPadKeysView: View {
     var body: some View {
         VStack(spacing: 8) {
             row([("7", .digit("7")), ("8", .digit("8")), ("9", .digit("9")), ("⌫", .backspace)])
-            row([("4", .digit("4")), ("5", .digit("5")), ("6", .digit("6")), (",", .comma)])
+            row([("4", .digit("4")), ("5", .digit("5")), ("6", .digit("6")), ("000", .digit("000"))])
             row([("1", .digit("1")), ("2", .digit("2")), ("3", .digit("3")), (".", .dot)])
             HStack(spacing: 8) {
                 key("0", action: .digit("0"))
@@ -141,8 +141,33 @@ final class NumberPadInputView: UIInputView {
 struct NumberPadField: UIViewRepresentable {
     @Binding var text: String
     var placeholder: String = ""
-    var font: UIFont = .preferredFont(forTextStyle: .body)
+    /// Amounts are always monospaced; this is the body-sized default.
+    var font: UIFont = NumberPadField.monospaced(.body)
     var alignment: NSTextAlignment = .natural
+
+    /// Monospaced system font at a text style's size, scaling with Dynamic Type.
+    static func monospaced(_ style: UIFont.TextStyle, weight: UIFont.Weight = .regular) -> UIFont {
+        let size = UIFont.preferredFont(forTextStyle: style).pointSize
+        return UIFontMetrics(forTextStyle: style).scaledFont(for: .monospacedSystemFont(ofSize: size, weight: weight))
+    }
+
+    /// Thousands separators on the integer part, fraction left as typed.
+    /// "1234567.5" → "1,234,567.5". Keeps a trailing "." while the user
+    /// is still typing the fraction.
+    static func grouped(_ raw: String) -> String {
+        let cleaned = raw.replacingOccurrences(of: ",", with: "")
+        guard !cleaned.isEmpty else { return "" }
+        let parts = cleaned.split(separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
+        let intPart = String(parts[0])
+        var groupedInt = ""
+        for (i, ch) in intPart.reversed().enumerated() {
+            if i > 0, i % 3 == 0 { groupedInt.append(",") }
+            groupedInt.append(ch)
+        }
+        groupedInt = String(groupedInt.reversed())
+        if parts.count == 2 { return groupedInt + "." + parts[1] }
+        return groupedInt
+    }
     var onSubmit: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -151,8 +176,9 @@ struct NumberPadField: UIViewRepresentable {
         let tf = UITextField()
         tf.placeholder = placeholder
         tf.font = font
+        tf.adjustsFontForContentSizeCategory = true
         tf.textAlignment = alignment
-        tf.text = text
+        tf.text = Self.grouped(text)
         tf.delegate = context.coordinator
         tf.addTarget(
             context.coordinator,
@@ -182,8 +208,8 @@ struct NumberPadField: UIViewRepresentable {
         context.coordinator.parent = self
         // Only push when the binding actually diverges from the field —
         // otherwise we churn the cursor on every parent rerender.
-        if uiView.text != text {
-            uiView.text = text
+        if (uiView.text ?? "").replacingOccurrences(of: ",", with: "") != text.replacingOccurrences(of: ",", with: "") {
+            uiView.text = Self.grouped(text)
         }
         uiView.placeholder = placeholder
         uiView.font = font
@@ -196,7 +222,22 @@ struct NumberPadField: UIViewRepresentable {
         init(_ parent: NumberPadField) { self.parent = parent }
 
         @objc func editingChanged(_ tf: UITextField) {
+            regroup(tf)
             parent.text = tf.text ?? ""
+        }
+
+        /// Re-insert thousands separators after any edit, keeping the
+        /// caret the same distance from the end so mid-string edits
+        /// don't jump.
+        private func regroup(_ tf: UITextField) {
+            let current = tf.text ?? ""
+            let formatted = NumberPadField.grouped(current)
+            guard formatted != current else { return }
+            let fromEnd = tf.selectedTextRange.map { tf.offset(from: $0.end, to: tf.endOfDocument) } ?? 0
+            tf.text = formatted
+            if let pos = tf.position(from: tf.endOfDocument, offset: -min(fromEnd, formatted.count)) {
+                tf.selectedTextRange = tf.textRange(from: pos, to: pos)
+            }
         }
 
         // Handles hardware-keyboard input (and any system paste). Filtering
@@ -234,13 +275,14 @@ struct NumberPadField: UIViewRepresentable {
                     tf.insertText(".")
                 }
             case .comma:
-                tf.insertText(",")
+                break // grouping is automatic; key no longer on the pad
             case .backspace:
                 tf.deleteBackward()
             case .done:
                 tf.resignFirstResponder()
                 parent.onSubmit?()
             }
+            regroup(tf)
             parent.text = tf.text ?? ""
         }
     }

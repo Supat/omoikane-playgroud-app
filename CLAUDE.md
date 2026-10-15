@@ -174,7 +174,9 @@ the few deliberate departures from stock controls).
 
 Amounts on screen always go through `Formatters.moneyText(_:currency:)` or
 `Text.moneyStyle()` (monospaced face + tabular digits). Don't write a bare
-`Text(Formatters.money(...))`.
+`Text(Formatters.money(...))`. Amount *input* always uses `NumberPadField`,
+which is monospaced by default and inserts thousands separators as you
+type; the bound text may contain commas, and `Money.parseMinor` strips them.
 
 ### Naming gotcha worth knowing
 

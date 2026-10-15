@@ -124,13 +124,13 @@ struct TransactionEntryView: View {
                         Spacer()
                         Text(formatMinorToText(splitTotalMinor, currency: fromCurrency))
                             .moneyStyle()
-                            .font(.system(size: 28))
+                            .font(.largeTitle)
                             .accessibilityLabel("Total of split lines")
                     } else {
                         NumberPadField(
                             text: $amountText,
                             placeholder: "0",
-                            font: .monospacedDigitSystemFont(ofSize: 28, weight: .regular),
+                            font: NumberPadField.monospaced(.largeTitle),
                             alignment: .right,
                             onSubmit: { advanceFocus(from: .amount) }
                         )
@@ -165,7 +165,7 @@ struct TransactionEntryView: View {
                             NumberPadField(
                                 text: $counterpartyAmountText,
                                 placeholder: "0",
-                                font: .monospacedDigitSystemFont(ofSize: 17, weight: .regular),
+                                font: NumberPadField.monospaced(.body),
                                 alignment: .right,
                                 onSubmit: { advanceFocus(from: .counterpartyAmount) }
                             )
@@ -218,7 +218,7 @@ struct TransactionEntryView: View {
                                 NumberPadField(
                                     text: $line.amountText,
                                     placeholder: "0",
-                                    font: .monospacedDigitSystemFont(ofSize: 17, weight: .regular),
+                                    font: NumberPadField.monospaced(.body),
                                     alignment: .right
                                 )
                                 .frame(maxWidth: 140)
