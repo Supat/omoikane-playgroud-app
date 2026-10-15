@@ -70,45 +70,7 @@ struct AccountsView: View {
         }
         .sheet(isPresented: $addingAccount) { AddAccountSheet() }
         .task(id: app.dataVersion) { reload() }
-        .alert(
-            "Delete '\(deletePrompt?.account.name ?? "")'?",
-            isPresented: Binding(
-                get: { deletePrompt != nil },
-                set: { if !$0 { deletePrompt = nil } }
-            ),
-            presenting: deletePrompt
-        ) { prompt in
-            if prompt.isBlocked {
-                // FK enforcement (transactions, statements) would refuse
-                // the delete. Offer Archive instead so the user has a
-                // useful next step without a dead-end alert.
-                Button("Archive instead") {
-                    do { try app.archiveAccount(id: prompt.account.id) }
-                    catch { actionError = "\(error)" }
-                }
-                Button("Cancel", role: .cancel) {}
-            } else {
-                Button("Delete", role: .destructive) {
-                    do { try app.deleteAccount(id: prompt.account.id) }
-                    catch { actionError = "\(error)" }
-                }
-                Button("Cancel", role: .cancel) {}
-            }
-        } message: { prompt in
-            Text(prompt.message)
-        }
-        .alert(
-            "Action failed",
-            isPresented: Binding(
-                get: { actionError != nil },
-                set: { if !$0 { actionError = nil } }
-            ),
-            presenting: actionError
-        ) { _ in
-            Button("OK", role: .cancel) {}
-        } message: { msg in
-            Text(msg)
-        }
+        .modifier(AccountManagementAlerts(deletePrompt: $deletePrompt, actionError: $actionError))
     }
 
     /// Trailing-swipe actions shared by both account groups. Delete is
@@ -196,7 +158,7 @@ struct AccountsView: View {
 /// Bundled state for the account-delete confirmation alert. Holds the
 /// account and a snapshot of how many transactions / statements still
 /// reference it so the alert text can adapt to the situation.
-private struct AccountDeletePrompt: Identifiable {
+struct AccountDeletePrompt: Identifiable {
     let account: Account
     let refs: (fromLeg: Int, toLeg: Int, statements: Int)
     var id: Int64 { account.id }
@@ -301,5 +263,64 @@ struct AddAccountSheet: View {
         if digits == 0 { return Int64(cleaned) }
         guard let d = Double(cleaned) else { return nil }
         return Int64((d * pow(10.0, Double(digits))).rounded())
+    }
+}
+
+extension AccountDeletePrompt {
+    /// Snapshot the reference count so the alert can choose between
+    /// a real delete and "archive instead".
+    static func make(for a: Account, app: AppState) throws -> AccountDeletePrompt {
+        AccountDeletePrompt(account: a, refs: try app.accounts.referenceCount(for: a.id))
+    }
+}
+
+/// Delete-confirmation and error alerts shared by AccountsView (swipe) and
+/// AccountDetailView (toolbar + keyboard) so both surfaces run the same
+/// reference-count gate. `onDone` fires after a delete or archive-instead
+/// so a detail screen can pop itself.
+struct AccountManagementAlerts: ViewModifier {
+    @Environment(AppState.self) private var app
+    @Binding var deletePrompt: AccountDeletePrompt?
+    @Binding var actionError: String?
+    var onDone: () -> Void = {}
+
+    func body(content: Content) -> some View {
+        content
+            .alert(
+                "Delete '\(deletePrompt?.account.name ?? "")'?",
+                isPresented: Binding(
+                    get: { deletePrompt != nil },
+                    set: { if !$0 { deletePrompt = nil } }
+                ),
+                presenting: deletePrompt
+            ) { prompt in
+                if prompt.isBlocked {
+                    Button("Archive instead") {
+                        do { try app.archiveAccount(id: prompt.account.id); onDone() }
+                        catch { actionError = "\(error)" }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } else {
+                    Button("Delete", role: .destructive) {
+                        do { try app.deleteAccount(id: prompt.account.id); onDone() }
+                        catch { actionError = "\(error)" }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                }
+            } message: { prompt in
+                Text(prompt.message)
+            }
+            .alert(
+                "Action failed",
+                isPresented: Binding(
+                    get: { actionError != nil },
+                    set: { if !$0 { actionError = nil } }
+                ),
+                presenting: actionError
+            ) { _ in
+                Button("OK", role: .cancel) {}
+            } message: { msg in
+                Text(msg)
+            }
     }
 }

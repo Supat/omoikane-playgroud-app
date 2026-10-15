@@ -324,6 +324,7 @@ struct AccountTransactionsView: View {
         .listStyle(.insetGrouped)
         .focused($listFocused)
         .background(searchShortcut)
+        .background(deleteShortcut)
         .overlay {
             if rows.isEmpty {
                 EmptyStateView(
@@ -366,6 +367,7 @@ struct AccountTransactionsView: View {
                     Label("Reconcile", systemImage: "checkmark.circle")
                 }
                 .toggleStyle(.button)
+                .keyboardShortcut("r", modifiers: .command)
                 .accessibilityLabel("Reconciliation mode")
             }
             ToolbarItem(placement: .topBarTrailing) {
@@ -419,6 +421,14 @@ struct AccountTransactionsView: View {
             }
             return .ignored
         }
+        .onKeyPress(.space) {
+            // Space in reconciliation mode ticks the selected row, the
+            // keyboard twin of the per-row circle button.
+            guard reconciliationMode, let id = selectedId,
+                  let tx = rows.first(where: { $0.id == id }) else { return .ignored }
+            toggleClear(tx)
+            return .handled
+        }
         .onKeyPress(.tab) {
             // iPadOS's default Tab-to-cycle-controls drifts focus into the
             // search field, which is jarring while keyboard-navigating the
@@ -426,6 +436,20 @@ struct AccountTransactionsView: View {
             // focus search deliberately with ⌘F.
             return .handled
         }
+    }
+
+    /// Hidden ⌘⌫ binding: delete the keyboard-selected row, same as the
+    /// full swipe. Mounted the same way as `searchShortcut`.
+    private var deleteShortcut: some View {
+        Button(role: .destructive) {
+            if let id = selectedId { try? app.deleteTransaction(id: id) }
+        } label: {
+            EmptyView()
+        }
+        .keyboardShortcut(.delete, modifiers: .command)
+        .frame(width: 1, height: 1)
+        .opacity(0)
+        .accessibilityHidden(true)
     }
 
     /// Hidden ⌘F binding. Lives in `.background(...)` so it's mounted but

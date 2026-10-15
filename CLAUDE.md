@@ -147,6 +147,15 @@ act, `onKeyPress(.escape)` to clear. Rows are plain views with
 `.onTapGesture`, **not** `Button` — a Button becomes a focusable child that
 swallows arrow keys before the List sees them.
 
+Shortcut vocabulary, keep it consistent: ⌘N new, ⌘F search, ⌘R reconcile
+(open the sheet, toggle reconciliation mode, or reopen a statement depending
+on the screen), Space ticks the selected row in reconciliation mode,
+⌘⇧A archive, ⌘U unarchive, ⌘⌫ delete. Every swipe action has one of these
+twins, either on the keyboard-selected row or in the entity's detail
+surface (account detail screen, category editor sheet). The delete path
+always goes through the shared `*ManagementAlerts` modifier so the
+reference-count gate runs no matter where the delete started.
+
 `NumberPadField` is a custom Numbers-style numpad for amount entry (one of
 the few deliberate departures from stock controls).
 

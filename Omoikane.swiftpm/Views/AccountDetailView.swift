@@ -5,6 +5,7 @@ import SwiftUI
 /// statements.
 struct AccountDetailView: View {
     @Environment(AppState.self) private var app
+    @Environment(\.dismiss) private var dismiss
 
     let accountId: Int64
 
@@ -14,6 +15,8 @@ struct AccountDetailView: View {
     @State private var statementsList: [LedgerStatement] = []
     @State private var startingReconciliation = false
     @State private var editingClosingDay = false
+    @State private var deletePrompt: AccountDeletePrompt? = nil
+    @State private var actionError: String? = nil
 
     var body: some View {
         Form {
@@ -31,27 +34,53 @@ struct AccountDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task(id: app.dataVersion) { reload() }
         .toolbar {
-            if account?.isArchived == true {
-                ToolbarItem(placement: .topBarTrailing) {
-                    // ⌘U — the same action as the Archived-section swipe
-                    // in AccountsView, reachable from the keyboard here.
-                    Button {
-                        try? app.unarchiveAccount(id: accountId)
-                    } label: {
-                        Label("Unarchive", systemImage: "tray.and.arrow.up")
-                    }
-                    .keyboardShortcut("u", modifiers: .command)
-                }
-            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     startingReconciliation = true
                 } label: {
                     Label("Reconcile", systemImage: "checkmark.seal")
                 }
+                .keyboardShortcut("r", modifiers: .command)
+                .disabled(account == nil)
+            }
+            // Archive / Unarchive / Delete: the same actions as the swipe
+            // gestures in AccountsView, reachable from the keyboard here.
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    if let account {
+                        if account.isArchived {
+                            Button {
+                                do { try app.unarchiveAccount(id: accountId) }
+                                catch { actionError = "\(error)" }
+                            } label: {
+                                Label("Unarchive", systemImage: "tray.and.arrow.up")
+                            }
+                            .keyboardShortcut("u", modifiers: .command)
+                        } else {
+                            Button {
+                                do { try app.archiveAccount(id: accountId) }
+                                catch { actionError = "\(error)" }
+                            } label: {
+                                Label("Archive", systemImage: "archivebox")
+                            }
+                            .keyboardShortcut("a", modifiers: [.command, .shift])
+                        }
+                        Button(role: .destructive) {
+                            do { deletePrompt = try AccountDeletePrompt.make(for: account, app: app) }
+                            catch { actionError = "Couldn't check references: \(error)" }
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                        .keyboardShortcut(.delete, modifiers: .command)
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .accessibilityLabel("More actions")
                 .disabled(account == nil)
             }
         }
+        .modifier(AccountManagementAlerts(deletePrompt: $deletePrompt, actionError: $actionError, onDone: { dismiss() }))
         .sheet(isPresented: $startingReconciliation) {
             if let account {
                 ReconciliationSheet(account: account, existingStatementId: nil)

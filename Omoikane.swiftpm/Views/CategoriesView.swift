@@ -14,7 +14,7 @@ struct CategoriesView: View {
     /// When non-nil, drives the delete-confirmation alert. Holds the target
     /// category plus a fresh reference count so the message can warn the
     /// user (or refuse) when the category is still in use.
-    @State private var deletePrompt: DeletePrompt? = nil
+    @State private var deletePrompt: CategoryDeletePrompt? = nil
     @State private var actionError: String? = nil
 
     var body: some View {
@@ -50,44 +50,7 @@ struct CategoriesView: View {
             CategoryEditor(initialKind: parent.kind, initialParent: parent)
         }
         .task(id: app.dataVersion) { reload() }
-        .alert(
-            "Delete '\(deletePrompt?.category.name ?? "")'?",
-            isPresented: Binding(
-                get: { deletePrompt != nil },
-                set: { if !$0 { deletePrompt = nil } }
-            ),
-            presenting: deletePrompt
-        ) { prompt in
-            if prompt.isBlocked {
-                // FK enforcement would refuse this anyway; offering Archive
-                // gives the user a useful next step without a dead-end alert.
-                Button("Archive instead") {
-                    do { try app.archiveCategory(id: prompt.category.id) }
-                    catch { actionError = "\(error)" }
-                }
-                Button("Cancel", role: .cancel) {}
-            } else {
-                Button("Delete", role: .destructive) {
-                    do { try app.deleteCategory(id: prompt.category.id) }
-                    catch { actionError = "\(error)" }
-                }
-                Button("Cancel", role: .cancel) {}
-            }
-        } message: { prompt in
-            Text(prompt.message)
-        }
-        .alert(
-            "Action failed",
-            isPresented: Binding(
-                get: { actionError != nil },
-                set: { if !$0 { actionError = nil } }
-            ),
-            presenting: actionError
-        ) { _ in
-            Button("OK", role: .cancel) {}
-        } message: { msg in
-            Text(msg)
-        }
+        .modifier(CategoryManagementAlerts(deletePrompt: $deletePrompt, actionError: $actionError))
     }
 
     @ViewBuilder
@@ -244,7 +207,7 @@ struct CategoriesView: View {
     private func startDelete(_ c: LedgerCategory) {
         do {
             let refs = try app.categories.referenceCount(for: c.id)
-            deletePrompt = DeletePrompt(category: c, refs: refs)
+            deletePrompt = CategoryDeletePrompt(category: c, refs: refs)
         } catch {
             actionError = "Couldn't check references: \(error)"
         }
@@ -266,7 +229,7 @@ struct CategoriesView: View {
 /// Bundled state for the delete-confirmation alert. Holds the category and
 /// a snapshot of how many transactions / sub-categories still reference it
 /// so the alert text can adapt to the situation.
-private struct DeletePrompt: Identifiable {
+struct CategoryDeletePrompt: Identifiable {
     let category: LedgerCategory
     let refs: (transactions: Int, children: Int)
     var id: Int64 { category.id }
@@ -313,6 +276,8 @@ struct CategoryEditor: View {
     @State private var parentId: Int64?
     @State private var allCategories: [LedgerCategory] = []
     @State private var saveError: String?
+    @State private var deletePrompt: CategoryDeletePrompt? = nil
+    @State private var actionError: String? = nil
 
     init(existing: LedgerCategory) {
         self.existing = existing
@@ -377,7 +342,45 @@ struct CategoryEditor: View {
                         .keyboardShortcut(.defaultAction)
                         .disabled(name.isEmpty)
                 }
+                // Archive / Unarchive / Delete: the same actions as the
+                // swipe gestures in CategoriesView, reachable from the
+                // keyboard here. The editor is the category's only
+                // detail surface, so this is where they live.
+                if let existing {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            if existing.isArchived {
+                                Button {
+                                    do { try app.unarchiveCategory(id: existing.id); dismiss() }
+                                    catch { actionError = "\(error)" }
+                                } label: {
+                                    Label("Unarchive", systemImage: "tray.and.arrow.up")
+                                }
+                                .keyboardShortcut("u", modifiers: .command)
+                            } else {
+                                Button {
+                                    do { try app.archiveCategory(id: existing.id); dismiss() }
+                                    catch { actionError = "\(error)" }
+                                } label: {
+                                    Label("Archive", systemImage: "archivebox")
+                                }
+                                .keyboardShortcut("a", modifiers: [.command, .shift])
+                            }
+                            Button(role: .destructive) {
+                                do { deletePrompt = try CategoryDeletePrompt.make(for: existing, app: app) }
+                                catch { actionError = "Couldn't check references: \(error)" }
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                            .keyboardShortcut(.delete, modifiers: .command)
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                        }
+                        .accessibilityLabel("More actions")
+                    }
+                }
             }
+            .modifier(CategoryManagementAlerts(deletePrompt: $deletePrompt, actionError: $actionError, onDone: { dismiss() }))
         }
     }
 
@@ -411,5 +414,63 @@ struct CategoryEditor: View {
         } catch {
             saveError = "Save failed: \(error)"
         }
+    }
+}
+
+extension CategoryDeletePrompt {
+    /// Snapshot the reference count so the alert can choose between
+    /// a real delete and "archive instead".
+    static func make(for c: LedgerCategory, app: AppState) throws -> CategoryDeletePrompt {
+        CategoryDeletePrompt(category: c, refs: try app.categories.referenceCount(for: c.id))
+    }
+}
+
+/// Delete-confirmation and error alerts shared by CategoriesView (swipe)
+/// and CategoryEditor (toolbar + keyboard). `onDone` fires after a delete
+/// or archive-instead so the editor sheet can dismiss itself.
+struct CategoryManagementAlerts: ViewModifier {
+    @Environment(AppState.self) private var app
+    @Binding var deletePrompt: CategoryDeletePrompt?
+    @Binding var actionError: String?
+    var onDone: () -> Void = {}
+
+    func body(content: Content) -> some View {
+        content
+            .alert(
+                "Delete '\(deletePrompt?.category.name ?? "")'?",
+                isPresented: Binding(
+                    get: { deletePrompt != nil },
+                    set: { if !$0 { deletePrompt = nil } }
+                ),
+                presenting: deletePrompt
+            ) { prompt in
+                if prompt.isBlocked {
+                    Button("Archive instead") {
+                        do { try app.archiveCategory(id: prompt.category.id); onDone() }
+                        catch { actionError = "\(error)" }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } else {
+                    Button("Delete", role: .destructive) {
+                        do { try app.deleteCategory(id: prompt.category.id); onDone() }
+                        catch { actionError = "\(error)" }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                }
+            } message: { prompt in
+                Text(prompt.message)
+            }
+            .alert(
+                "Action failed",
+                isPresented: Binding(
+                    get: { actionError != nil },
+                    set: { if !$0 { actionError = nil } }
+                ),
+                presenting: actionError
+            ) { _ in
+                Button("OK", role: .cancel) {}
+            } message: { msg in
+                Text(msg)
+            }
     }
 }

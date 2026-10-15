@@ -58,6 +58,7 @@ struct ReconciliationSheet: View {
                             .disabled(!canFinish)
                         if isReconciled {
                             Button("Reopen statement", role: .destructive, action: reopen)
+                                .keyboardShortcut("r", modifiers: .command)
                         }
                     } label: {
                         Text("Save").bold()
