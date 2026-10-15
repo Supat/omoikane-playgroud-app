@@ -338,12 +338,20 @@ struct CategoryEditor: View {
                     }
                 }
 
-                Picker("Parent", selection: $parentId) {
-                    Text("Top level").tag(Int64?.none)
-                    ForEach(eligibleParents) { p in
-                        Text(p.name).tag(Int64?.some(p.id))
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack {
+                        Text("Parent")
+                        Spacer()
+                        Text(parentId.flatMap { id in allCategories.first { $0.id == id }?.name } ?? "Top level")
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                    CategoryGlyphPicker(categories: eligibleParents, selection: $parentId,
+                                        allowsDrillDown: false, noneLabel: "Top level")
                 }
+                .listRowInsets(EdgeInsets())
 
                 if let saveError {
                     Section { Text(saveError).foregroundStyle(.red) }

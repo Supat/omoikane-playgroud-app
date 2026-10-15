@@ -8,6 +8,10 @@ struct CategoryGlyphPicker: View {
     /// Categories of the right kind, unarchived, both levels.
     let categories: [LedgerCategory]
     @Binding var selection: Int64?
+    /// Off for flat lists such as the category editor's Parent choice.
+    var allowsDrillDown: Bool = true
+    /// When set, a leading tile that selects nil (e.g. "Top level").
+    var noneLabel: String? = nil
     /// nil = top level; otherwise the parent whose children are shown.
     @State private var browsingParentId: Int64? = nil
 
@@ -31,8 +35,14 @@ struct CategoryGlyphPicker: View {
                             categoryTile(c, hasChildren: false)
                         }
                     } else {
+                        if let noneLabel {
+                            tile(icon: "rectangle.3.group", label: noneLabel, selected: selection == nil, hasChildren: false,
+                                 accessibility: noneLabel) {
+                                selection = nil
+                            }
+                        }
                         ForEach(topLevel) { c in
-                            categoryTile(c, hasChildren: !children(of: c.id).isEmpty)
+                            categoryTile(c, hasChildren: allowsDrillDown && !children(of: c.id).isEmpty)
                         }
                     }
                 }
@@ -47,6 +57,7 @@ struct CategoryGlyphPicker: View {
 
     /// Editing an entry on a sub-category opens inside its parent.
     private func syncBrowsingToSelection() {
+        guard allowsDrillDown else { browsingParentId = nil; return }
         if let id = selection, let c = categories.first(where: { $0.id == id }), let p = c.parentId {
             browsingParentId = p
         } else if let p = browsingParentId, !categories.contains(where: { $0.id == p }) {
