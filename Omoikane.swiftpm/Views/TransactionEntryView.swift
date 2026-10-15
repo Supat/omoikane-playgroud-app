@@ -243,15 +243,15 @@ struct TransactionEntryView: View {
                             .listRowInsets(EdgeInsets())
                         }
                         Button {
-                            splitLines.append(SplitLine(categoryId: availableCategories.first?.id, amountText: ""))
+                            splitLines.append(SplitLine(categoryId: nil, amountText: ""))
                         } label: {
                             Label("Add line", systemImage: "plus.circle")
                         }
                     } else {
                         Button {
                             splitLines = [
-                                SplitLine(categoryId: categoryId ?? availableCategories.first?.id, amountText: amountText),
-                                SplitLine(categoryId: availableCategories.first?.id, amountText: "")
+                                SplitLine(categoryId: categoryId, amountText: amountText),
+                                SplitLine(categoryId: nil, amountText: "")
                             ]
                         } label: {
                             Label("Split into categories", systemImage: "square.split.2x1")
@@ -363,7 +363,7 @@ struct TransactionEntryView: View {
                    (kind == .income ? c.kind == .income : c.kind == .expense) {
                     return
                 }
-                categoryId = availableCategories.first?.id
+                categoryId = nil   // no default: the user picks a category
             }
         }
         .onKeyPress(.escape) {
@@ -441,8 +441,7 @@ struct TransactionEntryView: View {
     private var selectedCategoryPath: String { categoryPath(for: categoryId) }
 
     private func categoryPath(for id: Int64?) -> String {
-        guard let id = id ?? availableCategories.first?.id,
-              let c = categories.first(where: { $0.id == id }) else { return "" }
+        guard let id, let c = categories.first(where: { $0.id == id }) else { return "Choose a category" }
         if let p = c.parentId, let parent = categories.first(where: { $0.id == p }) {
             return "\(parent.name) › \(c.name)"
         }
@@ -456,7 +455,7 @@ struct TransactionEntryView: View {
 
     private var canSave: Bool {
         if isSplit {
-            guard splitLines.allSatisfy({ ($0.categoryId ?? availableCategories.first?.id) != nil
+            guard splitLines.allSatisfy({ $0.categoryId != nil
                                           && (parseMinor($0.amountText, currency: fromCurrency) ?? 0) > 0 })
             else { return false }
         } else {
@@ -470,7 +469,7 @@ struct TransactionEntryView: View {
             }
             return true
         }
-        return categoryId != nil || availableCategories.first != nil
+        return categoryId != nil
     }
 
     private func loadReferences() {
@@ -486,7 +485,6 @@ struct TransactionEntryView: View {
                     accountId = accounts.first?.id
                 }
             }
-            if categoryId == nil { categoryId = availableCategories.first?.id }
             // For a brand-new entry, prime the Cleared toggle to the
             // from-account's `clearsEntriesByDefault` flag. Visible in the
             // editor; user can flip it off if needed.
@@ -534,9 +532,11 @@ struct TransactionEntryView: View {
         let acct = accountId ?? accounts.first?.id ?? 0
         let cat: Int64
         if kind == .transfer {
-            cat = categoryId ?? availableCategories.first?.id ?? categories.first?.id ?? 0
+            // Transfers carry no visible category; the column is NOT NULL.
+            cat = categories.first?.id ?? 0
         } else {
-            cat = categoryId ?? availableCategories.first?.id ?? 0
+            guard let chosen = categoryId else { return }
+            cat = chosen
         }
         let now = Date()
         let tags = tagsText
@@ -575,7 +575,7 @@ struct TransactionEntryView: View {
                 let lines: [Transaction] = isSplit
                     ? splitLines.map { line in
                         var t = template
-                        t.categoryId = line.categoryId ?? availableCategories.first?.id ?? cat
+                        t.categoryId = line.categoryId ?? cat
                         t.amountMinor = parseMinor(line.amountText, currency: fromCurrency) ?? 0
                         return t
                     }

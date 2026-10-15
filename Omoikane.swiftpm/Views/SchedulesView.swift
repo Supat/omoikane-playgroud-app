@@ -224,7 +224,7 @@ struct ScheduleEditor: View {
             .onChange(of: kind) { _, _ in
                 if kind != .transfer, let id = categoryId,
                    !availableCategories.contains(where: { $0.id == id }) {
-                    categoryId = availableCategories.first?.id
+                    categoryId = nil
                 }
             }
             .toolbar {
@@ -248,8 +248,7 @@ struct ScheduleEditor: View {
         categories.filter { $0.kind == (kind == .income ? .income : .expense) }
     }
     private var categoryPath: String {
-        guard let id = categoryId ?? availableCategories.first?.id,
-              let c = categories.first(where: { $0.id == id }) else { return "" }
+        guard let id = categoryId, let c = categories.first(where: { $0.id == id }) else { return "Choose a category" }
         if let p = c.parentId, let parent = categories.first(where: { $0.id == p }) {
             return "\(parent.name) › \(c.name)"
         }
@@ -262,7 +261,7 @@ struct ScheduleEditor: View {
             if isCrossCurrency, (Money.parseMinor(counterpartyAmountText, currency: toCurrency) ?? 0) <= 0 { return false }
             return true
         }
-        return categoryId != nil || availableCategories.first != nil
+        return categoryId != nil
     }
 
     private func load() {
@@ -288,15 +287,18 @@ struct ScheduleEditor: View {
             isEssential = sc.isEssential
         } else {
             accountId = accounts.first?.id
-            categoryId = availableCategories.first?.id
         }
     }
 
     private func save() {
         guard let amt = Money.parseMinor(amountText, currency: fromCurrency), let acct = accountId else { return }
-        let cat = kind == .transfer
-            ? (categoryId ?? categories.first?.id ?? 0)
-            : (categoryId ?? availableCategories.first?.id ?? 0)
+        let cat: Int64
+        if kind == .transfer {
+            cat = categories.first?.id ?? 0
+        } else {
+            guard let chosen = categoryId else { return }
+            cat = chosen
+        }
         let sc = Schedule(
             id: schedule?.id ?? 0,
             kind: kind,
