@@ -14,6 +14,17 @@ struct DashboardView: View {
     @State private var dailyTotals: [Int: Int64] = [:]
     @State private var selectedDay: Int? = nil
     @State private var dayRows: [Transaction] = []
+    @State private var dayBudgets: [DayBudgetRow] = []
+
+    /// A budgeted category the selected day touched: that day's spend and
+    /// the month-to-date position through that day.
+    struct DayBudgetRow: Identifiable {
+        var category: LedgerCategory
+        var todayHome: Int64
+        var toDateHome: Int64
+        var budgetMinor: Int64
+        var id: Int64 { category.id }
+    }
     @State private var categoryNames: [Int64: String] = [:]
     @State private var accountsById: [Int64: Account] = [:]
 
@@ -97,6 +108,33 @@ struct DashboardView: View {
                     }
                     .font(.subheadline)
                 }
+                if !dayBudgets.isEmpty {
+                    Divider()
+                    Text("Budgets through this day (\(app.homeCurrency))")
+                        .font(.subheadline.weight(.medium))
+                    ForEach(dayBudgets) { row in
+                        let over = row.toDateHome > row.budgetMinor
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(row.category.name)
+                                Text("\(Formatters.money(row.todayHome, currency: app.homeCurrency)) today")
+                                    .moneyStyle()
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text("\(Formatters.money(row.toDateHome, currency: app.homeCurrency)) / \(Formatters.money(row.budgetMinor, currency: app.homeCurrency))")
+                                    .moneyStyle()
+                                    .font(.subheadline)
+                                    .foregroundStyle(over ? .red : .primary)
+                            }
+                            ProgressView(value: Double(min(row.toDateHome, row.budgetMinor)), total: Double(max(row.budgetMinor, 1)))
+                                .tint(over ? .red : .accentColor)
+                                .accessibilityLabel("\(row.category.name) budget through this day")
+                                .accessibilityValue(over ? "Over budget" : "\(Int(Double(row.toDateHome) / Double(max(row.budgetMinor, 1)) * 100)) percent used")
+                        }
+                        .font(.subheadline)
+                    }
+                }
             }
         }
         .padding(12)
@@ -105,9 +143,23 @@ struct DashboardView: View {
     }
 
     private func loadDayRows() {
-        guard let day = selectedDay else { dayRows = []; return }
+        guard let day = selectedDay else { dayRows = []; dayBudgets = []; return }
         let all = (try? app.transactions.list(.month(Date.from(dayKey: day).yearMonthKey))) ?? []
         dayRows = all.filter { $0.occurredOn.dayKey == day }
+
+        // Budget position through the selected day, for categories spent on that day.
+        let cats = (try? app.categories.list()) ?? []
+        let expenses = all.filter { $0.kind == .expense && $0.occurredOn.dayKey <= day }
+        dayBudgets = cats.compactMap { c -> DayBudgetRow? in
+            guard let budget = c.budgetMinor else { return nil }
+            let ids = Set([c.id] + cats.filter { $0.parentId == c.id }.map(\.id))
+            let mine = expenses.filter { ids.contains($0.categoryId) }
+            let today = mine.filter { $0.occurredOn.dayKey == day }
+                .reduce(Int64(0)) { $0 + (app.convertedToHome($1.amountMinor, from: $1.currency) ?? 0) }
+            guard today > 0 else { return nil }
+            let toDate = mine.reduce(Int64(0)) { $0 + (app.convertedToHome($1.amountMinor, from: $1.currency) ?? 0) }
+            return DayBudgetRow(category: c, todayHome: today, toDateHome: toDate, budgetMinor: budget)
+        }
     }
 
     /// Essential vs discretionary share of the month's spending, in the
