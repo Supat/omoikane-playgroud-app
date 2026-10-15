@@ -8,9 +8,9 @@ A household account book ("kakeibo") iPad app, delivered in two parallel forms t
 build from a **single set of Swift sources**:
 
 - `Omoikane.swiftpm/` — Swift Playground app package (opens in Xcode or Swift Playgrounds on iPad)
-- `OmoikaneApp.xcodeproj/` — traditional Xcode iOS app project (references the same files via `SOURCE_ROOT` paths into `Omoikane.swiftpm/`)
+- `Omoikane.xcodeproj/` — traditional Xcode iOS app project (references the same files via `SOURCE_ROOT` paths into `Omoikane.swiftpm/`)
 
-There is **no** `OmoikaneApp/<sources>/` directory; the Xcode project does not duplicate code. Only `OmoikaneApp/Assets.xcassets/` lives outside `Omoikane.swiftpm/`.
+There is **no** `Omoikane/<sources>/` directory; the Xcode project does not duplicate code. Only `Omoikane/Assets.xcassets/` and `Omoikane/Omoikane.icon` lives outside `Omoikane.swiftpm/`.
 
 When you add a Swift file under `Omoikane.swiftpm/`, also add a `PBXFileReference` + `PBXBuildFile` for it in `project.pbxproj`, or the Xcode project silently won't compile it.
 
@@ -41,8 +41,8 @@ xcodebuild -workspace Omoikane.swiftpm \
 Build the **Xcode project**:
 
 ```sh
-xcodebuild -project OmoikaneApp.xcodeproj \
-  -scheme OmoikaneApp \
+xcodebuild -project Omoikane.xcodeproj \
+  -scheme Omoikane \
   -destination 'platform=iOS Simulator,id=<udid>' build
 ```
 
@@ -133,7 +133,7 @@ Database/SeedData.swift          first-launch defaults + sample transactions
 Models/Models.swift, Money.swift domain structs, minor-unit money helpers
 State/AppState.swift             @Observable; owns DB + stores; bumps `dataVersion`
 State/BackupStore.swift          dated SQLite copies in …/Omoikane/Backups (online backup API), auto cadence in UserDefaults
-App/OmoikaneApp.swift            WindowGroup, owns tab selection, ⌘1–⌘5 / ⌃Tab commands
+App/Omoikane.swift               WindowGroup, owns tab selection, ⌘1–⌘5 / ⌃Tab commands
 Views/ContentView.swift          five-tab root (see below)
 ```
 
@@ -155,7 +155,7 @@ Entity management (add/edit/archive/delete) lives only in its dedicated
 surface: Accounts tab, or Settings › Manage for categories, schedules and
 payees. Drill-down lists elsewhere are read-only. Five tabs, ⌘1–⌘5.
 
-Keyboard: tab switching is wired in `OmoikaneApp` via `.commands`, not on tab
+Keyboard: tab switching is wired in `Omoikane` via `.commands`, not on tab
 content (inactive tabs are lazy and their shortcuts never register). Lists use
 `List(selection:)` + `.tag` for arrow-key highlight, `onKeyPress(.return)` to
 act, `onKeyPress(.escape)` to clear. Rows are plain views with
@@ -221,4 +221,4 @@ so it stays as-is. If you add new top-level types, sanity-check against
   `MoneyProImport` sources and runs them against a real `.back` file; the
   compile command is in its header. Run it before and after.
 - **Adding a new tab** → add a case to `AppTab`, a `NavigationStack` branch in
-  `ContentView`, the view file, and a `⌘N` command in `OmoikaneApp`.
+  `ContentView`, the view file, and a `⌘N` command in `Omoikane` (App/Omoikane.swift).

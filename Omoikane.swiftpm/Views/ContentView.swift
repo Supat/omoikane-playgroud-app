@@ -17,7 +17,7 @@ enum AppTab: Hashable, CaseIterable {
     }
 }
 
-/// Multi-tab root. The selection binding is owned by `OmoikaneApp` so the
+/// Multi-tab root. The selection binding is owned by `Omoikane` (App/Omoikane.swift) so the
 /// `.commands { CommandMenu("AppTabs") { ... } }` block on the WindowGroup can
 /// drive tab switching from keyboard shortcuts. (Putting `.keyboardShortcut`
 /// on the tab content itself does not work — non-active tabs are lazy and

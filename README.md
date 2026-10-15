@@ -5,7 +5,7 @@ Two parallel projects, one shared source tree:
 | Form | Where to open |
 | --- | --- |
 | Swift Playground app | open `Omoikane.swiftpm/` in Xcode (or copy the bundle to an iPad with Swift Playgrounds) |
-| Traditional Xcode iOS app | open `OmoikaneApp.xcodeproj/` in Xcode |
+| Traditional Xcode iOS app | open `Omoikane.xcodeproj/` in Xcode |
 
 The Xcode project does **not** duplicate the Swift sources — its file references
 point to `Omoikane.swiftpm/{App,Views,Database,Models,State}/*.swift`. Edit a
@@ -37,7 +37,7 @@ xcodebuild -workspace Omoikane.swiftpm -scheme Omoikane \
   -destination 'platform=iOS Simulator,id=<udid>' build
 
 # Xcode project
-xcodebuild -project OmoikaneApp.xcodeproj -scheme OmoikaneApp \
+xcodebuild -project Omoikane.xcodeproj -scheme Omoikane \
   -destination 'platform=iOS Simulator,id=<udid>' build
 ```
 

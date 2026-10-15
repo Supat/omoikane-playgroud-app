@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct OmoikaneApp: App {
+struct Omoikane: App {
     @State private var bootstrap: Bootstrap = .loading
     /// Selected tab is owned at Scene level so `.commands { ... }` can mutate
     /// it from keyboard shortcuts. Putting selection inside ContentView and
