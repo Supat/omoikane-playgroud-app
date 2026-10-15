@@ -131,6 +131,7 @@ Database/MoneyProImport.swift    Money Pro `.back` importer (replaces the ledger
 Database/SeedData.swift          first-launch defaults + sample transactions
 Models/Models.swift, Money.swift domain structs, minor-unit money helpers
 State/AppState.swift             @Observable; owns DB + stores; bumps `dataVersion`
+State/BackupStore.swift          dated SQLite copies in …/Omoikane/Backups (online backup API), auto cadence in UserDefaults
 App/OmoikaneApp.swift            WindowGroup, owns tab selection, ⌘1–⌘6 / ⌃Tab commands
 Views/ContentView.swift          six-tab root (see below)
 ```
@@ -148,7 +149,7 @@ Mutating helpers on `AppState` serialize through `db.sync { … }` and bump
 | Transactions | `TransactionsView` | account list → per-account transaction list; landscape split view with inline `TransactionEntryView`, portrait uses the `TransactionEditor` sheet. The entry form handles splits (one row per line, shared `split_group`), payee, loan role and Repeat (creates a schedule) |
 | Reports | `ReportsView` | aggregate queries over `monthly_summaries` |
 | Categories | `CategoriesView` | expense/income categories with sub-categories |
-| Settings | `SettingsView` → `SchedulesView`, `PayeesView` | home currency, rates, scheduled transactions, payees, rebuild summaries, Money Pro import |
+| Settings | `SettingsView` → `SchedulesView`, `PayeesView`, `BackupsView` | home currency, rates, scheduled transactions, payees, backups (auto/manual/restore/share), rebuild summaries, delete all transactions, Money Pro import |
 
 Entity management (add/edit/archive/delete) lives only in its dedicated tab.
 Drill-down lists elsewhere are read-only.

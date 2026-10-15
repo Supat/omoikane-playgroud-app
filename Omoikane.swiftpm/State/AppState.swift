@@ -58,6 +58,25 @@ final class AppState {
         try SeedData.seedIfNeeded(db: db, homeCurrency: self.homeCurrency, addSampleTransactions: true)
         try refreshRates()
         try postDueSchedules()
+        BackupStore.backupIfDue(db: db)
+    }
+
+    // MARK: - Backups
+
+    @discardableResult
+    func backupNow() throws -> URL { try BackupStore.backup(db: db) }
+
+    func autoBackupIfDue() { BackupStore.backupIfDue(db: db) }
+
+    /// Replace the live database with a backup, then migrate it forward
+    /// and refresh everything derived from it.
+    func restore(from url: URL) throws {
+        try db.sync {
+            try db.restore(from: url)
+            try Schema.migrate(db)
+        }
+        try refreshRates()
+        bump()
     }
 
     /// Post every recurring transaction that has come due. Called at

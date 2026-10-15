@@ -63,7 +63,10 @@ struct ContentView: View {
         // Recurring entries post when they come due; launch covers the
         // cold start, this covers an app that stayed open overnight.
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { try? app.postDueSchedules() }
+            if phase == .active {
+                try? app.postDueSchedules()
+                app.autoBackupIfDue()
+            }
         }
     }
 }

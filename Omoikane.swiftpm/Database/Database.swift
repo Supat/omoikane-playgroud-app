@@ -121,6 +121,43 @@ final class Database {
         try serial.sync { try block() }
     }
 
+    /// Consistent copy of the live database to `url` via SQLite's online
+    /// backup API (safe with WAL and an open connection).
+    func copy(to url: URL) throws {
+        try? FileManager.default.removeItem(at: url)
+        try transfer(from: self.handle, path: self.url.path, toPath: url.path)
+    }
+
+    /// Replace the live database's contents with the file at `url`.
+    /// Callers re-run `Schema.migrate` afterwards in case the copy is older.
+    func restore(from url: URL) throws {
+        var src: OpaquePointer?
+        guard sqlite3_open_v2(url.path, &src, SQLITE_OPEN_READONLY, nil) == SQLITE_OK, let src else {
+            throw DatabaseError.execFailed("Could not open backup.")
+        }
+        defer { sqlite3_close_v2(src) }
+        guard let b = sqlite3_backup_init(handle, "main", src, "main") else {
+            throw DatabaseError.execFailed(String(cString: sqlite3_errmsg(handle)))
+        }
+        sqlite3_backup_step(b, -1)
+        let rc = sqlite3_backup_finish(b)
+        guard rc == SQLITE_OK else { throw DatabaseError.execFailed("Restore failed (\(rc)).") }
+    }
+
+    private func transfer(from source: OpaquePointer?, path: String, toPath dest: String) throws {
+        var dst: OpaquePointer?
+        guard sqlite3_open_v2(dest, &dst, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nil) == SQLITE_OK, let dst else {
+            throw DatabaseError.execFailed("Could not create backup file.")
+        }
+        defer { sqlite3_close_v2(dst) }
+        guard let b = sqlite3_backup_init(dst, "main", source, "main") else {
+            throw DatabaseError.execFailed(String(cString: sqlite3_errmsg(dst)))
+        }
+        sqlite3_backup_step(b, -1)
+        let rc = sqlite3_backup_finish(b)
+        guard rc == SQLITE_OK else { throw DatabaseError.execFailed("Backup failed (\(rc)).") }
+    }
+
     var lastInsertId: Int64 { sqlite3_last_insert_rowid(handle) }
     var changes: Int { Int(sqlite3_changes(handle)) }
 }

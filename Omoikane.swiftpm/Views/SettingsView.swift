@@ -14,6 +14,9 @@ struct SettingsView: View {
     @State private var importMessage = ""
     @State private var showImportResult = false
     @State private var confirmClear = false
+    @State private var backupInterval: BackupStore.Interval = BackupStore.interval
+    @State private var lastBackup: Date? = BackupStore.lastBackup
+    @State private var backupCount = 0
 
     var body: some View {
         // @Bindable lets a Picker bind to a property of an @Observable.
@@ -58,6 +61,36 @@ struct SettingsView: View {
                 } label: {
                     Label("Payees", systemImage: "person.crop.circle")
                 }
+            }
+
+            Section {
+                Picker("Automatic backup", selection: $backupInterval) {
+                    ForEach(BackupStore.Interval.allCases) { i in Text(i.displayName).tag(i) }
+                }
+                .onChange(of: backupInterval) { _, v in
+                    BackupStore.interval = v
+                    app.autoBackupIfDue()
+                    reload()
+                }
+                LabeledContent("Last backup", value: lastBackup.map { Formatters.mediumDate.string(from: $0) + " " + Formatters.shortTime.string(from: $0) } ?? "Never")
+                Button {
+                    do { _ = try app.backupNow() }
+                    catch { importMessage = "\(error)"; showImportResult = true }
+                    reload()
+                } label: {
+                    Label("Back up now", systemImage: "externaldrive.badge.plus")
+                }
+                .keyboardShortcut("b", modifiers: .command)
+                NavigationLink {
+                    BackupsView()
+                } label: {
+                    LabeledContent("Backups", value: "\(backupCount)")
+                }
+            } header: {
+                Text("Backups")
+            } footer: {
+                Text("Backups are complete copies of the database kept in the app's own storage (newest \(BackupStore.keepCount)). Automatic backups run at launch and when the app returns to the foreground. Use the list to restore or share one.")
+                    .font(.footnote)
             }
 
             Section("Database") {
@@ -163,6 +196,8 @@ struct SettingsView: View {
     }
 
     private func reload() {
+        lastBackup = BackupStore.lastBackup
+        backupCount = BackupStore.list(for: app.db).count
         transactionCount = (try? app.transactions.count()) ?? 0
         activeCurrencies = (try? app.summaries.distinctCurrencies()) ?? []
     }
@@ -226,5 +261,79 @@ private struct RateRow: View {
         if r >= 100 { return String(format: "%.2f", r) }
         if r >= 1   { return String(format: "%.4f", r) }
         return String(format: "%.6f", r)
+    }
+}
+
+
+/// Settings → Backups. Share a copy out, restore one (confirmed), or
+/// delete. Return restores the selected row, ⌘⌫ deletes it.
+struct BackupsView: View {
+    @Environment(AppState.self) private var app
+    @State private var files: [BackupStore.BackupFile] = []
+    @State private var selectedId: URL? = nil
+    @State private var restoring: BackupStore.BackupFile? = nil
+    @State private var message: String? = nil
+    @FocusState private var listFocused: Bool
+
+    var body: some View {
+        List(selection: $selectedId) {
+            if files.isEmpty {
+                Text("No backups yet. Use Back up now in Settings.").foregroundStyle(.secondary)
+            }
+            ForEach(files) { f in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(Formatters.mediumDate.string(from: f.date) + " " + Formatters.shortTime.string(from: f.date))
+                        Text(ByteCountFormatter.string(fromByteCount: f.bytes, countStyle: .file))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    ShareLink(item: f.url) { Image(systemName: "square.and.arrow.up") }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Share backup")
+                    Button("Restore") { restoring = f }
+                        .buttonStyle(.borderless)
+                }
+                .tag(f.url)
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button(role: .destructive) { remove(f) } label: { Label("Delete", systemImage: "trash") }
+                }
+            }
+        }
+        .focused($listFocused)
+        .navigationTitle("Backups")
+        .background(deleteShortcut)
+        .onKeyPress(.return) {
+            if let id = selectedId, let f = files.first(where: { $0.url == id }) { restoring = f; return .handled }
+            return .ignored
+        }
+        .confirmationDialog("Restore this backup?", isPresented: Binding(get: { restoring != nil }, set: { if !$0 { restoring = nil } }),
+                            titleVisibility: .visible, presenting: restoring) { f in
+            Button("Replace current data", role: .destructive) {
+                do { try app.restore(from: f.url); message = "Restored backup from \(Formatters.mediumDate.string(from: f.date))." }
+                catch { message = "\(error)" }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { f in
+            Text("Everything currently in Omoikane is replaced by the backup from \(Formatters.mediumDate.string(from: f.date)) \(Formatters.shortTime.string(from: f.date)). This cannot be undone.")
+        }
+        .alert("Backups", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } }), presenting: message) { _ in
+            Button("OK") {}
+        } message: { m in Text(m) }
+        .task(id: app.dataVersion) { files = BackupStore.list(for: app.db) }
+        .onAppear { listFocused = true; files = BackupStore.list(for: app.db) }
+    }
+
+    private var deleteShortcut: some View {
+        Button(role: .destructive) {
+            if let id = selectedId, let f = files.first(where: { $0.url == id }) { remove(f) }
+        } label: { EmptyView() }
+        .keyboardShortcut(.delete, modifiers: .command)
+        .frame(width: 1, height: 1).opacity(0).accessibilityHidden(true)
+    }
+
+    private func remove(_ f: BackupStore.BackupFile) {
+        do { try BackupStore.delete(f); files = BackupStore.list(for: app.db) }
+        catch { message = "\(error)" }
     }
 }
