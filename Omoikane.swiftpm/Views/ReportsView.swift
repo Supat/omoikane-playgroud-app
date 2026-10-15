@@ -14,6 +14,16 @@ struct ReportsView: View {
     @State private var totals: SummaryStore.CurrencyTotals = .init()
     @State private var availableCurrencies: [String] = []
     @State private var loans: [TransactionStore.LoanBalance] = []
+    @State private var budgetRows: [BudgetRow] = []
+
+    /// One budgeted category over the selected range: the monthly budget
+    /// times the number of months, against what was actually spent.
+    struct BudgetRow: Identifiable {
+        var category: LedgerCategory
+        var budgetMinor: Int64
+        var spentMinor: Int64
+        var id: Int64 { category.id }
+    }
 
     var body: some View {
         ScrollView {
@@ -61,6 +71,50 @@ struct ReportsView: View {
                             )
                         }
                         .frame(height: CGFloat(min(categoryRows.count, 10) * 36 + 60))
+                    }
+                }
+
+                section("Budgets (\(app.homeCurrency), \(monthsBack) month\(monthsBack == 1 ? "" : "s"))") {
+                    if budgetRows.isEmpty {
+                        Text("No budgets set. Give an expense category a monthly budget in the Categories tab.")
+                            .foregroundStyle(.secondary)
+                            .font(.subheadline)
+                    } else {
+                        let totalBudget = budgetRows.reduce(Int64(0)) { $0 + $1.budgetMinor }
+                        let totalSpent = budgetRows.reduce(Int64(0)) { $0 + $1.spentMinor }
+                        ForEach(budgetRows) { row in
+                            let over = row.spentMinor > row.budgetMinor
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text(row.category.name)
+                                    Spacer()
+                                    Text(over
+                                         ? "over by \(Formatters.money(row.spentMinor - row.budgetMinor, currency: app.homeCurrency))"
+                                         : "\(Formatters.money(row.budgetMinor - row.spentMinor, currency: app.homeCurrency)) left")
+                                        .moneyStyle()
+                                        .font(.caption)
+                                        .foregroundStyle(over ? .red : .secondary)
+                                    Text("\(Formatters.money(row.spentMinor, currency: app.homeCurrency)) / \(Formatters.money(row.budgetMinor, currency: app.homeCurrency))")
+                                        .moneyStyle()
+                                        .font(.subheadline)
+                                        .foregroundStyle(over ? .red : .primary)
+                                }
+                                ProgressView(value: Double(min(row.spentMinor, row.budgetMinor)), total: Double(max(row.budgetMinor, 1)))
+                                    .tint(over ? .red : .accentColor)
+                                    .accessibilityLabel("\(row.category.name) budget")
+                                    .accessibilityValue(over ? "Over budget" : "\(Int(Double(row.spentMinor) / Double(max(row.budgetMinor, 1)) * 100)) percent used")
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        Divider()
+                        HStack {
+                            Text("All budgets").font(.subheadline.weight(.medium))
+                            Spacer()
+                            Text("\(Formatters.money(totalSpent, currency: app.homeCurrency)) / \(Formatters.money(totalBudget, currency: app.homeCurrency))")
+                                .moneyStyle()
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(totalSpent > totalBudget ? .red : .primary)
+                        }
                     }
                 }
 
@@ -238,6 +292,18 @@ struct ReportsView: View {
             totals      = try app.summaries.totals(fromYM: win.start, toYM: win.end)
             availableCurrencies = try app.summaries.distinctCurrencies(fromYM: win.start, toYM: win.end)
             loans = try app.transactions.loanBalances()
+            // Budgets always roll up to the home currency, regardless of the currency filter.
+            let cats = try app.categories.list()
+            let spentRows = try app.summaries.byCategory(fromYM: win.start, toYM: win.end, kind: .expense)
+            budgetRows = cats.compactMap { c -> BudgetRow? in
+                guard let monthly = c.budgetMinor else { return nil }
+                let ids = Set([c.id] + cats.filter { $0.parentId == c.id }.map(\.id))
+                let spent = spentRows
+                    .filter { ids.contains($0.keyId) }
+                    .reduce(Int64(0)) { $0 + (app.convertedToHome($1.totalMinor, from: $1.currency) ?? 0) }
+                return BudgetRow(category: c, budgetMinor: monthly * Int64(monthsBack), spentMinor: spent)
+            }
+            .sorted { Double($0.spentMinor) / Double(max($0.budgetMinor, 1)) > Double($1.spentMinor) / Double(max($1.budgetMinor, 1)) }
             // If the chosen filter no longer has data, fall back to all.
             if let c = currencyFilter, !availableCurrencies.contains(c) {
                 currencyFilter = nil
