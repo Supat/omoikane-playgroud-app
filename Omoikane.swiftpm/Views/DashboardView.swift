@@ -30,6 +30,7 @@ struct DashboardView: View {
     }
     @State private var categoryNames: [Int64: String] = [:]
     @State private var categoryParents: [Int64: Int64] = [:]
+    @State private var categoryColors: [Int64: Color] = [:]
     @State private var accountsById: [Int64: Account] = [:]
 
     struct BudgetRow: Identifiable {
@@ -240,6 +241,30 @@ struct DashboardView: View {
         }
     }
 
+    /// Spend slices for the stacked bar: budgeted expense categories that
+    /// count toward the allocation, each with its month-to-date spend.
+    private var spendSlices: [StackedShareBar.Slice] {
+        let expenseRows = budgets.filter { $0.category.kind == .expense }
+        let budgetedIds = Set(expenseRows.map { $0.category.id })
+        return expenseRows
+            .filter { r in r.category.parentId.map { !budgetedIds.contains($0) } ?? true }
+            .filter { $0.spentHome > 0 }
+            .map { r in
+                let parent = r.category.parentId.flatMap { pid in categoryNames[pid] }
+                return StackedShareBar.Slice(name: parent.map { "\($0) › \(r.category.name)" } ?? r.category.name,
+                                             amount: r.spentHome,
+                                             color: r.category.ownColor ?? (r.category.parentId.flatMap { categoryColors[$0] }) ?? .accentColor)
+            }
+            .sorted { $0.amount > $1.amount }
+    }
+    private var spendCapacityFromBudgets: Int64 {
+        let expenseRows = budgets.filter { $0.category.kind == .expense }
+        let budgetedIds = Set(expenseRows.map { $0.category.id })
+        return expenseRows
+            .filter { r in r.category.parentId.map { !budgetedIds.contains($0) } ?? true }
+            .reduce(Int64(0)) { $0 + ($1.category.budgetMinor ?? 0) }
+    }
+
     /// Monthly budgets from Categories, spent this month in the home
     /// currency. A parent's budget covers its sub-categories.
     @ViewBuilder
@@ -247,6 +272,16 @@ struct DashboardView: View {
         if !budgets.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Budgets and income targets (\(app.homeCurrency))").font(.headline)
+                if !spendSlices.isEmpty {
+                    // This month's spend per budgeted category, in its colour,
+                    // against the spending limit (or the budgets' total).
+                    let capacity = (app.monthlySpendingLimitMinor ?? 0) > 0 ? (app.monthlySpendingLimitMinor ?? 0) : spendCapacityFromBudgets
+                    Text((app.monthlySpendingLimitMinor ?? 0) > 0 ? "Spent against the limit" : "Spent against all budgets")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    StackedShareBar(slices: spendSlices, capacity: capacity, remainderLabel: "Left", overflowLabel: "Over")
+                    Divider()
+                }
                 ForEach(budgets) { row in
                     let limit = row.category.budgetMinor ?? 0
                     let isIncome = row.category.kind == .income
@@ -536,6 +571,7 @@ struct DashboardView: View {
             let allCats = try app.categories.list(includeArchived: true)
             categoryNames = Dictionary(uniqueKeysWithValues: allCats.map { ($0.id, $0.name) })
             categoryParents = Dictionary(uniqueKeysWithValues: allCats.compactMap { c in c.parentId.map { (c.id, $0) } })
+            categoryColors = Dictionary(uniqueKeysWithValues: allCats.compactMap { c in c.ownColor.map { (c.id, $0) } })
             monthTransactionCount = try app.summaries.transactionCount(fromYM: ymKey, toYM: ymKey)
             accountsById = Dictionary(uniqueKeysWithValues: try app.accounts.list(includeArchived: true).map { ($0.id, $0) })
             if let day = selectedDay, Date.from(dayKey: day).yearMonthKey != ymKey { selectedDay = nil }

@@ -1,5 +1,4 @@
 import SwiftUI
-import Charts
 
 /// "Categories" tab. Two sections (Expense / Income); each renders top-level
 /// categories with their sub-categories indented underneath. Tap any row to
@@ -78,56 +77,23 @@ struct CategoriesView: View {
 
     /// One segment per budgeted expense category that counts toward the
     /// allocation (parent, or child of an unbudgeted parent), in its colour.
-    private struct BudgetSlice: Identifiable {
-        var name: String
-        var amount: Int64
-        var color: Color
-        var id: String { name }
-    }
-    private var budgetSlices: [BudgetSlice] {
+    private var budgetSlices: [StackedShareBar.Slice] {
         let all = categories + archivedCategories
         return categories
             .filter { $0.kind == .expense && $0.budgetMinor != nil }
             .filter { c in c.parentId.map { pid in categories.first { $0.id == pid }?.budgetMinor == nil } ?? true }
             .map { c in
                 let parent = c.parentId.flatMap { pid in categories.first { $0.id == pid }?.name }
-                return BudgetSlice(name: parent.map { "\($0) › \(c.name)" } ?? c.name,
-                                   amount: c.budgetMinor ?? 0,
-                                   color: c.displayColor(in: all))
+                return StackedShareBar.Slice(name: parent.map { "\($0) › \(c.name)" } ?? c.name,
+                                             amount: c.budgetMinor ?? 0,
+                                             color: c.displayColor(in: all))
             }
             .sorted { $0.amount > $1.amount }
     }
 
-    /// Stacked bar: each budgeted category's share of the limit in its own
-    /// colour, with the unallocated remainder (or the overshoot) at the end.
     @ViewBuilder
     private func budgetCompositionBar(limit: Int64, allocated: Int64) -> some View {
-        let slices = budgetSlices
-        let rest = max(limit - allocated, 0)
-        let over = max(allocated - limit, 0)
-        let domainMax = Double(max(limit, allocated))
-        let names = slices.map(\.name) + (rest > 0 ? ["Unallocated"] : []) + (over > 0 ? ["Over the limit"] : [])
-        let colors = slices.map(\.color) + (rest > 0 ? [Color.secondary.opacity(0.3)] : []) + (over > 0 ? [Color.red] : [])
-        Chart {
-            ForEach(slices) { sl in
-                BarMark(x: .value("Budget", Double(sl.amount)), y: .value("", "Budgets"))
-                    .foregroundStyle(by: .value("Category", sl.name))
-            }
-            if rest > 0 {
-                BarMark(x: .value("Budget", Double(rest)), y: .value("", "Budgets"))
-                    .foregroundStyle(by: .value("Category", "Unallocated"))
-            }
-            if over > 0 {
-                BarMark(x: .value("Budget", Double(over)), y: .value("", "Budgets"))
-                    .foregroundStyle(by: .value("Category", "Over the limit"))
-            }
-        }
-        .chartForegroundStyleScale(domain: names, range: colors)
-        .chartXScale(domain: 0 ... max(domainMax, 1))
-        .chartXAxis(.hidden)
-        .chartYAxis(.hidden)
-        .chartLegend(position: .bottom, alignment: .leading, spacing: 6)
-        .frame(height: 28 + CGFloat((names.count + 2) / 3) * 22)
+        StackedShareBar(slices: budgetSlices, capacity: limit)
     }
 
     /// Income targets compared with the spending limit (or, without one,

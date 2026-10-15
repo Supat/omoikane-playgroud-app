@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 extension View {
     /// Restricts the bound text to characters that look like a number entry
@@ -206,5 +207,50 @@ struct CurrencyPicker: View {
             return "\(name) (\(code))"
         }
         return code
+    }
+}
+
+/// Horizontal stacked bar: one segment per slice in its colour against a
+/// capacity, with the unfilled remainder in grey and any overshoot in red,
+/// plus a legend. Used for budget composition on Dashboard and in
+/// Categories and Budget.
+struct StackedShareBar: View {
+    struct Slice: Identifiable {
+        var name: String
+        var amount: Int64
+        var color: Color
+        var id: String { name }
+    }
+    var slices: [Slice]
+    var capacity: Int64
+    var remainderLabel: String = "Unallocated"
+    var overflowLabel: String = "Over the limit"
+
+    var body: some View {
+        let used = slices.reduce(Int64(0)) { $0 + $1.amount }
+        let rest = max(capacity - used, 0)
+        let over = max(used - capacity, 0)
+        let names = slices.map(\.name) + (rest > 0 ? [remainderLabel] : []) + (over > 0 ? [overflowLabel] : [])
+        let colors = slices.map(\.color) + (rest > 0 ? [Color.secondary.opacity(0.3)] : []) + (over > 0 ? [Color.red] : [])
+        Chart {
+            ForEach(slices) { sl in
+                BarMark(x: .value("Amount", Double(sl.amount)), y: .value("", "bar"))
+                    .foregroundStyle(by: .value("Category", sl.name))
+            }
+            if rest > 0 {
+                BarMark(x: .value("Amount", Double(rest)), y: .value("", "bar"))
+                    .foregroundStyle(by: .value("Category", remainderLabel))
+            }
+            if over > 0 {
+                BarMark(x: .value("Amount", Double(over)), y: .value("", "bar"))
+                    .foregroundStyle(by: .value("Category", overflowLabel))
+            }
+        }
+        .chartForegroundStyleScale(domain: names, range: colors)
+        .chartXScale(domain: 0 ... Double(max(capacity, used, 1)))
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
+        .chartLegend(position: .bottom, alignment: .leading, spacing: 6)
+        .frame(height: 28 + CGFloat((names.count + 2) / 3) * 22)
     }
 }
