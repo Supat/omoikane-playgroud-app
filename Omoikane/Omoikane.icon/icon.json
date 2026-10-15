@@ -5,13 +5,13 @@
   "fill-specializations" : [
     {
       "value" : {
-        "automatic-gradient" : "srgb:0.75407,0.75409,0.75408,1.00000"
+        "automatic-gradient" : "extended-gray:1.00000,1.00000"
       }
     },
     {
       "appearance" : "dark",
       "value" : {
-        "automatic-gradient" : "srgb:0.37056,0.37056,0.37056,1.00000"
+        "automatic-gradient" : "extended-gray:0.25000,1.00000"
       }
     }
   ],
