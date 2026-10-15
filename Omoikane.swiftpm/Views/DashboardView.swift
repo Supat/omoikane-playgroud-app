@@ -36,16 +36,19 @@ struct DashboardView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                header
-                if !missing.isEmpty { missingRatesBanner }
-                summaryCards
-                essentialSection
-                calendarSection
-                budgetSection
-                trendChart
-                categoryBreakdown
-                accountBreakdown
+            // One container so the glass panels render and morph together.
+            GlassEffectContainer(spacing: 20) {
+                VStack(alignment: .leading, spacing: 20) {
+                    header
+                    if !missing.isEmpty { missingRatesBanner }
+                    summaryCards
+                    essentialSection
+                    calendarSection
+                    budgetSection
+                    trendChart
+                    categoryBreakdown
+                    accountBreakdown
+                }
             }
             .padding()
         }
@@ -138,7 +141,7 @@ struct DashboardView: View {
             }
         }
         .padding(12)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .glassCard(cornerRadius: 12)
         .onChange(of: selectedDay) { _, _ in loadDayRows() }
     }
 
@@ -198,7 +201,7 @@ struct DashboardView: View {
                     .accessibilityValue("\(Int((share * 100).rounded())) percent")
             }
             .padding(12)
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .glassCard(cornerRadius: 12)
         }
     }
 
@@ -229,7 +232,7 @@ struct DashboardView: View {
                 }
             }
             .padding(12)
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .glassCard(cornerRadius: 12)
         }
     }
 
@@ -247,7 +250,7 @@ struct DashboardView: View {
             Spacer()
         }
         .padding(12)
-        .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .glassEffect(.regular.tint(.orange.opacity(0.3)), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private var summaryCards: some View {
@@ -302,7 +305,7 @@ struct DashboardView: View {
                     }
                 }
                 .padding(.horizontal, 14).padding(.vertical, 6)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .glassCard()
             }
         }
     }
@@ -333,7 +336,7 @@ struct DashboardView: View {
             }
         }
         .padding(14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .glassCard()
     }
 
     private var categoryBreakdown: some View {
@@ -358,7 +361,7 @@ struct DashboardView: View {
             }
         }
         .padding(14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .glassCard()
     }
 
     private var accountBreakdown: some View {
@@ -381,7 +384,7 @@ struct DashboardView: View {
             }
         }
         .padding(14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .glassCard()
     }
 
     // MARK: - Derived data

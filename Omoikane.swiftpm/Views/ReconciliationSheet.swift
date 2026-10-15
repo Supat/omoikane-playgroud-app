@@ -185,7 +185,7 @@ struct ReconciliationSheet: View {
             .padding(.horizontal)
             .padding(.bottom, 4)
         }
-        .background(.regularMaterial)
+        .glassEffect(in: Rectangle())
     }
 
     private func stat(_ title: String, _ value: String, tint: Color = .primary) -> some View {

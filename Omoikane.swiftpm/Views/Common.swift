@@ -101,6 +101,13 @@ extension Text {
     func moneyStyle() -> Text { fontDesign(.monospaced).monospacedDigit() }
 }
 
+extension View {
+    /// Liquid Glass card surface, the house style for every custom panel.
+    func glassCard(cornerRadius: CGFloat = 14) -> some View {
+        glassEffect(in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    }
+}
+
 struct StatCard: View {
     let title: String
     let value: String
@@ -125,7 +132,7 @@ struct StatCard: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .glassCard()
     }
 }
 

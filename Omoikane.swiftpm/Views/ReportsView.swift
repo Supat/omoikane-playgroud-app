@@ -27,6 +27,7 @@ struct ReportsView: View {
 
     var body: some View {
         ScrollView {
+            GlassEffectContainer(spacing: 18) {
             VStack(alignment: .leading, spacing: 18) {
                 controls
                 summaryRow
@@ -165,6 +166,7 @@ struct ReportsView: View {
                     }
                 }
             }
+            }
             .padding()
         }
         .navigationTitle("Reports")
@@ -225,7 +227,7 @@ struct ReportsView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .glassCard()
     }
 
     // MARK: - Derived

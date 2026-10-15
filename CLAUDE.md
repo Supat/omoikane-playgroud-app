@@ -172,6 +172,11 @@ reference-count gate runs no matter where the delete started.
 `NumberPadField` is a custom Numbers-style numpad for amount entry (one of
 the few deliberate departures from stock controls).
 
+Surfaces: system chrome is Liquid Glass on its own. Every custom panel uses
+`.glassCard()` (Common.swift) inside a `GlassEffectContainer`; custom
+buttons use `.buttonStyle(.glass)` / `.glassProminent`. No flat
+`.background(Color…)` or material fills on cards.
+
 Amounts on screen always go through `Formatters.moneyText(_:currency:)` or
 `Text.moneyStyle()` (monospaced face + tabular digits). Don't write a bare
 `Text(Formatters.money(...))`. Amount *input* always uses `NumberPadField`,
