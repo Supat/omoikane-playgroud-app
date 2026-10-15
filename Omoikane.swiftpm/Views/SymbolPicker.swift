@@ -46,7 +46,6 @@ struct SymbolPicker: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                GlassEffectContainer(spacing: 12) {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: 12)], spacing: 12) {
                     ForEach(filtered, id: \.self) { name in
                         Button {
@@ -70,7 +69,6 @@ struct SymbolPicker: View {
                         .accessibilityLabel(name)
                         .accessibilityAddTraits(name == selection ? .isSelected : [])
                     }
-                }
                 }
                 .padding()
                 if filtered.isEmpty {

@@ -35,7 +35,6 @@ struct ReportsView: View {
 
     var body: some View {
         ScrollView {
-            GlassEffectContainer(spacing: 18) {
             VStack(alignment: .leading, spacing: 18) {
                 controls
                 summaryRow
@@ -176,7 +175,6 @@ struct ReportsView: View {
                         }
                     }
                 }
-            }
             }
             .padding()
         }

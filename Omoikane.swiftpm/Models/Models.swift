@@ -259,7 +259,8 @@ struct GroupedSummary: Identifiable, Hashable {
     var currency: String
     var totalMinor: Int64
     var count: Int
-    var id: String { "\(key)|\(currency)" }
+    /// keyId, not key: two accounts (or categories) may share a name.
+    var id: String { "\(keyId)|\(currency)" }
 }
 
 /// One row in `currency_rates`. Home currency is not stored here (it's a UI

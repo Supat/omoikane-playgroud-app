@@ -39,19 +39,16 @@ struct DashboardView: View {
 
     var body: some View {
         ScrollView {
-            // One container so the glass panels render and morph together.
-            GlassEffectContainer(spacing: 20) {
-                VStack(alignment: .leading, spacing: 20) {
-                    header
-                    if !missing.isEmpty { missingRatesBanner }
-                    summaryCards
-                    essentialSection
-                    calendarSection
-                    budgetSection
-                    trendChart
-                    categoryBreakdown
-                    accountBreakdown
-                }
+            VStack(alignment: .leading, spacing: 20) {
+                header
+                if !missing.isEmpty { missingRatesBanner }
+                summaryCards
+                essentialSection
+                calendarSection
+                budgetSection
+                trendChart
+                categoryBreakdown
+                accountBreakdown
             }
             .padding()
         }

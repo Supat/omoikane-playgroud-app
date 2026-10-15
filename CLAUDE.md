@@ -174,9 +174,11 @@ reference-count gate runs no matter where the delete started.
 the few deliberate departures from stock controls).
 
 Surfaces: system chrome is Liquid Glass on its own. Every custom panel uses
-`.glassCard()` (Common.swift) inside a `GlassEffectContainer`; custom
-buttons use `.buttonStyle(.glass)` / `.glassProminent`. No flat
-`.background(Color…)` or material fills on cards.
+`.glassCard()` (Common.swift); custom buttons use `.buttonStyle(.glass)` /
+`.glassProminent`. No flat `.background(Color…)` or material fills on cards.
+Don't wrap scrolling card stacks in `GlassEffectContainer`: it is for glass
+shapes that morph into each other, and on a ScrollView of static cards it
+logs "glassEffect() tried to update multiple times per frame".
 
 Amounts on screen always go through `Formatters.moneyText(_:currency:)` or
 `Text.moneyStyle()` (monospaced face + tabular digits). Don't write a bare
