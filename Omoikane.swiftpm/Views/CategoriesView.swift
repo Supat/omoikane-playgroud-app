@@ -75,18 +75,18 @@ struct CategoriesView: View {
         }
     }
 
-    /// One segment per budgeted expense category that counts toward the
-    /// allocation (parent, or child of an unbudgeted parent), in its colour.
+    /// One segment per parent expense category: its own budget, or, when it
+    /// has none, the sum of its sub-categories' budgets. Parents with no
+    /// budget anywhere are left out.
     private var budgetSlices: [StackedShareBar.Slice] {
         let all = categories + archivedCategories
         return categories
-            .filter { $0.kind == .expense && $0.budgetMinor != nil }
-            .filter { c in c.parentId.map { pid in categories.first { $0.id == pid }?.budgetMinor == nil } ?? true }
-            .map { c in
-                let parent = c.parentId.flatMap { pid in categories.first { $0.id == pid }?.name }
-                return StackedShareBar.Slice(name: parent.map { "\($0) › \(c.name)" } ?? c.name,
-                                             amount: c.budgetMinor ?? 0,
-                                             color: c.displayColor(in: all))
+            .filter { $0.kind == .expense && $0.parentId == nil }
+            .compactMap { parent in
+                let amount = parent.budgetMinor
+                    ?? categories.filter { $0.parentId == parent.id }.reduce(Int64(0)) { $0 + ($1.budgetMinor ?? 0) }
+                guard amount > 0 else { return nil }
+                return StackedShareBar.Slice(name: parent.name, amount: amount, color: parent.displayColor(in: all))
             }
             .sorted { $0.amount > $1.amount }
     }

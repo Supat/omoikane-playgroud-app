@@ -241,20 +241,23 @@ struct DashboardView: View {
         }
     }
 
-    /// Spend slices for the stacked bar: budgeted expense categories that
-    /// count toward the allocation, each with its month-to-date spend.
+    /// Spend slices at parent level: each parent expense category that has a
+    /// budget (its own, or via budgeted sub-categories) with the spend of
+    /// the covered part this month, in the parent's colour.
     private var spendSlices: [StackedShareBar.Slice] {
         let expenseRows = budgets.filter { $0.category.kind == .expense }
-        let budgetedIds = Set(expenseRows.map { $0.category.id })
-        return expenseRows
-            .filter { r in r.category.parentId.map { !budgetedIds.contains($0) } ?? true }
-            .filter { $0.spentHome > 0 }
-            .map { r in
-                let parent = r.category.parentId.flatMap { pid in categoryNames[pid] }
-                return StackedShareBar.Slice(name: parent.map { "\($0) › \(r.category.name)" } ?? r.category.name,
-                                             amount: r.spentHome,
-                                             color: r.category.ownColor ?? (r.category.parentId.flatMap { categoryColors[$0] }) ?? .accentColor)
-            }
+        var byParent: [Int64: (name: String, color: Color, amount: Int64)] = [:]
+        for r in expenseRows {
+            let parentId = r.category.parentId ?? r.category.id
+            // A budgeted parent already includes its children; skip the child rows then.
+            if let pid = r.category.parentId, expenseRows.contains(where: { $0.category.id == pid }) { continue }
+            let name = r.category.parentId.flatMap { categoryNames[$0] } ?? r.category.name
+            let color = (r.category.parentId.flatMap { categoryColors[$0] }) ?? r.category.ownColor ?? .accentColor
+            byParent[parentId, default: (name, color, 0)].amount += r.spentHome
+        }
+        return byParent.values
+            .filter { $0.amount > 0 }
+            .map { StackedShareBar.Slice(name: $0.name, amount: $0.amount, color: $0.color) }
             .sorted { $0.amount > $1.amount }
     }
     private var spendCapacityFromBudgets: Int64 {
