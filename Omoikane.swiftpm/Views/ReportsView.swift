@@ -118,10 +118,10 @@ struct ReportsView: View {
                             .foregroundStyle(.secondary)
                             .font(.subheadline)
                     } else {
-                        // A parent's budget covers its children: a child whose parent is
-                        // budgeted is shown but not counted twice in the total.
-                        let budgetedIds = Set(budgetRows.map { $0.category.id })
-                        let counted = budgetRows.filter { r in r.category.parentId.map { !budgetedIds.contains($0) } ?? true }
+                        // Totals follow the effective-budget rule: one figure per parent
+                        // (max of its own budget and its sub-categories' total), which every
+                        // parent row already carries; sub-category rows are shown, not summed.
+                        let counted = budgetRows.filter { $0.category.parentId == nil }
                         let expenseRows = counted.filter { $0.category.kind == .expense }
                         let incomeRows = counted.filter { $0.category.kind == .income }
                         let totalBudget = expenseRows.reduce(Int64(0)) { $0 + $1.budgetMinor }
