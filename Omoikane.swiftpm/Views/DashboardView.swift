@@ -71,6 +71,7 @@ struct DashboardView: View {
             Text("Calendar (\(app.homeCurrency))").font(.headline)
             MonthCalendar(yearMonth: $ymKey, selectedDay: $selectedDay,
                           dailyTotals: dailyTotals, currency: app.homeCurrency)
+                .frame(maxWidth: .infinity)
             if let day = selectedDay {
                 Divider()
                 HStack {

@@ -48,7 +48,9 @@ struct MonthCalendar: UIViewRepresentable {
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: UICalendarView, context: Context) -> CGSize? {
-        let width = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? 360
+        // One month page is ~360pt wide; wider than ~380 and UICalendarView
+        // starts showing the neighbouring months alongside.
+        let width = min(proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? 360, 380)
         let fitted = uiView.systemLayoutSizeFitting(
             CGSize(width: width, height: UIView.layoutFittingCompressedSize.height),
             withHorizontalFittingPriority: .required,
