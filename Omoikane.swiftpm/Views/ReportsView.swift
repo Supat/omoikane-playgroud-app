@@ -85,6 +85,33 @@ struct ReportsView: View {
                     }
                 }
 
+                if let monthly = app.monthlySpendingLimitMinor, monthly > 0 {
+                    let limit = monthly * Int64(monthsBack)
+                    let spent = homeExpenseTotal
+                    let over = spent > limit
+                    let share = Double(spent) / Double(limit)
+                    section("Spending limit (\(app.homeCurrency), \(monthsBack) month\(monthsBack == 1 ? "" : "s"))") {
+                        HStack {
+                            Text("Spent")
+                            Spacer()
+                            Text("\(Formatters.money(spent, currency: app.homeCurrency)) / \(Formatters.money(limit, currency: app.homeCurrency))")
+                                .moneyStyle()
+                                .font(.subheadline)
+                                .foregroundStyle(over ? .red : .primary)
+                        }
+                        ProgressView(value: min(share, 1))
+                            .tint(over ? .red : (share > 0.85 ? .orange : .accentColor))
+                            .accessibilityLabel("Spending against the limit for the range")
+                            .accessibilityValue(over ? "Over the limit" : "\(Int((share * 100).rounded())) percent used")
+                        Text(over
+                             ? "Over the limit by \(Formatters.money(spent - limit, currency: app.homeCurrency)) across the range."
+                             : "\(Formatters.money(limit - spent, currency: app.homeCurrency)) under the limit across the range (\(Formatters.money(monthly, currency: app.homeCurrency)) per month).")
+                            .moneyStyle()
+                            .font(.caption)
+                            .foregroundStyle(over ? .red : .secondary)
+                    }
+                }
+
                 section("Budgets (\(app.homeCurrency), \(monthsBack) month\(monthsBack == 1 ? "" : "s"))") {
                     if budgetRows.isEmpty {
                         Text("No budgets set. Give an expense category a monthly budget in the Categories tab.")
@@ -268,6 +295,12 @@ struct ReportsView: View {
     // MARK: - Derived
 
     private var displayCurrency: String { currencyFilter ?? app.homeCurrency }
+
+    /// Range expense in the home currency, ignoring the currency filter,
+    /// since the spending limit is a home-currency figure.
+    private var homeExpenseTotal: Int64 {
+        totals.total(for: .expense).reduce(Int64(0)) { $0 + (app.convertedToHome($1.value, from: $1.key) ?? 0) }
+    }
 
     private func displayCurrencyTotal(_ k: TransactionKind) -> Int64 {
         if let c = currencyFilter {
