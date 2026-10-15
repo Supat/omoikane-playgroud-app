@@ -17,6 +17,9 @@ struct CategoriesView: View {
     @State private var deletePrompt: CategoryDeletePrompt? = nil
     @State private var actionError: String? = nil
     @State private var limitText: String = ""
+    /// This month's spend (expense) or income per category, home currency,
+    /// parents including their sub-categories.
+    @State private var monthUsed: [Int64: Int64] = [:]
 
     var body: some View {
         List {
@@ -170,7 +173,7 @@ struct CategoriesView: View {
 
     @ViewBuilder
     private func section(for kind: CategoryKind) -> some View {
-        Section(kind == .expense ? "Expense" : "Income") {
+        Section("\(kind == .expense ? "Expense" : "Income") · \(YearMonth.label(YearMonth.current()))") {
             let topLevels = categories.filter { $0.kind == kind && $0.parentId == nil }
             if topLevels.isEmpty {
                 Text("No \(kind == .expense ? "expense" : "income") categories yet.")
@@ -249,14 +252,26 @@ struct CategoriesView: View {
     }
 
     /// "¥60,000 / mo" for a budgeted category, nothing otherwise.
+    /// "¥12,300 / ¥60,000" this month against the budget, or just this
+    /// month's figure when there is no budget. Red when an expense budget is
+    /// passed, green when an income target is reached.
     @ViewBuilder
     private func budgetLabel(_ c: LedgerCategory) -> some View {
-        if let b = c.budgetMinor {
-            Text("\(Formatters.money(b, currency: app.homeCurrency)) / mo")
+        let used = monthUsed[c.id] ?? 0
+        let usedText = Formatters.money(used, currency: app.homeCurrency)
+        if let b = c.effectiveBudgetMinor(in: categories + archivedCategories) {
+            let over = used > b
+            Text("\(usedText) / \(Formatters.money(b, currency: app.homeCurrency))")
+                .moneyStyle()
+                .font(.subheadline)
+                .foregroundStyle(c.kind == .expense ? (over ? .red : .secondary) : (used >= b ? .green : .secondary))
+                .accessibilityLabel("\(usedText) this month of a \(Formatters.money(b, currency: app.homeCurrency)) monthly \(c.kind == .expense ? "budget" : "target")")
+        } else if used != 0 {
+            Text(usedText)
                 .moneyStyle()
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-                .accessibilityLabel("Budget \(Formatters.money(b, currency: app.homeCurrency)) per month")
+                .accessibilityLabel("\(usedText) this month")
         }
     }
 
@@ -355,6 +370,14 @@ struct CategoriesView: View {
             let all = try app.categories.list(includeArchived: true)
             categories = all.filter { !$0.isArchived }
             archivedCategories = all.filter(\.isArchived)
+            let ym = YearMonth.current()
+            let expense = try app.summaries.byCategory(fromYM: ym, toYM: ym, kind: .expense)
+            let income = try app.summaries.byCategory(fromYM: ym, toYM: ym, kind: .income)
+            monthUsed = Dictionary(uniqueKeysWithValues: all.map { c in
+                let ids = c.familyIds(in: all)
+                let rows = (c.kind == .income ? income : expense).filter { ids.contains($0.keyId) }
+                return (c.id, app.sumToHome(rows.map { ($0.totalMinor, $0.currency) }))
+            })
         } catch {
             print("CategoriesView reload error: \(error)")
         }
