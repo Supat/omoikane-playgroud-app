@@ -441,6 +441,10 @@ struct AccountTransactionsView: View {
     private func rowView(_ tx: Transaction) -> some View {
         let cat = categoriesById[tx.categoryId]
         let acc = accountsById[tx.accountId]
+        let to = tx.counterpartyAccountId.flatMap { accountsById[$0] }
+        // Transfers are titled by role (Asset purchase, Repayment…) and
+        // show both ends; their category is a hidden placeholder.
+        let role = (acc.flatMap { a in to.map { AccountKind.transferRole(from: a.kind, to: $0.kind) } } ?? nil) ?? "Transfer"
         HStack(spacing: 12) {
             ZStack {
                 Circle().fill(tint(for: tx.kind).opacity(0.15)).frame(width: 36, height: 36)
@@ -467,11 +471,11 @@ struct AccountTransactionsView: View {
                             .font(.caption)
                             .accessibilityLabel("Essential")
                     }
-                    Text(cat?.name ?? "—").font(.body)
+                    Text(tx.kind == .transfer ? role : (cat?.name ?? "—")).font(.body)
                 }
                 HStack(spacing: 6) {
                     if let acc {
-                        Text(acc.name)
+                        Text(to.map { "\(acc.name) → \($0.name)" } ?? acc.name)
                     }
                     if let note = tx.note, !note.isEmpty {
                         Text("·")
