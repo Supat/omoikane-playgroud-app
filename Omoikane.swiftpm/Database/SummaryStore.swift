@@ -215,6 +215,23 @@ final class SummaryStore {
 
     /// Distinct currencies that have any monthly_summaries activity in the
     /// window — used to populate the rates editor and currency filters.
+    /// Essential expense per currency in a month window. Reads the fact
+    /// table (the flag isn't a summary dimension); the year_month index
+    /// keeps it to one month's rows.
+    func essentialExpense(fromYM: Int, toYM: Int) throws -> [String: Int64] {
+        let s = try db.prepare("""
+            SELECT currency, SUM(amount_minor)
+              FROM transactions
+             WHERE kind = 'expense' AND is_essential = 1
+               AND year_month BETWEEN ? AND ?
+             GROUP BY currency;
+        """)
+        s.bind(Int64(fromYM), at: 1).bind(Int64(toYM), at: 2)
+        var out: [String: Int64] = [:]
+        while try s.step() { out[s.string(0)] = s.int64(1) }
+        return out
+    }
+
     func distinctCurrencies(fromYM: Int? = nil, toYM: Int? = nil) throws -> [String] {
         var sql = "SELECT DISTINCT currency FROM monthly_summaries"
         var binds: [(Statement, Int32) -> Void] = []

@@ -10,6 +10,7 @@ struct DashboardView: View {
     @State private var topAccounts: [GroupedSummary] = []
     @State private var ymKey: Int = YearMonth.current()
     @State private var budgets: [BudgetRow] = []
+    @State private var essentialByCurrency: [String: Int64] = [:]
 
     struct BudgetRow: Identifiable {
         var category: LedgerCategory
@@ -23,6 +24,7 @@ struct DashboardView: View {
                 header
                 if !missing.isEmpty { missingRatesBanner }
                 summaryCards
+                essentialSection
                 budgetSection
                 trendChart
                 categoryBreakdown
@@ -54,6 +56,46 @@ struct DashboardView: View {
                 if m < 1  { ymKey = YearMonth.key(year: y - 1, month: 12) }
                 if m > 12 { ymKey = YearMonth.key(year: y + 1, month: 1) }
             }
+        }
+    }
+
+    /// Essential vs discretionary share of the month's spending, in the
+    /// home currency. Hidden until at least one expense is flagged.
+    @ViewBuilder
+    private var essentialSection: some View {
+        let essential = sumToHome(essentialByCurrency)
+        if essential > 0 {
+            let discretionary = max(homeExpense - essential, 0)
+            let share = homeExpense > 0 ? Double(essential) / Double(homeExpense) : 0
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Essential vs discretionary (\(app.homeCurrency))").font(.headline)
+                HStack {
+                    Label("Essential", systemImage: "lifepreserver").foregroundStyle(.orange)
+                    Spacer()
+                    Formatters.moneyText(essential, currency: app.homeCurrency)
+                    Text("\(Int((share * 100).rounded()))%")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                        .frame(width: 44, alignment: .trailing)
+                }
+                HStack {
+                    Label("Discretionary", systemImage: "cart").foregroundStyle(.secondary)
+                    Spacer()
+                    Formatters.moneyText(discretionary, currency: app.homeCurrency)
+                    Text("\(Int(((1 - share) * 100).rounded()))%")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                        .frame(width: 44, alignment: .trailing)
+                }
+                ProgressView(value: share)
+                    .tint(.orange)
+                    .accessibilityLabel("Essential share of spending")
+                    .accessibilityValue("\(Int((share * 100).rounded())) percent")
+            }
+            .padding(12)
+            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 
@@ -313,6 +355,7 @@ struct DashboardView: View {
             let win = YearMonth.window(endingAt: ymKey, monthsBack: 6)
             trend = try app.summaries.byMonth(fromYM: win.start, toYM: win.end, kind: .expense)
             topAccounts = try app.summaries.netByAccount(fromYM: ymKey, toYM: ymKey)
+            essentialByCurrency = try app.summaries.essentialExpense(fromYM: ymKey, toYM: ymKey)
             let cats = try app.categories.list()
             budgets = cats.filter { $0.budgetMinor != nil }.map { c in
                 let ids = Set([c.id] + cats.filter { $0.parentId == c.id }.map(\.id))
