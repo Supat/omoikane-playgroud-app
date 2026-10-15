@@ -212,31 +212,35 @@ struct TransactionEntryView: View {
                 Section {
                     if isSplit {
                         ForEach($splitLines) { $line in
-                            HStack {
-                                Picker("Category", selection: Binding(
-                                    get: { line.categoryId ?? availableCategories.first?.id ?? 0 },
-                                    set: { line.categoryId = $0 }
-                                )) {
-                                    ForEach(availableCategories) { c in Text(c.name).tag(c.id) }
+                            // Same glyph strip as the main category row, one per line,
+                            // with the line's amount and remove button above it.
+                            VStack(alignment: .leading, spacing: 0) {
+                                HStack {
+                                    Text(categoryPath(for: line.categoryId))
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                    Spacer()
+                                    NumberPadField(
+                                        text: $line.amountText,
+                                        placeholder: "0",
+                                        font: NumberPadField.monospaced(.body),
+                                        alignment: .right
+                                    )
+                                    .frame(maxWidth: 140)
+                                    Button {
+                                        splitLines.removeAll { $0.id == line.id }
+                                        collapseSplitIfSingle()
+                                    } label: {
+                                        Image(systemName: "minus.circle")
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .accessibilityLabel("Remove line")
                                 }
-                                .labelsHidden()
-                                Spacer()
-                                NumberPadField(
-                                    text: $line.amountText,
-                                    placeholder: "0",
-                                    font: NumberPadField.monospaced(.body),
-                                    alignment: .right
-                                )
-                                .frame(maxWidth: 140)
-                                Button {
-                                    splitLines.removeAll { $0.id == line.id }
-                                    collapseSplitIfSingle()
-                                } label: {
-                                    Image(systemName: "minus.circle")
-                                }
-                                .buttonStyle(.borderless)
-                                .accessibilityLabel("Remove line")
+                                .padding(.horizontal, 16)
+                                .padding(.top, 10)
+                                CategoryGlyphPicker(categories: availableCategories, selection: $line.categoryId)
                             }
+                            .listRowInsets(EdgeInsets())
                         }
                         Button {
                             splitLines.append(SplitLine(categoryId: availableCategories.first?.id, amountText: ""))
@@ -434,8 +438,10 @@ struct TransactionEntryView: View {
     }
 
     /// "Food › Groceries" for the current selection, for the row header.
-    private var selectedCategoryPath: String {
-        guard let id = categoryId ?? availableCategories.first?.id,
+    private var selectedCategoryPath: String { categoryPath(for: categoryId) }
+
+    private func categoryPath(for id: Int64?) -> String {
+        guard let id = id ?? availableCategories.first?.id,
               let c = categories.first(where: { $0.id == id }) else { return "" }
         if let p = c.parentId, let parent = categories.first(where: { $0.id == p }) {
             return "\(parent.name) › \(c.name)"
