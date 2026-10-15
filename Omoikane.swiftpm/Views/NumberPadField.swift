@@ -177,11 +177,7 @@ struct NumberPadField: UIViewRepresentable {
         tf.placeholder = placeholder
         tf.font = font
         tf.adjustsFontForContentSizeCategory = true
-        // Long amounts shrink rather than push the row's siblings off screen.
-        tf.adjustsFontSizeToFitWidth = true
-        tf.minimumFontSize = 11
         tf.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        tf.setContentHuggingPriority(.defaultLow, for: .horizontal)
         tf.textAlignment = alignment
         tf.text = Self.grouped(text)
         tf.delegate = context.coordinator
@@ -207,6 +203,14 @@ struct NumberPadField: UIViewRepresentable {
         }
         tf.inputView = pad
         return tf
+    }
+
+    /// Take the width the layout offers instead of the text's own width,
+    /// so a long amount scrolls inside the field (stock text-field
+    /// behaviour) rather than running over the currency label beside it.
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextField, context: Context) -> CGSize? {
+        let intrinsic = uiView.intrinsicContentSize
+        return CGSize(width: proposal.width ?? intrinsic.width, height: intrinsic.height)
     }
 
     func updateUIView(_ uiView: UITextField, context: Context) {
