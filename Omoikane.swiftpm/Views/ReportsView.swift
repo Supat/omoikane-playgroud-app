@@ -13,6 +13,7 @@ struct ReportsView: View {
     /// nil = "All currencies → home rollup". Non-nil = isolate one currency.
     @State private var currencyFilter: String? = nil
     @State private var byMonth: [GroupedSummary] = []
+    @State private var byDay: [SummaryStore.DayTotal] = []
     @State private var byCategory: [GroupedSummary] = []
     @State private var byAccount: [GroupedSummary] = []
     @State private var totals: SummaryStore.CurrencyTotals = .init()
@@ -36,29 +37,32 @@ struct ReportsView: View {
                 controls
                 summaryRow
 
-                section(currencyFilter == nil ? "Trend (\(app.homeCurrency))" : "Trend (\(currencyFilter!))") {
-                    if trendRows.isEmpty {
+                section("Trend (\(displayCurrency)) · \(trendUnitName)") {
+                    if trendPoints.allSatisfy({ $0.minor == 0 }) {
                         EmptyStateView(title: "No data", message: "Try a longer range.", sfSymbol: "chart.bar")
                             .frame(height: 200)
                     } else {
-                        Chart(trendRows, id: \.label) { row in
+                        Chart(trendPoints, id: \.date) { p in
                             LineMark(
-                                x: .value("Month", YearMonth.date(fromLabel: row.label), unit: .month),
-                                y: .value("Total", Double(row.minor))
+                                x: .value("Date", p.date, unit: trendUnit),
+                                y: .value("Total", Double(p.minor))
                             )
                             .interpolationMethod(.monotone)
                             PointMark(
-                                x: .value("Month", YearMonth.date(fromLabel: row.label), unit: .month),
-                                y: .value("Total", Double(row.minor))
+                                x: .value("Date", p.date, unit: trendUnit),
+                                y: .value("Total", Double(p.minor))
                             )
                         }
-                        // A date axis thins its own labels: "Oct 25", "Jan 26"…
+                        // Marks follow the bucket unit, thinned to ~8 labels.
                         .chartXAxis {
-                            // One mark per month, thinned so at most ~8 labels show.
-                            AxisMarks(values: .stride(by: .month, count: max(1, trendRows.count / 8))) { _ in
+                            AxisMarks(values: .stride(by: trendUnit, count: max(1, trendPoints.count / 8))) { _ in
                                 AxisGridLine()
                                 AxisTick()
-                                AxisValueLabel(format: .dateTime.month(.abbreviated).year())
+                                if trendUnit == .month {
+                                    AxisValueLabel(format: .dateTime.month(.abbreviated).year())
+                                } else {
+                                    AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                                }
                             }
                         }
                         .frame(height: 240)
@@ -275,22 +279,74 @@ struct ReportsView: View {
         }
     }
 
-    private struct LabeledMinor: Hashable { let label: String; let minor: Int64 }
-
-    private var trendRows: [LabeledMinor] {
-        var bucket: [String: Int64] = [:]
-        for row in byMonth {
-            let amount: Int64?
-            if currencyFilter != nil {
-                amount = (row.currency == currencyFilter) ? row.totalMinor : nil
-            } else {
-                amount = app.convertedToHome(row.totalMinor, from: row.currency)
-            }
-            if let a = amount { bucket[row.key, default: 0] += a }
+    /// Bucket size for the trend chart: daily for one month, weekly for a
+    /// quarter, monthly beyond that.
+    private var trendUnit: Calendar.Component {
+        switch monthsBack {
+        case 1:  return .day
+        case 3:  return .weekOfYear
+        default: return .month
         }
-        return bucket
-            .sorted { $0.key < $1.key }
-            .map { LabeledMinor(label: $0.key, minor: $0.value) }
+    }
+    private var trendUnitName: String {
+        switch trendUnit {
+        case .day:        return "daily"
+        case .weekOfYear: return "weekly"
+        default:          return "monthly"
+        }
+    }
+
+    private struct TrendPoint: Hashable { let date: Date; let minor: Int64 }
+
+    /// Amount in the display currency, or nil when it can't be shown.
+    private func displayAmount(_ minor: Int64, currency: String) -> Int64? {
+        if let f = currencyFilter { return currency == f ? minor : nil }
+        return app.convertedToHome(minor, from: currency)
+    }
+
+    /// One point per bucket across the whole window, zero-filled so gaps
+    /// read as zero rather than vanishing. The window stops at today when
+    /// it ends in the current month.
+    private var trendPoints: [TrendPoint] {
+        let cal = Calendar.current
+        let win = YearMonth.window(endingAt: anchorYM, monthsBack: monthsBack)
+        let (sy, sm) = YearMonth.components(win.start)
+        let (ey, em) = YearMonth.components(win.end)
+        guard let startDate = cal.date(from: DateComponents(year: sy, month: sm, day: 1)),
+              let nextMonth = cal.date(from: DateComponents(year: ey, month: em + 1, day: 1)),
+              let monthEnd = cal.date(byAdding: .day, value: -1, to: nextMonth)
+        else { return [] }
+        let endDate = min(monthEnd, Date())
+        guard startDate <= endDate else { return [] }
+
+        func bucketStart(_ d: Date) -> Date {
+            cal.dateInterval(of: trendUnit, for: d)?.start ?? d
+        }
+        var bucket: [Date: Int64] = [:]
+        if trendUnit == .month {
+            for row in byMonth {
+                if let a = displayAmount(row.totalMinor, currency: row.currency) {
+                    bucket[bucketStart(YearMonth.date(fromLabel: row.key)), default: 0] += a
+                }
+            }
+        } else {
+            for row in byDay {
+                if let a = displayAmount(row.minor, currency: row.currency) {
+                    bucket[bucketStart(Date.from(dayKey: row.dayKey)), default: 0] += a
+                }
+            }
+        }
+        var points: [TrendPoint] = []
+        var cursor = bucketStart(startDate)
+        let last = bucketStart(endDate)
+        var guardCount = 0
+        while cursor <= last, guardCount < 1000 {
+            points.append(TrendPoint(date: cursor, minor: bucket[cursor] ?? 0))
+            guard let next = cal.date(byAdding: trendUnit, value: 1, to: cursor) else { break }
+            cursor = bucketStart(next)
+            guardCount += 1
+        }
+        return points
     }
 
     private struct CategoryRow: Hashable { let name: String; let minor: Int64 }
@@ -317,6 +373,7 @@ struct ReportsView: View {
         let win = YearMonth.window(endingAt: anchorYM, monthsBack: monthsBack)
         do {
             byMonth     = try app.summaries.byMonth(fromYM: win.start, toYM: win.end, kind: kind, currency: currencyFilter)
+            byDay       = trendUnit == .month ? [] : try app.summaries.dailyTotals(fromYM: win.start, toYM: win.end, kind: kind)
             byCategory  = try app.summaries.byCategory(fromYM: win.start, toYM: win.end, kind: kind, currency: currencyFilter)
             byAccount   = try app.summaries.byAccount(fromYM: win.start, toYM: win.end, kind: kind)
                 .filter { currencyFilter == nil || $0.currency == currencyFilter }

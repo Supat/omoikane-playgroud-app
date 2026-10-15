@@ -232,6 +232,25 @@ final class SummaryStore {
         return out
     }
 
+    struct DayTotal: Hashable { var dayKey: Int; var currency: String; var minor: Int64 }
+
+    /// Per-day totals of one kind over a month window, straight from the
+    /// fact table (the summary table is monthly). Used for daily/weekly
+    /// trend charts on short ranges.
+    func dailyTotals(fromYM: Int, toYM: Int, kind: TransactionKind) throws -> [DayTotal] {
+        let s = try db.prepare("""
+            SELECT occurred_on, currency, SUM(amount_minor)
+              FROM transactions
+             WHERE kind = ? AND year_month BETWEEN ? AND ?
+             GROUP BY occurred_on, currency
+             ORDER BY occurred_on;
+        """)
+        s.bind(kind.rawValue, at: 1).bind(Int64(fromYM), at: 2).bind(Int64(toYM), at: 3)
+        var out: [DayTotal] = []
+        while try s.step() { out.append(DayTotal(dayKey: s.int(0), currency: s.string(1), minor: s.int64(2))) }
+        return out
+    }
+
     /// Expense per day and currency inside one month: dayKey → currency → minor.
     func dailyExpense(yearMonth: Int) throws -> [Int: [String: Int64]] {
         let s = try db.prepare("""
