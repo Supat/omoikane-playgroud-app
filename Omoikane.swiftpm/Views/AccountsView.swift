@@ -123,7 +123,7 @@ struct AccountsView: View {
             AccountDetailView(accountId: a.id)
         } label: {
             HStack {
-                Image(systemName: a.kind.sfSymbol).foregroundStyle(.tint)
+                Image(systemName: a.kind.sfSymbol).foregroundStyle(.tint).leadingIcon()
                 VStack(alignment: .leading) {
                     Text(a.name)
                     Text("\(a.kind.displayName) · \(a.currency)")

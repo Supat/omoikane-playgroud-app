@@ -102,6 +102,10 @@ extension Text {
 }
 
 extension View {
+    /// Fixed-width slot for a row's leading symbol so titles line up no
+    /// matter how wide the glyph is.
+    func leadingIcon() -> some View { frame(width: 28, alignment: .center) }
+
     /// Liquid Glass card surface, the house style for every custom panel.
     func glassCard(cornerRadius: CGFloat = 14) -> some View {
         glassEffect(in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))

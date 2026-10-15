@@ -73,7 +73,7 @@ struct SchedulesView: View {
     private func row(_ sc: Schedule) -> some View {
         let acct = accounts[sc.accountId]
         return HStack {
-            Image(systemName: sc.kind.sfSymbol).foregroundStyle(.tint)
+            Image(systemName: sc.kind.sfSymbol).foregroundStyle(.tint).leadingIcon()
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     if sc.isEssential {

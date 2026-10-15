@@ -89,6 +89,7 @@ struct CategoriesView: View {
                 HStack {
                     Image(systemName: c.icon ?? "tag")
                         .foregroundStyle(c.kind == .income ? .green : .red)
+                        .leadingIcon()
                     Text(c.name)
                     Spacer()
                 }
@@ -116,8 +117,10 @@ struct CategoriesView: View {
                 Image(systemName: "arrow.turn.down.right")
                     .foregroundStyle(.tertiary)
                     .font(.caption)
+                    .frame(width: 16)
                 Image(systemName: c.icon ?? "tag")
                     .foregroundStyle(c.kind == .income ? .green : .red)
+                    .leadingIcon()
                 Text(c.name)
                 Spacer()
             }
@@ -157,6 +160,7 @@ struct CategoriesView: View {
             HStack {
                 Image(systemName: c.icon ?? "tag")
                     .foregroundStyle(c.kind == .income ? .green : .red)
+                    .leadingIcon()
                 Text(c.name)
                 Spacer()
                 Text(c.kind == .income ? "Income" : "Expense")
