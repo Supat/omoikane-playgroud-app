@@ -26,11 +26,17 @@ struct Money: Hashable, CustomStringConvertible {
     /// "1,234.5" → minor units for `currency`; nil for empty or unparsable text.
     static func parseMinor(_ text: String, currency: String) -> Int64? {
         let cleaned = text.replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)
-        guard !cleaned.isEmpty else { return nil }
-        let digits = fractionDigits(for: currency)
-        if digits == 0 { return Int64(cleaned) }
-        guard let d = Double(cleaned) else { return nil }
-        return Int64((d * pow(10.0, Double(digits))).rounded())
+        // Decimal, not Double: Double loses integer precision past 2^53,
+        // which a 15-digit amount in a 2-decimal currency exceeds.
+        guard !cleaned.isEmpty,
+              var scaled = Decimal(string: cleaned, locale: Locale(identifier: "en_US_POSIX"))
+        else { return nil }
+        scaled *= pow(Decimal(10), fractionDigits(for: currency))
+        var rounded = Decimal()
+        NSDecimalRound(&rounded, &scaled, 0, .plain)
+        // Int64 conversion wraps silently out of range; refuse instead.
+        guard abs(rounded) < Decimal(sign: .plus, exponent: 18, significand: 9) else { return nil }
+        return NSDecimalNumber(decimal: rounded).int64Value
     }
 
     /// Minor units → plain editable text ("1234" or "12.34"), no symbol.

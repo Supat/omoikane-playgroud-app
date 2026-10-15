@@ -151,6 +151,19 @@ struct NumberPadField: UIViewRepresentable {
         return UIFontMetrics(forTextStyle: style).scaledFont(for: .monospacedSystemFont(ofSize: size, weight: weight))
     }
 
+    /// Largest amount the field accepts: 15 integer digits and 2 fraction
+    /// digits. Keeps every currency's minor-unit value far inside Int64 and
+    /// stops runaway typing from growing the field without bound.
+    static let maxIntegerDigits = 15
+    static let maxFractionDigits = 2
+    static func withinLimits(_ raw: String) -> Bool {
+        let cleaned = raw.replacingOccurrences(of: ",", with: "")
+        let parts = cleaned.split(separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
+        if parts[0].count > maxIntegerDigits { return false }
+        if parts.count == 2, parts[1].count > maxFractionDigits { return false }
+        return true
+    }
+
     /// Thousands separators on the integer part, fraction left as typed.
     /// "1234567.5" → "1,234,567.5". Keeps a trailing "." while the user
     /// is still typing the fraction.
@@ -210,7 +223,8 @@ struct NumberPadField: UIViewRepresentable {
     /// behaviour) rather than running over the currency label beside it.
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextField, context: Context) -> CGSize? {
         let intrinsic = uiView.intrinsicContentSize
-        return CGSize(width: proposal.width ?? intrinsic.width, height: intrinsic.height)
+        let width = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? intrinsic.width
+        return CGSize(width: width, height: intrinsic.height)
     }
 
     func updateUIView(_ uiView: UITextField, context: Context) {
@@ -261,6 +275,7 @@ struct NumberPadField: UIViewRepresentable {
             guard let r = Range(range, in: current) else { return false }
             let proposed = current.replacingCharacters(in: r, with: string)
             let filtered = NumericInput.filter(proposed)
+            guard NumberPadField.withinLimits(filtered) else { return false }
             if filtered != proposed {
                 textField.text = filtered
                 textField.sendActions(for: .editingChanged)
@@ -276,7 +291,7 @@ struct NumberPadField: UIViewRepresentable {
         func handle(action: NumberPadAction, on tf: UITextField) {
             switch action {
             case .digit(let d):
-                tf.insertText(d)
+                if NumberPadField.withinLimits((tf.text ?? "") + d) { tf.insertText(d) }
             case .dot:
                 // Refuse a second dot — easier than letting the filter
                 // strip it after the fact (which would shift the cursor).

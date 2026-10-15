@@ -435,13 +435,7 @@ struct ReconciliationSheet: View {
     // MARK: - Number helpers (mirror TransactionEditor)
 
     private func parseMinor(_ text: String, currency: String) -> Int64? {
-        let cleaned = text.replacingOccurrences(of: ",", with: "")
-        let digits = Money.fractionDigits(for: currency)
-        if digits == 0 {
-            return Int64(cleaned)
-        }
-        guard let d = Double(cleaned) else { return nil }
-        return Int64((d * pow(10.0, Double(digits))).rounded())
+        Money.parseMinor(text, currency: currency)
     }
 
     private func formatMinorToInputText(_ minor: Int64) -> String {
