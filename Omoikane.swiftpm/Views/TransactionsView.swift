@@ -9,18 +9,14 @@ struct TransactionsView: View {
 
     @State private var accounts: [Account] = []
     @State private var balanceByAccount: [Int64: Int64] = [:]
-    /// Drives the drill-down via `.navigationDestination(item:)`. We avoid
-    /// `NavigationLink` here because on iPadOS with a hardware keyboard,
-    /// arrow / Tab focusing a `NavigationLink` inside a `List` was firing
-    /// it without a deliberate Return — a `Button` only navigates when
-    /// activated, so focus alone is harmless.
+    /// Drives the drill-down via `.navigationDestination(item:)`. Set by
+    /// row tap or by the Return-key handler on the keyboard-highlighted
+    /// account.
     @State private var pushedAccountId: Int64? = nil
     /// Keyboard-driven row highlight. Arrow keys move it; Return navigates
     /// to the highlighted account. Decoupled from `pushedAccountId` so a
     /// drill-down doesn't lose the highlight when the user navigates back.
     @State private var highlightedAccountId: Int64? = nil
-    /// Claim focus on appear so arrow keys land on this list rather than
-    /// drifting to a sibling control.
     @FocusState private var listFocused: Bool
 
     var body: some View {
@@ -58,16 +54,13 @@ struct TransactionsView: View {
         .task(id: app.dataVersion) { reload() }
         .onAppear { listFocused = true }
         .onChange(of: accounts) { _, newAccounts in
-            // Don't carry stale highlights across reloads (e.g. after the
-            // user archives an account from the Accounts tab and switches
-            // back here).
+            // Don't carry stale highlights across reloads.
             if let id = highlightedAccountId,
                !newAccounts.contains(where: { $0.id == id }) {
                 highlightedAccountId = nil
             }
         }
         .onKeyPress(.return) {
-            // Return navigates to the keyboard-highlighted account.
             if let id = highlightedAccountId {
                 pushedAccountId = id
                 return .handled
@@ -75,8 +68,6 @@ struct TransactionsView: View {
             return .ignored
         }
         .onKeyPress(.escape) {
-            // Esc drops the highlight and resigns list focus, matching
-            // the dismissal pattern used in AccountTransactionsView.
             if highlightedAccountId != nil || listFocused {
                 highlightedAccountId = nil
                 listFocused = false
@@ -86,34 +77,33 @@ struct TransactionsView: View {
         }
     }
 
+    /// Plain HStack + `.onTapGesture` — deliberately not a `Button`.
+    /// Wrapping the cell in a Button makes it a focusable child of the
+    /// List, which captures arrow keys before `List(selection:)` can act
+    /// on them. AccountTransactionsView uses this same pattern and its
+    /// arrow nav works correctly. Navigation is gated by
+    /// `pushedAccountId`, written here on tap or by `onKeyPress(.return)`,
+    /// so focus alone never auto-navigates.
     @ViewBuilder
     private func row(for a: Account) -> some View {
-        Button {
-            pushedAccountId = a.id
-        } label: {
-            HStack {
-                Image(systemName: a.kind.sfSymbol).foregroundStyle(.tint)
-                VStack(alignment: .leading) {
-                    Text(a.name)
-                    Text("\(a.kind.displayName) · \(a.currency)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Text(Formatters.money(balanceByAccount[a.id] ?? 0, currency: a.currency))
-                    .monospacedDigit()
-                    .foregroundStyle((balanceByAccount[a.id] ?? 0) >= 0 ? Color.primary : .red)
-                // Manual chevron — Button(.plain) doesn't draw the
-                // disclosure indicator that NavigationLink would.
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
+        HStack {
+            Image(systemName: a.kind.sfSymbol).foregroundStyle(.tint)
+            VStack(alignment: .leading) {
+                Text(a.name)
+                Text("\(a.kind.displayName) · \(a.currency)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .contentShape(Rectangle())
+            Spacer()
+            Text(Formatters.money(balanceByAccount[a.id] ?? 0, currency: a.currency))
+                .monospacedDigit()
+                .foregroundStyle((balanceByAccount[a.id] ?? 0) >= 0 ? Color.primary : .red)
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
         }
-        .buttonStyle(.plain)
-        // Tag drives the List's keyboard selection — arrow keys move
-        // the highlight onto this row when its tag matches selection.
+        .contentShape(Rectangle())
+        .onTapGesture { pushedAccountId = a.id }
         .tag(a.id)
     }
 

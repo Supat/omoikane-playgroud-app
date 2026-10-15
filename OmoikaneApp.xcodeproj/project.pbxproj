@@ -12,11 +12,8 @@
 		B100000000000000000003 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000003 /* DashboardView.swift */; };
 		B100000000000000000004 /* TransactionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000004 /* TransactionsView.swift */; };
 		B100000000000000000005 /* TransactionEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000005 /* TransactionEditor.swift */; };
-		B100000000000000000025 /* TransactionEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000025 /* TransactionEntryView.swift */; };
-		B100000000000000000026 /* NumberPadField.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000026 /* NumberPadField.swift */; };
 		B100000000000000000006 /* ReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000006 /* ReportsView.swift */; };
 		B100000000000000000007 /* AccountsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000007 /* AccountsView.swift */; };
-		B100000000000000000024 /* CategoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000024 /* CategoriesView.swift */; };
 		B100000000000000000008 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000008 /* SettingsView.swift */; };
 		B100000000000000000009 /* Common.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000009 /* Common.swift */; };
 		B10000000000000000000A /* Database.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000A /* Database.swift */; };
@@ -25,14 +22,17 @@
 		B10000000000000000000D /* TransactionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000D /* TransactionStore.swift */; };
 		B10000000000000000000E /* SummaryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000E /* SummaryStore.swift */; };
 		B10000000000000000000F /* SeedData.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000F /* SeedData.swift */; };
-		B100000000000000000020 /* CurrencyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000020 /* CurrencyStore.swift */; };
-		B100000000000000000021 /* StatementStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000021 /* StatementStore.swift */; };
-		B100000000000000000022 /* AccountDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000022 /* AccountDetailView.swift */; };
-		B100000000000000000023 /* ReconciliationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000023 /* ReconciliationSheet.swift */; };
 		B100000000000000000010 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000010 /* Models.swift */; };
 		B100000000000000000011 /* Money.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000011 /* Money.swift */; };
 		B100000000000000000012 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000012 /* AppState.swift */; };
 		B100000000000000000013 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F100000000000000000013 /* Assets.xcassets */; };
+		B100000000000000000020 /* CurrencyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000020 /* CurrencyStore.swift */; };
+		B100000000000000000021 /* StatementStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000021 /* StatementStore.swift */; };
+		B100000000000000000022 /* AccountDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000022 /* AccountDetailView.swift */; };
+		B100000000000000000023 /* ReconciliationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000023 /* ReconciliationSheet.swift */; };
+		B100000000000000000024 /* CategoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000024 /* CategoriesView.swift */; };
+		B100000000000000000025 /* TransactionEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000025 /* TransactionEntryView.swift */; };
+		B100000000000000000026 /* NumberPadField.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000026 /* NumberPadField.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -41,11 +41,8 @@
 		F100000000000000000003 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DashboardView.swift; path = Omoikane.swiftpm/Views/DashboardView.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000004 /* TransactionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TransactionsView.swift; path = Omoikane.swiftpm/Views/TransactionsView.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000005 /* TransactionEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TransactionEditor.swift; path = Omoikane.swiftpm/Views/TransactionEditor.swift; sourceTree = SOURCE_ROOT; };
-		F100000000000000000025 /* TransactionEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TransactionEntryView.swift; path = Omoikane.swiftpm/Views/TransactionEntryView.swift; sourceTree = SOURCE_ROOT; };
-		F100000000000000000026 /* NumberPadField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = NumberPadField.swift; path = Omoikane.swiftpm/Views/NumberPadField.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000006 /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ReportsView.swift; path = Omoikane.swiftpm/Views/ReportsView.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000007 /* AccountsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AccountsView.swift; path = Omoikane.swiftpm/Views/AccountsView.swift; sourceTree = SOURCE_ROOT; };
-		F100000000000000000024 /* CategoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CategoriesView.swift; path = Omoikane.swiftpm/Views/CategoriesView.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000008 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SettingsView.swift; path = Omoikane.swiftpm/Views/SettingsView.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000009 /* Common.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Common.swift; path = Omoikane.swiftpm/Views/Common.swift; sourceTree = SOURCE_ROOT; };
 		F10000000000000000000A /* Database.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Database.swift; path = Omoikane.swiftpm/Database/Database.swift; sourceTree = SOURCE_ROOT; };
@@ -54,14 +51,17 @@
 		F10000000000000000000D /* TransactionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TransactionStore.swift; path = Omoikane.swiftpm/Database/TransactionStore.swift; sourceTree = SOURCE_ROOT; };
 		F10000000000000000000E /* SummaryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SummaryStore.swift; path = Omoikane.swiftpm/Database/SummaryStore.swift; sourceTree = SOURCE_ROOT; };
 		F10000000000000000000F /* SeedData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SeedData.swift; path = Omoikane.swiftpm/Database/SeedData.swift; sourceTree = SOURCE_ROOT; };
-		F100000000000000000020 /* CurrencyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CurrencyStore.swift; path = Omoikane.swiftpm/Database/CurrencyStore.swift; sourceTree = SOURCE_ROOT; };
-		F100000000000000000021 /* StatementStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = StatementStore.swift; path = Omoikane.swiftpm/Database/StatementStore.swift; sourceTree = SOURCE_ROOT; };
-		F100000000000000000022 /* AccountDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AccountDetailView.swift; path = Omoikane.swiftpm/Views/AccountDetailView.swift; sourceTree = SOURCE_ROOT; };
-		F100000000000000000023 /* ReconciliationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ReconciliationSheet.swift; path = Omoikane.swiftpm/Views/ReconciliationSheet.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000010 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Models.swift; path = Omoikane.swiftpm/Models/Models.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000011 /* Money.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Money.swift; path = Omoikane.swiftpm/Models/Money.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000012 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppState.swift; path = Omoikane.swiftpm/State/AppState.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000013 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = OmoikaneApp/Assets.xcassets; sourceTree = SOURCE_ROOT; };
+		F100000000000000000020 /* CurrencyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CurrencyStore.swift; path = Omoikane.swiftpm/Database/CurrencyStore.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000021 /* StatementStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = StatementStore.swift; path = Omoikane.swiftpm/Database/StatementStore.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000022 /* AccountDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AccountDetailView.swift; path = Omoikane.swiftpm/Views/AccountDetailView.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000023 /* ReconciliationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ReconciliationSheet.swift; path = Omoikane.swiftpm/Views/ReconciliationSheet.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000024 /* CategoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CategoriesView.swift; path = Omoikane.swiftpm/Views/CategoriesView.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000025 /* TransactionEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TransactionEntryView.swift; path = Omoikane.swiftpm/Views/TransactionEntryView.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000026 /* NumberPadField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = NumberPadField.swift; path = Omoikane.swiftpm/Views/NumberPadField.swift; sourceTree = SOURCE_ROOT; };
 		F1000000000000000000FF /* OmoikaneApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OmoikaneApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -201,7 +201,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1500;
-				LastUpgradeCheck = 1500;
+				LastUpgradeCheck = 2640;
 				TargetAttributes = {
 					T100000000000000000001 = {
 						CreatedOnToolsVersion = 15.0;
@@ -299,6 +299,7 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
 				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
@@ -307,6 +308,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = LV4TZ9M6Q9;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -330,6 +332,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -361,6 +364,7 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
 				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
@@ -369,6 +373,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = LV4TZ9M6Q9;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -385,6 +390,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -398,7 +404,6 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
-				DEVELOPMENT_TEAM = LV4TZ9M6Q9;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -428,7 +433,6 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
-				DEVELOPMENT_TEAM = LV4TZ9M6Q9;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
