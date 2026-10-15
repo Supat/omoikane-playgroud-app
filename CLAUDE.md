@@ -132,8 +132,8 @@ Database/SeedData.swift          first-launch defaults + sample transactions
 Models/Models.swift, Money.swift domain structs, minor-unit money helpers
 State/AppState.swift             @Observable; owns DB + stores; bumps `dataVersion`
 State/BackupStore.swift          dated SQLite copies in …/Omoikane/Backups (online backup API), auto cadence in UserDefaults
-App/OmoikaneApp.swift            WindowGroup, owns tab selection, ⌘1–⌘6 / ⌃Tab commands
-Views/ContentView.swift          six-tab root (see below)
+App/OmoikaneApp.swift            WindowGroup, owns tab selection, ⌘1–⌘5 / ⌃Tab commands
+Views/ContentView.swift          five-tab root (see below)
 ```
 
 Views observe `app.dataVersion` via `.task(id: app.dataVersion)` to refetch.
@@ -148,11 +148,11 @@ Mutating helpers on `AppState` serialize through `db.sync { … }` and bump
 | Accounts | `AccountsView` → `AccountDetailView` → `ReconciliationSheet` | account management, balances, reconciliation statements |
 | Transactions | `TransactionsView` | account list → per-account transaction list; landscape split view with inline `TransactionEntryView`, portrait uses the `TransactionEditor` sheet. The entry form handles splits (one row per line, shared `split_group`), payee, loan role and Repeat (creates a schedule) |
 | Reports | `ReportsView` | aggregate queries over `monthly_summaries` |
-| Categories | `CategoriesView` | expense/income categories with sub-categories |
-| Settings | `SettingsView` → `SchedulesView`, `PayeesView`, `BackupsView` | home currency, rates, scheduled transactions, payees, backups (auto/manual/restore/share), rebuild summaries, delete all transactions, Money Pro import |
+| Settings | `SettingsView` → `CategoriesView`, `SchedulesView`, `PayeesView`, `BackupsView` | home currency, rates, Manage (categories with sub-categories, scheduled transactions, payees), backups (auto/manual/restore/share), rebuild summaries, delete all transactions, Money Pro import |
 
-Entity management (add/edit/archive/delete) lives only in its dedicated tab.
-Drill-down lists elsewhere are read-only.
+Entity management (add/edit/archive/delete) lives only in its dedicated
+surface: Accounts tab, or Settings › Manage for categories, schedules and
+payees. Drill-down lists elsewhere are read-only. Five tabs, ⌘1–⌘5.
 
 Keyboard: tab switching is wired in `OmoikaneApp` via `.commands`, not on tab
 content (inactive tabs are lazy and their shortcuts never register). Lists use

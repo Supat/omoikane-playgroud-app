@@ -52,6 +52,11 @@ struct SettingsView: View {
 
             Section("Manage") {
                 NavigationLink {
+                    CategoriesView()
+                } label: {
+                    Label("Categories", systemImage: "folder")
+                }
+                NavigationLink {
                     SchedulesView()
                 } label: {
                     Label("Scheduled transactions", systemImage: "calendar.badge.clock")

@@ -4,7 +4,7 @@ import SwiftUI
 /// (and its `.commands` block) can refer to it without importing ContentView's
 /// nested types.
 enum AppTab: Hashable, CaseIterable {
-    case dashboard, accounts, transactions, reports, categories, settings
+    case dashboard, accounts, transactions, reports, settings
 
     var title: String {
         switch self {
@@ -12,7 +12,6 @@ enum AppTab: Hashable, CaseIterable {
         case .accounts:     return "Accounts"
         case .transactions: return "Transactions"
         case .reports:      return "Reports"
-        case .categories:   return "Categories"
         case .settings:     return "Settings"
         }
     }
@@ -26,7 +25,7 @@ enum AppTab: Hashable, CaseIterable {
 /// register.)
 ///
 /// Keyboard navigation:
-///   ⌘1…⌘6   — jump straight to a tab
+///   ⌘1…⌘5   — jump straight to a tab
 ///   ⌃AppTab   — next tab (wraps)
 ///   ⇧⌃AppTab  — previous tab (wraps)
 struct ContentView: View {
@@ -51,10 +50,6 @@ struct ContentView: View {
             NavigationStack { ReportsView() }
                 .tabItem { Label("Reports", systemImage: "chart.bar.xaxis") }
                 .tag(AppTab.reports)
-
-            NavigationStack { CategoriesView() }
-                .tabItem { Label("Categories", systemImage: "folder.fill") }
-                .tag(AppTab.categories)
 
             NavigationStack { SettingsView() }
                 .tabItem { Label("Settings", systemImage: "gearshape.fill") }
