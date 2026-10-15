@@ -250,7 +250,8 @@ struct StackedShareBar: View {
         .chartXScale(domain: 0 ... Double(max(capacity, used, 1)))
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
+        .chartPlotStyle { plot in plot.clipShape(Capsule()) }   // rounded ends on the whole bar
         .chartLegend(position: .bottom, alignment: .leading, spacing: 6)
-        .frame(height: 28 + CGFloat((names.count + 2) / 3) * 22)
+        .frame(height: 14 + CGFloat((names.count + 2) / 3) * 22)
     }
 }
