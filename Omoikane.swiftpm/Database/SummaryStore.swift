@@ -232,6 +232,20 @@ final class SummaryStore {
         return out
     }
 
+    /// Expense per day and currency inside one month: dayKey → currency → minor.
+    func dailyExpense(yearMonth: Int) throws -> [Int: [String: Int64]] {
+        let s = try db.prepare("""
+            SELECT occurred_on, currency, SUM(amount_minor)
+              FROM transactions
+             WHERE kind = 'expense' AND year_month = ?
+             GROUP BY occurred_on, currency;
+        """)
+        s.bind(Int64(yearMonth), at: 1)
+        var out: [Int: [String: Int64]] = [:]
+        while try s.step() { out[s.int(0), default: [:]][s.string(1)] = s.int64(2) }
+        return out
+    }
+
     func distinctCurrencies(fromYM: Int? = nil, toYM: Int? = nil) throws -> [String] {
         var sql = "SELECT DISTINCT currency FROM monthly_summaries"
         var binds: [(Statement, Int32) -> Void] = []

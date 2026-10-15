@@ -143,7 +143,7 @@ Mutating helpers on `AppState` serialize through `db.sync { … }` and bump
 
 | Tab | View | Role |
 |---|---|---|
-| Dashboard | `DashboardView` | summary of the current period |
+| Dashboard | `DashboardView` + `MonthCalendar` (UICalendarView) | summary cards, essential split, month calendar with daily spend, budgets, charts |
 | Accounts | `AccountsView` → `AccountDetailView` → `ReconciliationSheet` | account management, balances, reconciliation statements |
 | Transactions | `TransactionsView` | account list → per-account transaction list; landscape split view with inline `TransactionEntryView`, portrait uses the `TransactionEditor` sheet. The entry form handles splits (one row per line, shared `split_group`), payee, loan role and Repeat (creates a schedule) |
 | Reports | `ReportsView` | aggregate queries over `monthly_summaries` |

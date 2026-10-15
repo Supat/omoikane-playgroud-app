@@ -11,6 +11,11 @@ struct DashboardView: View {
     @State private var ymKey: Int = YearMonth.current()
     @State private var budgets: [BudgetRow] = []
     @State private var essentialByCurrency: [String: Int64] = [:]
+    @State private var dailyTotals: [Int: Int64] = [:]
+    @State private var selectedDay: Int? = nil
+    @State private var dayRows: [Transaction] = []
+    @State private var categoryNames: [Int64: String] = [:]
+    @State private var accountsById: [Int64: Account] = [:]
 
     struct BudgetRow: Identifiable {
         var category: LedgerCategory
@@ -25,6 +30,7 @@ struct DashboardView: View {
                 if !missing.isEmpty { missingRatesBanner }
                 summaryCards
                 essentialSection
+                calendarSection
                 budgetSection
                 trendChart
                 categoryBreakdown
@@ -57,6 +63,50 @@ struct DashboardView: View {
                 if m > 12 { ymKey = YearMonth.key(year: y + 1, month: 1) }
             }
         }
+    }
+
+    /// Month grid with each day's spending; tapping a day lists its entries.
+    private var calendarSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Calendar (\(app.homeCurrency))").font(.headline)
+            MonthCalendar(yearMonth: $ymKey, selectedDay: $selectedDay,
+                          dailyTotals: dailyTotals, currency: app.homeCurrency)
+            if let day = selectedDay {
+                Divider()
+                HStack {
+                    Text(Formatters.mediumDate.string(from: Date.from(dayKey: day)))
+                        .font(.subheadline.weight(.medium))
+                    Spacer()
+                    if dayRows.isEmpty {
+                        Text("No entries").font(.subheadline).foregroundStyle(.secondary)
+                    }
+                }
+                ForEach(dayRows) { tx in
+                    HStack(spacing: 8) {
+                        Image(systemName: tx.kind.sfSymbol)
+                            .foregroundStyle(tx.kind == .income ? .green : (tx.kind == .expense ? .red : .blue))
+                            .font(.caption)
+                        Text(categoryNames[tx.categoryId] ?? tx.kind.displayName)
+                        Text(accountsById[tx.accountId]?.name ?? "")
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        Spacer()
+                        Formatters.moneyText(tx.amountMinor, currency: tx.currency)
+                            .foregroundStyle(tx.kind == .expense ? .red : .primary)
+                    }
+                    .font(.subheadline)
+                }
+            }
+        }
+        .padding(12)
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .onChange(of: selectedDay) { _, _ in loadDayRows() }
+    }
+
+    private func loadDayRows() {
+        guard let day = selectedDay else { dayRows = []; return }
+        let all = (try? app.transactions.list(.month(Date.from(dayKey: day).yearMonthKey))) ?? []
+        dayRows = all.filter { $0.occurredOn.dayKey == day }
     }
 
     /// Essential vs discretionary share of the month's spending, in the
@@ -356,6 +406,11 @@ struct DashboardView: View {
             trend = try app.summaries.byMonth(fromYM: win.start, toYM: win.end, kind: .expense)
             topAccounts = try app.summaries.netByAccount(fromYM: ymKey, toYM: ymKey)
             essentialByCurrency = try app.summaries.essentialExpense(fromYM: ymKey, toYM: ymKey)
+            dailyTotals = try app.summaries.dailyExpense(yearMonth: ymKey).mapValues { sumToHome($0) }
+            categoryNames = Dictionary(uniqueKeysWithValues: try app.categories.list(includeArchived: true).map { ($0.id, $0.name) })
+            accountsById = Dictionary(uniqueKeysWithValues: try app.accounts.list(includeArchived: true).map { ($0.id, $0) })
+            if let day = selectedDay, Date.from(dayKey: day).yearMonthKey != ymKey { selectedDay = nil }
+            loadDayRows()
             let cats = try app.categories.list()
             budgets = cats.filter { $0.budgetMinor != nil }.map { c in
                 let ids = Set([c.id] + cats.filter { $0.parentId == c.id }.map(\.id))
