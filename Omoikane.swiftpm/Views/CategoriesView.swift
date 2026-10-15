@@ -275,6 +275,7 @@ struct CategoryEditor: View {
     @State private var icon: String
     @State private var parentId: Int64?
     @State private var budgetText: String
+    @State private var pickingGlyph = false
     @State private var allCategories: [LedgerCategory] = []
     @State private var saveError: String?
     @State private var deletePrompt: CategoryDeletePrompt? = nil
@@ -312,7 +313,24 @@ struct CategoryEditor: View {
                 }
                 .pickerStyle(.segmented)
                 .disabled(existing != nil) // changing kind on an existing cat would orphan transactions
-                TextField("SF Symbol", text: $icon)
+                Button {
+                    pickingGlyph = true
+                } label: {
+                    LabeledContent("Glyph") {
+                        HStack(spacing: 8) {
+                            Image(systemName: icon.isEmpty ? "tag" : icon)
+                                .foregroundStyle(kind == .income ? .green : .red)
+                            Text(icon.isEmpty ? "tag" : icon)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Choose a symbol")
                 if kind == .expense {
                     LabeledContent("Monthly budget (\(app.homeCurrency))") {
                         NumberPadField(text: $budgetText, placeholder: "None", alignment: .right)
@@ -333,6 +351,7 @@ struct CategoryEditor: View {
             }
             .navigationTitle(existing == nil ? "New Category" : "Edit Category")
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $pickingGlyph) { SymbolPicker(selection: $icon) }
             .task {
                 allCategories = (try? app.categories.list(includeArchived: false)) ?? []
                 if let b = existing?.budgetMinor { budgetText = Money.formatMinorText(b, currency: app.homeCurrency) }
