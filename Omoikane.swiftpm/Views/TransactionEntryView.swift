@@ -46,10 +46,27 @@ struct TransactionEntryView: View {
     @State private var tagsText: String = ""
     @State private var clearedNow: Bool = false
     @State private var counterpartyClearedNow: Bool = false
+    @State private var payeeId: Int64? = nil
+    @State private var addingPayee = false
+    @State private var newPayeeName = ""
+    @State private var loanRole: LoanRole? = nil
+    /// New entries only: also create a schedule that repeats this entry.
+    @State private var repeatFrequency: ScheduleFrequency? = nil
+    /// Two or more lines = a split; the main Category picker and Amount
+    /// field give way to the per-line ones. Empty = ordinary single row.
+    @State private var splitLines: [SplitLine] = []
 
     @State private var categories: [LedgerCategory] = []
     @State private var accounts: [Account] = []
+    @State private var payees: [Payee] = []
     @State private var loadError: String?
+
+    struct SplitLine: Identifiable, Hashable {
+        let id = UUID()
+        var categoryId: Int64?
+        var amountText: String
+    }
+    private var isSplit: Bool { splitLines.count >= 2 }
 
     /// Focusable text fields. Drives Tab / Return / next-button traversal:
     /// amount → (counterpartyAmount if cross-currency transfer) → note → tags.
@@ -102,13 +119,20 @@ struct TransactionEntryView: View {
 
             Section(kind == .transfer ? "From amount" : "Amount") {
                 HStack {
-                    NumberPadField(
-                        text: $amountText,
-                        placeholder: "0",
-                        font: .monospacedDigitSystemFont(ofSize: 28, weight: .regular),
-                        alignment: .right,
-                        onSubmit: { advanceFocus(from: .amount) }
-                    )
+                    if isSplit {
+                        Spacer()
+                        Text(formatMinorToText(splitTotalMinor, currency: fromCurrency))
+                            .font(.system(size: 28, weight: .regular, design: .default).monospacedDigit())
+                            .accessibilityLabel("Total of split lines")
+                    } else {
+                        NumberPadField(
+                            text: $amountText,
+                            placeholder: "0",
+                            font: .monospacedDigitSystemFont(ofSize: 28, weight: .regular),
+                            alignment: .right,
+                            onSubmit: { advanceFocus(from: .amount) }
+                        )
+                    }
                     Text(fromCurrency)
                         .foregroundStyle(.secondary)
                 }
@@ -148,17 +172,101 @@ struct TransactionEntryView: View {
                         }
                     }
                 } else {
-                    Picker("Category", selection: Binding(
-                        get: { categoryId ?? availableCategories.first?.id ?? 0 },
-                        set: { categoryId = $0 }
-                    )) {
-                        ForEach(availableCategories) { c in
-                            if let icon = c.icon {
-                                Label(c.name, systemImage: icon).tag(c.id)
-                            } else {
-                                Text(c.name).tag(c.id)
+                    if !isSplit {
+                        Picker("Category", selection: Binding(
+                            get: { categoryId ?? availableCategories.first?.id ?? 0 },
+                            set: { categoryId = $0 }
+                        )) {
+                            ForEach(availableCategories) { c in
+                                if let icon = c.icon {
+                                    Label(c.name, systemImage: icon).tag(c.id)
+                                } else {
+                                    Text(c.name).tag(c.id)
+                                }
                             }
                         }
+                    }
+                    Picker("Payee", selection: $payeeId) {
+                        Text("None").tag(Int64?.none)
+                        ForEach(payees) { p in Text(p.name).tag(Int64?.some(p.id)) }
+                    }
+                    Button("New payee…") { addingPayee = true }
+                    Picker("Loan", selection: $loanRole) {
+                        Text("None").tag(LoanRole?.none)
+                        ForEach(allowedLoanRoles, id: \.self) { r in
+                            Text(r.displayName).tag(LoanRole?.some(r))
+                        }
+                    }
+                }
+            }
+
+            if kind != .transfer {
+                Section {
+                    if isSplit {
+                        ForEach($splitLines) { $line in
+                            HStack {
+                                Picker("Category", selection: Binding(
+                                    get: { line.categoryId ?? availableCategories.first?.id ?? 0 },
+                                    set: { line.categoryId = $0 }
+                                )) {
+                                    ForEach(availableCategories) { c in Text(c.name).tag(c.id) }
+                                }
+                                .labelsHidden()
+                                Spacer()
+                                NumberPadField(
+                                    text: $line.amountText,
+                                    placeholder: "0",
+                                    font: .monospacedDigitSystemFont(ofSize: 17, weight: .regular),
+                                    alignment: .right
+                                )
+                                .frame(maxWidth: 140)
+                                Button {
+                                    splitLines.removeAll { $0.id == line.id }
+                                    collapseSplitIfSingle()
+                                } label: {
+                                    Image(systemName: "minus.circle")
+                                }
+                                .buttonStyle(.borderless)
+                                .accessibilityLabel("Remove line")
+                            }
+                        }
+                        Button {
+                            splitLines.append(SplitLine(categoryId: availableCategories.first?.id, amountText: ""))
+                        } label: {
+                            Label("Add line", systemImage: "plus.circle")
+                        }
+                    } else {
+                        Button {
+                            splitLines = [
+                                SplitLine(categoryId: categoryId ?? availableCategories.first?.id, amountText: amountText),
+                                SplitLine(categoryId: availableCategories.first?.id, amountText: "")
+                            ]
+                        } label: {
+                            Label("Split into categories", systemImage: "square.split.2x1")
+                        }
+                    }
+                } header: {
+                    Text("Split")
+                } footer: {
+                    if isSplit {
+                        Text("The amount is the sum of the lines. Remove lines down to one to un-split.")
+                            .font(.footnote)
+                    }
+                }
+            }
+
+            if transaction == nil {
+                Section {
+                    Picker("Repeat", selection: $repeatFrequency) {
+                        Text("Never").tag(ScheduleFrequency?.none)
+                        ForEach(ScheduleFrequency.allCases, id: \.self) { f in
+                            Text(f.displayName).tag(ScheduleFrequency?.some(f))
+                        }
+                    }
+                } footer: {
+                    if repeatFrequency != nil {
+                        Text("Also creates a schedule that posts this entry again every period, starting with the next one. Manage schedules in Settings.")
+                            .font(.footnote)
                     }
                 }
             }
@@ -217,7 +325,20 @@ struct TransactionEntryView: View {
             if transaction == nil { focusedField = .amount }
         }
         .task { loadReferences() }
+        .alert("New payee", isPresented: $addingPayee) {
+            TextField("Name", text: $newPayeeName)
+            Button("Add") {
+                if let id = try? app.findOrCreatePayee(name: newPayeeName) {
+                    payeeId = id
+                    payees = (try? app.payees.list()) ?? []
+                }
+                newPayeeName = ""
+            }
+            Button("Cancel", role: .cancel) { newPayeeName = "" }
+        }
         .onChange(of: kind) { _, _ in
+            if let r = loanRole, !allowedLoanRoles.contains(r) { loanRole = nil }
+            if kind == .transfer { splitLines = [] }
             if kind != .transfer {
                 if let id = categoryId,
                    let c = categories.first(where: { $0.id == id }),
@@ -276,13 +397,41 @@ struct TransactionEntryView: View {
         }
     }
 
+    /// Lend is money going out, borrow is money coming in; repayment goes
+    /// either way, so the kind decides which roles make sense.
+    private var allowedLoanRoles: [LoanRole] {
+        switch kind {
+        case .expense:  return [.lend, .repay]
+        case .income:   return [.borrow, .repay]
+        case .transfer: return []
+        }
+    }
+
+    private var splitTotalMinor: Int64 {
+        splitLines.compactMap { parseMinor($0.amountText, currency: fromCurrency) }.reduce(0, +)
+    }
+
+    /// One line left is no longer a split: fold it back into the main fields.
+    private func collapseSplitIfSingle() {
+        guard splitLines.count == 1, let only = splitLines.first else { return }
+        categoryId = only.categoryId
+        amountText = only.amountText
+        splitLines = []
+    }
+
     private var availableCategories: [LedgerCategory] {
         let target: CategoryKind = (kind == .income) ? .income : .expense
         return categories.filter { $0.kind == target && !$0.isArchived }
     }
 
     private var canSave: Bool {
-        guard let parsed = parseMinor(amountText, currency: fromCurrency), parsed > 0 else { return false }
+        if isSplit {
+            guard splitLines.allSatisfy({ ($0.categoryId ?? availableCategories.first?.id) != nil
+                                          && (parseMinor($0.amountText, currency: fromCurrency) ?? 0) > 0 })
+            else { return false }
+        } else {
+            guard let parsed = parseMinor(amountText, currency: fromCurrency), parsed > 0 else { return false }
+        }
         if accountId == nil && accounts.first == nil { return false }
         if kind == .transfer {
             guard counterpartyAccountId != nil, counterpartyAccountId != accountId else { return false }
@@ -298,6 +447,7 @@ struct TransactionEntryView: View {
         do {
             categories = try app.categories.list()
             accounts = try app.accounts.list()
+            payees = try app.payees.list()
             if accountId == nil {
                 if let pre = initialAccountId,
                    accounts.contains(where: { $0.id == pre }) {
@@ -334,10 +484,22 @@ struct TransactionEntryView: View {
         tagsText = tx.tags.joined(separator: ", ")
         clearedNow = (tx.clearedAt != nil)
         counterpartyClearedNow = (tx.counterpartyClearedAt != nil)
+        payeeId = tx.payeeId
+        loanRole = tx.loanRole
+        if let g = tx.splitGroup, let rows = try? app.transactions.listGroup(g), rows.count > 1 {
+            splitLines = rows.map { SplitLine(categoryId: $0.categoryId, amountText: formatMinorToText($0.amountMinor, currency: $0.currency)) }
+        }
     }
 
     private func save() {
-        guard let amt = parseMinor(amountText, currency: fromCurrency), amt > 0 else { return }
+        let amt: Int64
+        if isSplit {
+            amt = splitTotalMinor
+            guard amt > 0 else { return }
+        } else {
+            guard let parsed = parseMinor(amountText, currency: fromCurrency), parsed > 0 else { return }
+            amt = parsed
+        }
         let acct = accountId ?? accounts.first?.id ?? 0
         let cat: Int64
         if kind == .transfer {
@@ -356,7 +518,40 @@ struct TransactionEntryView: View {
             : nil
 
         do {
-            if let existing = transaction {
+            if isSplit || transaction?.splitGroup != nil {
+                // Split path: one row per line, replacing whatever rows
+                // this logical transaction had before.
+                var template = transaction ?? Transaction(
+                    id: 0, occurredOn: occurredOn, amountMinor: amt, currency: fromCurrency,
+                    kind: kind, categoryId: cat, accountId: acct,
+                    counterpartyAccountId: nil, counterpartyAmountMinor: nil,
+                    note: nil, tags: [], createdAt: now, updatedAt: now
+                )
+                template.id = 0
+                template.kind = kind
+                template.currency = fromCurrency
+                template.occurredOn = occurredOn
+                template.accountId = acct
+                template.counterpartyAccountId = nil
+                template.counterpartyAmountMinor = nil
+                template.note = note.isEmpty ? nil : note
+                template.tags = tags
+                template.updatedAt = now
+                template.payeeId = payeeId
+                template.loanRole = loanRole
+                applyClearingToggles(to: &template, now: now)
+                let lines: [Transaction] = isSplit
+                    ? splitLines.map { line in
+                        var t = template
+                        t.categoryId = line.categoryId ?? availableCategories.first?.id ?? cat
+                        t.amountMinor = parseMinor(line.amountText, currency: fromCurrency) ?? 0
+                        return t
+                    }
+                    : [{ var t = template; t.categoryId = cat; t.amountMinor = amt; return t }()]
+                try app.saveLines(lines,
+                                  replacingGroup: transaction?.splitGroup,
+                                  replacingSingle: transaction?.splitGroup == nil ? transaction?.id : nil)
+            } else if let existing = transaction {
                 var updated = existing
                 updated.kind = kind
                 updated.amountMinor = amt
@@ -369,6 +564,8 @@ struct TransactionEntryView: View {
                 updated.note = note.isEmpty ? nil : note
                 updated.tags = tags
                 updated.updatedAt = now
+                updated.payeeId = payeeId
+                updated.loanRole = loanRole
                 applyClearingToggles(to: &updated, now: now)
                 try app.updateTransaction(updated)
             } else {
@@ -387,8 +584,21 @@ struct TransactionEntryView: View {
                     createdAt: now,
                     updatedAt: now
                 )
+                tx.payeeId = payeeId
+                tx.loanRole = loanRole
                 applyClearingToggles(to: &tx, now: now)
                 try app.addTransaction(tx)
+            }
+            if transaction == nil, let freq = repeatFrequency {
+                let sc = Schedule(
+                    id: 0, kind: kind, amountMinor: amt, categoryId: cat, accountId: acct,
+                    counterpartyAccountId: kind == .transfer ? counterpartyAccountId : nil,
+                    counterpartyAmountMinor: cpAmount, payeeId: payeeId,
+                    note: note.isEmpty ? nil : note, frequency: freq, interval: 1,
+                    nextDue: ScheduleStore.advance(occurredOn, frequency: freq, interval: 1),
+                    endOn: nil
+                )
+                try app.addSchedule(sc)
             }
             if let onSaveCompletion {
                 onSaveCompletion()
@@ -408,6 +618,10 @@ struct TransactionEntryView: View {
                 tagsText = ""
                 counterpartyClearedNow = false
                 clearedNow = fromAccount?.clearsEntriesByDefault ?? false
+                payeeId = nil
+                loanRole = nil
+                repeatFrequency = nil
+                splitLines = []
                 focusedField = nil
             }
         } catch {

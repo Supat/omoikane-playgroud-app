@@ -88,7 +88,7 @@ final class ScheduleStore {
                     if acct?.clearsEntriesByDefault == true { tx.clearedAt = now }
                     _ = try transactions.insert(tx)
                     posted += 1
-                    sc.nextDue = Self.advance(sc.nextDue, by: sc)
+                    sc.nextDue = Self.advance(sc.nextDue, frequency: sc.frequency, interval: sc.interval)
                 }
                 if let end = sc.endOn, sc.nextDue.dayKey > end.dayKey {
                     try delete(id: sc.id)
@@ -100,8 +100,8 @@ final class ScheduleStore {
         return posted
     }
 
-    static func advance(_ date: Date, by sc: Schedule) -> Date {
-        Calendar.current.date(byAdding: sc.frequency.calendarComponent, value: max(1, sc.interval), to: date) ?? date
+    static func advance(_ date: Date, frequency: ScheduleFrequency, interval: Int) -> Date {
+        Calendar.current.date(byAdding: frequency.calendarComponent, value: max(1, interval), to: date) ?? date
     }
 
     private func bind(_ s: Statement, _ sc: Schedule) {
