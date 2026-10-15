@@ -292,8 +292,12 @@ struct DashboardView: View {
                     StackedShareBar(slices: spendSlices, capacity: capacity, remainderLabel: "Left", overflowLabel: "Over")
                     Divider()
                 }
-                ForEach(budgets) { line in
-                    BudgetRowView(line: line, currency: app.homeCurrency, color: line.category.ownColor)
+                ForEach(BudgetMath.grouped(budgets)) { group in
+                    BudgetRowView(line: group.parent, currency: app.homeCurrency, color: group.parent.category.ownColor)
+                    ForEach(group.children) { line in
+                        BudgetRowView(line: line, currency: app.homeCurrency, color: group.parent.category.ownColor)
+                            .padding(.leading, 20)
+                    }
                 }
             }
             .padding(12)

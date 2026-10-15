@@ -96,9 +96,16 @@ struct ReportsView: View {
                     } else {
                         let (totalBudget, totalSpent) = BudgetMath.totals(budgetRows, kind: .expense)
                         let (totalTarget, totalIncome) = BudgetMath.totals(budgetRows, kind: .income)
-                        ForEach(budgetRows) { line in
-                            BudgetRowView(line: line, currency: app.homeCurrency, showsCaption: true)
+                        ForEach(BudgetMath.grouped(budgetRows)) { group in
+                            BudgetRowView(line: group.parent, currency: app.homeCurrency, showsCaption: true,
+                                          color: group.parent.category.ownColor)
                                 .padding(.vertical, 4)
+                            ForEach(group.children) { line in
+                                BudgetRowView(line: line, currency: app.homeCurrency, showsCaption: true,
+                                              color: group.parent.category.ownColor)
+                                    .padding(.vertical, 4)
+                                    .padding(.leading, 20)
+                            }
                         }
                         Divider()
                         if totalBudget > 0 {
@@ -354,7 +361,6 @@ struct ReportsView: View {
             let spentRows = try app.summaries.byCategory(fromYM: win.start, toYM: win.end, kind: .expense)
             let earnedRows = try app.summaries.byCategory(fromYM: win.start, toYM: win.end, kind: .income)
             budgetRows = BudgetMath.lines(categories: cats, expense: spentRows, income: earnedRows, months: monthsBack, sumToHome: app.sumToHome)
-                .sorted { $0.fraction > $1.fraction }
             // If the chosen filter no longer has data, fall back to all.
             if let c = currencyFilter, !availableCurrencies.contains(c) {
                 currencyFilter = nil

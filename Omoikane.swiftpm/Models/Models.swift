@@ -352,6 +352,24 @@ enum BudgetMath {
         .sorted { ($0.isIncome ? 1 : 0, $0.category.name) < ($1.isIncome ? 1 : 0, $1.category.name) }
     }
 
+    /// Parents with their sub-category lines underneath, expense parents
+    /// first, each group ordered by name. Every budgeted sub-category has a
+    /// parent line because the parent's effective budget covers it.
+    struct Group: Identifiable {
+        var parent: BudgetLine
+        var children: [BudgetLine]
+        var id: Int64 { parent.id }
+    }
+    static func grouped(_ lines: [BudgetLine]) -> [Group] {
+        let parents = lines.filter { $0.category.parentId == nil }
+        return parents
+            .sorted { ($0.isIncome ? 1 : 0, $0.category.name) < ($1.isIncome ? 1 : 0, $1.category.name) }
+            .map { p in
+                Group(parent: p, children: lines.filter { $0.category.parentId == p.id }
+                                                 .sorted { $0.category.name < $1.category.name })
+            }
+    }
+
     static func totals(_ lines: [BudgetLine], kind: CategoryKind) -> (budget: Int64, used: Int64) {
         let parents = lines.filter { $0.category.kind == kind && $0.category.parentId == nil }
         return (parents.reduce(Int64(0)) { $0 + $1.budgetMinor }, parents.reduce(Int64(0)) { $0 + $1.usedMinor })
