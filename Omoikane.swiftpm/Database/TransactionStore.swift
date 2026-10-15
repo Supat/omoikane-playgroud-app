@@ -27,12 +27,12 @@ final class TransactionStore {
             let now = Int64(Date().timeIntervalSince1970)
             let s = try db.prepare("""
                 INSERT INTO transactions
-                    (occurred_on, year_month, amount_minor, currency, kind,
+                    (occurred_on, year_month, occurred_at, amount_minor, currency, kind,
                      category_id, account_id, counterparty_account_id,
                      counterparty_amount_minor, note, tags, created_at, updated_at,
                      cleared_at, statement_id,
                      counterparty_cleared_at, counterparty_statement_id)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
             """)
             for tx in items {
                 s.reset()
