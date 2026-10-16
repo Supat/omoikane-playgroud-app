@@ -70,6 +70,7 @@ final class AppState {
             try? self?.refreshRates()
             self?.bump(schedulesSync: false)
         }
+        cloud.snapshotProvider = { [weak self] in try self?.watchSnapshot() }
         // Preferences ride the iCloud key-value store, not the ledger zone.
         NotificationCenter.default.addObserver(forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
                                                object: Self.kvs, queue: .main) { [weak self] _ in
@@ -87,6 +88,29 @@ final class AppState {
         guard on else { return }
         Self.kvs.set(homeCurrency, forKey: Self.homeCurrencyKey)
         if let v = monthlySpendingLimitMinor { Self.kvs.set(v, forKey: Self.spendingLimitKey) }
+    }
+
+    /// Active accounts and expense categories plus this month's figure,
+    /// for the Watch. Sync uuids identify everything.
+    func watchSnapshot() throws -> WatchSnapshot {
+        func uuid(_ table: String, _ id: Int64) throws -> String {
+            let s = try db.prepare("SELECT uuid FROM \(table) WHERE id = ?;"); s.bind(id, at: 1)
+            return try s.step() ? s.string(0) : ""
+        }
+        let accs = try accounts.list().filter { $0.kind != .asset && $0.kind != .liability }
+        let cats = try categories.list().filter { $0.kind == .expense }
+        let catUUID = Dictionary(uniqueKeysWithValues: try cats.map { ($0.id, try uuid("categories", $0.id)) })
+        let ym = Date().yearMonthKey
+        let spent = sumToHome(try summaries.totals(fromYM: ym, toYM: ym).total(for: .expense).map { ($0.value, $0.key) })
+        return WatchSnapshot(
+            homeCurrency: homeCurrency,
+            accounts: try accs.map { .init(id: try uuid("accounts", $0.id), name: $0.name, kind: $0.kind.rawValue, currency: $0.currency) },
+            categories: cats.sorted { ($0.parentId == nil ? 0 : 1, $0.sortOrder) < ($1.parentId == nil ? 0 : 1, $1.sortOrder) }
+                .map { .init(id: catUUID[$0.id] ?? "", name: $0.name, parentId: $0.parentId.flatMap { catUUID[$0] }, icon: $0.icon, color: $0.color ?? $0.parentId.flatMap { pid in cats.first { $0.id == pid }?.color }) },
+            yearMonth: ym,
+            monthSpentMinor: spent,
+            monthLimitMinor: monthlySpendingLimitMinor,
+            generatedAt: Int64(Date().timeIntervalSince1970))
     }
 
     /// Take the other device's preferences when they differ from ours.

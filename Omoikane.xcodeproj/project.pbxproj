@@ -45,6 +45,12 @@
 		B100000000000000000036 /* Omoikane.icon in Resources */ = {isa = PBXBuildFile; fileRef = F100000000000000000036 /* Omoikane.icon */; };
 		B100000000000000000037 /* SyncStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000037 /* SyncStore.swift */; };
 		B100000000000000000038 /* CloudSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000038 /* CloudSync.swift */; };
+		B100000000000000000041 /* WatchModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000041 /* WatchModels.swift */; };
+		B100000000000000000051 /* WatchModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000041 /* WatchModels.swift */; };
+		B100000000000000000052 /* Money.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000011 /* Money.swift */; };
+		B100000000000000000042 /* OmoikaneWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000042 /* OmoikaneWatchApp.swift */; };
+		B100000000000000000043 /* WatchStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000043 /* WatchStore.swift */; };
+		B100000000000000000044 /* CaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000044 /* CaptureView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -87,11 +93,24 @@
 		F100000000000000000037 /* SyncStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SyncStore.swift; path = Omoikane/Database/SyncStore.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000038 /* CloudSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CloudSync.swift; path = Omoikane/State/CloudSync.swift; sourceTree = SOURCE_ROOT; };
 		F100000000000000000039 /* Omoikane.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = Omoikane.entitlements; path = Omoikane/Omoikane.entitlements; sourceTree = SOURCE_ROOT; };
+		F100000000000000000041 /* WatchModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WatchModels.swift; path = Omoikane/Shared/WatchModels.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000042 /* OmoikaneWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OmoikaneWatchApp.swift; path = OmoikaneWatch/OmoikaneWatchApp.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000043 /* WatchStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WatchStore.swift; path = OmoikaneWatch/WatchStore.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000044 /* CaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CaptureView.swift; path = OmoikaneWatch/CaptureView.swift; sourceTree = SOURCE_ROOT; };
+		F100000000000000000045 /* OmoikaneWatch.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = OmoikaneWatch.entitlements; path = OmoikaneWatch/OmoikaneWatch.entitlements; sourceTree = SOURCE_ROOT; };
+		F100000000000000000046 /* OmoikaneWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OmoikaneWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F1000000000000000000FF /* Omoikane.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Omoikane.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		P100000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		P100000000000000000005 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -118,6 +137,8 @@
 				G100000000000000000005 /* Database */,
 				G100000000000000000006 /* Models */,
 				G100000000000000000007 /* State */,
+				G100000000000000000010 /* Shared */,
+				G100000000000000000011 /* OmoikaneWatch */,
 			);
 			name = Sources;
 			sourceTree = "<group>";
@@ -196,6 +217,7 @@
 			isa = PBXGroup;
 			children = (
 				F1000000000000000000FF /* Omoikane.app */,
+				F100000000000000000046 /* OmoikaneWatch.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -208,6 +230,25 @@
 				F100000000000000000036 /* Omoikane.icon */,
 			);
 			name = Resources;
+			sourceTree = "<group>";
+		};
+		G100000000000000000010 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				F100000000000000000041 /* WatchModels.swift */,
+			);
+			name = Shared;
+			sourceTree = "<group>";
+		};
+		G100000000000000000011 /* OmoikaneWatch */ = {
+			isa = PBXGroup;
+			children = (
+				F100000000000000000042 /* OmoikaneWatchApp.swift */,
+				F100000000000000000043 /* WatchStore.swift */,
+				F100000000000000000044 /* CaptureView.swift */,
+				F100000000000000000045 /* OmoikaneWatch.entitlements */,
+			);
+			name = OmoikaneWatch;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -230,6 +271,23 @@
 			productReference = F1000000000000000000FF /* Omoikane.app */;
 			productType = "com.apple.product-type.application";
 		};
+		T100000000000000000002 /* OmoikaneWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = L200000000000000000002 /* Build configuration list for PBXNativeTarget "OmoikaneWatch" */;
+			buildPhases = (
+				P100000000000000000004 /* Sources */,
+				P100000000000000000005 /* Frameworks */,
+				P100000000000000000006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = OmoikaneWatch;
+			productName = OmoikaneWatch;
+			productReference = F100000000000000000046 /* OmoikaneWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -242,6 +300,9 @@
 				TargetAttributes = {
 					T100000000000000000001 = {
 						CreatedOnToolsVersion = 15.0;
+					};
+					T100000000000000000002 = {
+						CreatedOnToolsVersion = 26.0;
 					};
 				};
 			};
@@ -259,6 +320,7 @@
 			projectRoot = "";
 			targets = (
 				T100000000000000000001 /* Omoikane */,
+				T100000000000000000002 /* OmoikaneWatch */,
 			);
 		};
 /* End PBXProject section */
@@ -270,6 +332,13 @@
 			files = (
 				B100000000000000000013 /* Assets.xcassets in Resources */,
 				B100000000000000000036 /* Omoikane.icon in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		P100000000000000000006 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -308,6 +377,7 @@
 				B100000000000000000035 /* BackupStore.swift in Sources */,
 				B100000000000000000037 /* SyncStore.swift in Sources */,
 				B100000000000000000038 /* CloudSync.swift in Sources */,
+				B100000000000000000041 /* WatchModels.swift in Sources */,
 				B100000000000000000028 /* PayeeStore.swift in Sources */,
 				B100000000000000000029 /* ScheduleStore.swift in Sources */,
 				B100000000000000000027 /* MoneyProImport.swift in Sources */,
@@ -316,6 +386,18 @@
 				B100000000000000000010 /* Models.swift in Sources */,
 				B100000000000000000011 /* Money.swift in Sources */,
 				B100000000000000000012 /* AppState.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		P100000000000000000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B100000000000000000042 /* OmoikaneWatchApp.swift in Sources */,
+				B100000000000000000043 /* WatchStore.swift in Sources */,
+				B100000000000000000044 /* CaptureView.swift in Sources */,
+				B100000000000000000051 /* WatchModels.swift in Sources */,
+				B100000000000000000052 /* Money.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -509,6 +591,66 @@
 			};
 			name = Release;
 		};
+		C200000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = OmoikaneWatch/OmoikaneWatch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = LV4TZ9M6Q9;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Omoikane;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKApplication = YES;
+				INFOPLIST_KEY_WKWatchOnly = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.supatsaetia.omoikane.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		C200000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = OmoikaneWatch/OmoikaneWatch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = LV4TZ9M6Q9;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Omoikane;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKApplication = YES;
+				INFOPLIST_KEY_WKWatchOnly = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.supatsaetia.omoikane.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -526,6 +668,15 @@
 			buildConfigurations = (
 				C200000000000000000001 /* Debug */,
 				C200000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		L200000000000000000002 /* Build configuration list for PBXNativeTarget "OmoikaneWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C200000000000000000003 /* Debug */,
+				C200000000000000000004 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -5,9 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 A household account book ("kakeibo") app for iPad and iPhone, built as a
-single Xcode project. Sources, assets, icon and entitlements live under
-`Omoikane/`; `Omoikane.xcodeproj/` references them by explicit file
-references (`SOURCE_ROOT` paths), not a synchronized folder.
+single Xcode project with two targets: `Omoikane` (iOS; sources, assets,
+icon and entitlements under `Omoikane/`) and `OmoikaneWatch` (a standalone
+watchOS capture app under `OmoikaneWatch/`, sharing `Omoikane/Shared/` and
+`Omoikane/Models/Money.swift`). `Omoikane.xcodeproj/` references files
+explicitly (`SOURCE_ROOT` paths), not through a synchronized folder.
 
 The Swift Playground package that used to sit beside the project was
 dropped on 2026-10-16. Do not recreate `Package.swift` or reason about
@@ -38,6 +40,13 @@ Build:
 xcodebuild -project Omoikane.xcodeproj \
   -scheme Omoikane \
   -destination 'platform=iOS Simulator,id=<udid>' build
+```
+
+Build the Watch app (no scheme is checked in; build the target):
+
+```sh
+xcodebuild -project Omoikane.xcodeproj -target OmoikaneWatch \
+  -sdk watchsimulator -configuration Debug build CODE_SIGNING_ALLOWED=NO
 ```
 
 Notes on tooling oddities:
@@ -170,7 +179,9 @@ Database/SeedData.swift          first-launch defaults + sample transactions
 Models/Models.swift, Money.swift domain structs, minor-unit money helpers
 State/AppState.swift             @Observable; owns DB + stores; bumps `dataVersion`
 State/BackupStore.swift          dated SQLite copies in …/Omoikane/Backups (online backup API), auto cadence in UserDefaults
-State/CloudSync.swift            CloudKit half of iCloud sync: private zone "Ledger", pull then push, token, silent-push subscription
+State/CloudSync.swift            CloudKit half of iCloud sync: private zone "Ledger", pull then push, token, silent-push subscription; Watch inbox ingest + snapshot publish
+Shared/WatchModels.swift         WatchSnapshot / WatchInboxEntry (Codable, Foundation only); compiled into both targets
+OmoikaneWatch/                   OmoikaneWatchApp, WatchStore (CloudKit + disk cache + upload queue), CaptureView
 App/Omoikane.swift               WindowGroup, owns tab selection, ⌘1–⌘5 / ⌃Tab commands
 Views/ContentView.swift          five-tab root (see below)
 ```
@@ -272,6 +283,21 @@ so it stays as-is. If you add new top-level types, sanity-check against
   touching `SyncStore` or the V13 triggers. Adding a synced table: append
   to `SyncStore.tables` in dependency order and give it the V13 treatment
   in a new migration.
+- **Apple Watch** → `OmoikaneWatch` is watch-only (`WKWatchOnly`): no
+  iPhone app needed, no WatchConnectivity, never touches the ledger. It
+  reads one `watch_snapshot` record (JSON: accounts, expense categories,
+  this month's spend and limit; published by the iOS app at the end of
+  every sync cycle when its content hash changes) and writes one
+  `watch_inbox` record per captured expense (JSON, record name = entry
+  uuid), both in the same private zone. The iOS `pull()` sees inbox
+  records through zone changes, turns each into a transaction with the
+  entry's uuid (`WatchInboxEntry.transactionRecord(autoClear:)`, a pure
+  function, so two devices ingesting the same entry upsert one row) and
+  deletes the inbox record. The Watch caches the snapshot and its queue
+  on disk, so it captures offline and uploads later. Expense only, no
+  complication yet. Keep the Watch independent of `Models.swift` and
+  everything UIKit; add shared types to `Omoikane/Shared/` and list them
+  in both targets' Sources phases.
 - **Changing the importer** → `tools/moneypro-import/main.swift` is a macOS
   dry run that compiles the app's own `Database`, `Schema`, `SyncStore` and
   `MoneyProImport` sources and runs them against a real `.back` file; the

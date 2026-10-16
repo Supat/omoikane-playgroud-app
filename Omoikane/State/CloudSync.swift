@@ -29,6 +29,8 @@ final class CloudSync {
     private let store: SyncStore
     /// Runs after remote rows landed: the owner refreshes rates and bumps the data version.
     var onApplied: () -> Void = {}
+    /// What the Watch needs; nil when there is nothing to publish.
+    var snapshotProvider: () throws -> WatchSnapshot? = { nil }
 
     var enabled: Bool {
         didSet {
@@ -85,6 +87,7 @@ final class CloudSync {
             let applied = try await pull()
             if applied > 0 { onApplied() }
             try await push()
+            try await publishSnapshot()
             try db.sync { try store.sweepTombstones() }
             lastSync = Date()
             status = "Up to date"
@@ -125,9 +128,19 @@ final class CloudSync {
             let r = try await database.recordZoneChanges(inZoneWith: zoneID, since: token)
             let records = r.modificationResultsByID.values.compactMap { try? $0.get().record }
             let deletes = r.deletions.map { (table: $0.recordType, uuid: $0.recordID.recordName) }
+            // Watch captures ride the same zone. They become transactions
+            // with the entry's uuid, then the inbox record is removed.
+            let inbox = records.filter { $0.recordType == WatchInboxEntry.recordType }
             applied += try db.sync {
-                let ups = try records.compactMap { try decode($0) }
+                var ups = try records.compactMap { try decode($0) }
+                ups += try inbox.compactMap { try ingest($0) }
                 return try store.apply(upserts: ups, deletes: deletes)
+            }
+            if !inbox.isEmpty {
+                let r = try await database.modifyRecords(saving: [], deleting: inbox.map(\.recordID), savePolicy: .ifServerRecordUnchanged, atomically: false)
+                for (_, result) in r.deleteResults {
+                    if case .failure(let e) = result, (e as? CKError)?.code != CKError.Code.unknownItem { throw e }
+                }
             }
             token = r.changeToken
             let data = try NSKeyedArchiver.archivedData(withRootObject: r.changeToken, requiringSecureCoding: true)
@@ -177,6 +190,30 @@ final class CloudSync {
             }
         }
         try db.sync { try store.markPushed(upsertSeq: pending.seq, deleteSeq: tombstones.seq) }
+    }
+
+    // MARK: - Watch
+
+    /// Inbox record → transaction record, inside `db.sync`.
+    private func ingest(_ r: CKRecord) throws -> SyncRecord? {
+        guard let data = r.object(forKey: WatchInboxEntry.payloadKey) as? Data,
+              let entry = try? JSONDecoder().decode(WatchInboxEntry.self, from: data) else { return nil }
+        let s = try db.prepare("SELECT clears_entries_by_default FROM accounts WHERE uuid = ?;")
+        s.bind(entry.accountId, at: 1)
+        let autoClear = try s.step() && s.int(0) != 0
+        return entry.transactionRecord(autoClear: autoClear)
+    }
+
+    /// One record the Watch reads; overwritten whenever its content changes.
+    private func publishSnapshot() async throws {
+        guard let snapshot = try snapshotProvider() else { return }
+        let hash = snapshot.contentHash
+        let key = "snapshot_hash"
+        if let d = try db.sync({ try store.state(key) }), d == Data(String(hash).utf8) { return }
+        let rec = CKRecord(recordType: WatchSnapshot.recordType, recordID: CKRecord.ID(recordName: WatchSnapshot.recordName, zoneID: zoneID))
+        rec.setObject(try JSONEncoder.sorted.encode(snapshot) as NSData, forKey: WatchSnapshot.payloadKey)
+        _ = try await database.modifyRecords(saving: [rec], deleting: [], savePolicy: .allKeys, atomically: false)
+        try db.sync { try store.setState(key, Data(String(hash).utf8)) }
     }
 
     // MARK: - Record coding

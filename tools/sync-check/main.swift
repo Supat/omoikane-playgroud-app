@@ -7,7 +7,7 @@
 //       Omoikane/Database/TransactionStore.swift Omoikane/Database/CategoryAccountStore.swift \
 //       Omoikane/Database/PayeeStore.swift Omoikane/Database/CurrencyStore.swift \
 //       Omoikane/Database/SeedData.swift Omoikane/Models/Models.swift \
-//       Omoikane/Models/Money.swift tools/sync-check/main.swift \
+//       Omoikane/Models/Money.swift Omoikane/Shared/WatchModels.swift tools/sync-check/main.swift \
 //   && /tmp/sync-check /tmp/sync-check-dir
 import Foundation
 
@@ -198,3 +198,19 @@ precondition(a.scalar("SELECT COUNT(*) FROM sync_tombstones") > 0, "sweep remove
 try a.sync.sweepTombstones(now: Int64(Date().timeIntervalSince1970) + SyncStore.tombstoneRetention + 1)
 precondition(a.scalar("SELECT COUNT(*) FROM sync_tombstones WHERE pushed = 1") == 0, "sweep kept old tombstones")
 print("sync-check ok")
+
+// --- 8. A Watch capture ingested on two devices is one transaction.
+let entry = WatchInboxEntry(id: WatchInboxEntry.newID(), amountMinor: 480, currency: "JPY",
+                            accountId: a.text("SELECT uuid FROM accounts WHERE name = 'Bank'"),
+                            categoryId: a.text("SELECT uuid FROM categories WHERE name = 'Groceries'"),
+                            occurredAt: Int64(Date().timeIntervalSince1970) - 60, note: "coffee",
+                            isEssential: false, isReimbursable: true)
+let rec = entry.transactionRecord(autoClear: true)
+try a.sync.apply(upserts: [rec], deletes: [])
+try b.sync.apply(upserts: [rec], deletes: [])       // the other device ingested the same inbox record
+try a.sync(zone); try b.sync(zone); try a.sync(zone)
+try b.sync.apply(upserts: [rec], deletes: [])       // and a stale fetch ingests it once more
+precondition(a.scalar("SELECT COUNT(*) FROM transactions WHERE uuid = '\(entry.id)'") == 1 && b.scalar("SELECT COUNT(*) FROM transactions WHERE uuid = '\(entry.id)'") == 1, "watch entry duplicated")
+precondition(b.text("SELECT c.name || '/' || a.name || '/' || t.is_reimbursable || '/' || (t.cleared_at IS NOT NULL) FROM transactions t JOIN categories c ON c.id = t.category_id JOIN accounts a ON a.id = t.account_id WHERE t.uuid = '\(entry.id)'") == "Groceries/Bank/1/1", "watch entry fields wrong")
+precondition(a.summariesConsistent() && b.summariesConsistent())
+print("8 watch inbox ok")

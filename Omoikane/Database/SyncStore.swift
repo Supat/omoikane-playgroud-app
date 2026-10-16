@@ -263,3 +263,37 @@ final class SyncStore {
         }
     }
 }
+
+extension WatchInboxEntry {
+    /// The transaction this entry becomes. A pure function of the entry
+    /// plus the account's auto-clear policy: every device that ingests it
+    /// builds the identical row, and the uuid makes a second ingest a no-op.
+    func transactionRecord(autoClear: Bool) -> SyncRecord {
+        let date = Date(timeIntervalSince1970: TimeInterval(occurredAt))
+        return SyncRecord(table: "transactions", uuid: id, fields: [
+            "occurred_on": .int(Int64(date.dayKey)),
+            "year_month": .int(Int64(date.yearMonthKey)),
+            "occurred_at": .int(occurredAt),
+            "amount_minor": .int(amountMinor),
+            "currency": .text(currency),
+            "kind": .text("expense"),
+            "category_id": .text(categoryId),
+            "account_id": .text(accountId),
+            "counterparty_account_id": .null,
+            "counterparty_amount_minor": .null,
+            "note": note.map { .text($0) } ?? .null,
+            "tags": .text("[]"),
+            "created_at": .int(occurredAt),
+            "updated_at": .int(occurredAt),
+            "cleared_at": autoClear ? .int(occurredAt) : .null,
+            "statement_id": .null,
+            "counterparty_cleared_at": .null,
+            "counterparty_statement_id": .null,
+            "split_group": .null,
+            "payee_id": .null,
+            "loan_role": .null,
+            "is_essential": .int(isEssential ? 1 : 0),
+            "is_reimbursable": .int(isReimbursable ? 1 : 0),
+        ])
+    }
+}
