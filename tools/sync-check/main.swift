@@ -2,12 +2,12 @@
 // on macOS with two databases and an in-memory stand-in for the CloudKit
 // zone. No iCloud account needed. Run from the repo root:
 //
-//   swiftc -O -o /tmp/sync-check Omoikane.swiftpm/Database/Database.swift \
-//       Omoikane.swiftpm/Database/Schema.swift Omoikane.swiftpm/Database/SyncStore.swift \
-//       Omoikane.swiftpm/Database/TransactionStore.swift Omoikane.swiftpm/Database/CategoryAccountStore.swift \
-//       Omoikane.swiftpm/Database/PayeeStore.swift Omoikane.swiftpm/Database/CurrencyStore.swift \
-//       Omoikane.swiftpm/Database/SeedData.swift Omoikane.swiftpm/Models/Models.swift \
-//       Omoikane.swiftpm/Models/Money.swift tools/sync-check/main.swift \
+//   swiftc -O -o /tmp/sync-check Omoikane/Database/Database.swift \
+//       Omoikane/Database/Schema.swift Omoikane/Database/SyncStore.swift \
+//       Omoikane/Database/TransactionStore.swift Omoikane/Database/CategoryAccountStore.swift \
+//       Omoikane/Database/PayeeStore.swift Omoikane/Database/CurrencyStore.swift \
+//       Omoikane/Database/SeedData.swift Omoikane/Models/Models.swift \
+//       Omoikane/Models/Money.swift tools/sync-check/main.swift \
 //   && /tmp/sync-check /tmp/sync-check-dir
 import Foundation
 

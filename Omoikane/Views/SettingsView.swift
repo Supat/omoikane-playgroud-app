@@ -113,7 +113,7 @@ struct SettingsView: View {
             } header: {
                 Text("iCloud")
             } footer: {
-                Text("Keeps the ledger the same on every device signed into your iCloud account. Changes upload a few seconds after you make them and download when the app opens, returns to the foreground, or is told about a change. Home currency and the spending limit follow too. Needs the Xcode build with the iCloud capability; the Swift Playground build cannot use it.")
+                Text("Keeps the ledger the same on every device signed into your iCloud account. Changes upload a few seconds after you make them and download when the app opens, returns to the foreground, or is told about a change. Home currency and the spending limit follow too. Needs a build signed with the iCloud capability.")
                     .font(.footnote)
             }
 

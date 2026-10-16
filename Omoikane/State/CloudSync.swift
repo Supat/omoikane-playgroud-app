@@ -15,8 +15,8 @@ import UIKit
 /// row and its outbox entry, so a stale edit never goes up. Conflicts on
 /// push compare `updated_at` with the server copy; the newer one stays.
 ///
-/// Needs the iCloud (CloudKit) capability, so only the Xcode build can turn
-/// it on; the toggle defaults to off.
+/// Needs the iCloud (CloudKit) capability (`Omoikane/Omoikane.entitlements`);
+/// the toggle defaults to off.
 @Observable
 final class CloudSync {
     static let containerID = "iCloud.com.supatsaetia.omoikane"

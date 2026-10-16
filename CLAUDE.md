@@ -4,15 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A household account book ("kakeibo") iPad app, delivered in two parallel forms that
-build from a **single set of Swift sources**:
+A household account book ("kakeibo") app for iPad and iPhone, built as a
+single Xcode project. Sources, assets, icon and entitlements live under
+`Omoikane/`; `Omoikane.xcodeproj/` references them by explicit file
+references (`SOURCE_ROOT` paths), not a synchronized folder.
 
-- `Omoikane.swiftpm/` — Swift Playground app package (opens in Xcode or Swift Playgrounds on iPad)
-- `Omoikane.xcodeproj/` — traditional Xcode iOS app project (references the same files via `SOURCE_ROOT` paths into `Omoikane.swiftpm/`)
+The Swift Playground package that used to sit beside the project was
+dropped on 2026-10-16. Do not recreate `Package.swift` or reason about
+Swift Playgrounds limits; capabilities go in `Omoikane/Omoikane.entitlements`.
 
-There is **no** `Omoikane/<sources>/` directory; the Xcode project does not duplicate code. Only `Omoikane/Assets.xcassets/` and `Omoikane/Omoikane.icon` lives outside `Omoikane.swiftpm/`.
-
-When you add a Swift file under `Omoikane.swiftpm/`, also add a `PBXFileReference` + `PBXBuildFile` for it in `project.pbxproj`, or the Xcode project silently won't compile it.
+When you add a Swift file under `Omoikane/`, also add a `PBXFileReference` +
+`PBXBuildFile` for it in `project.pbxproj`, or it silently won't compile.
 
 ## Implementation rules
 
@@ -30,15 +32,7 @@ iPad simulator UDID is needed for `-destination`. The simulator's OS must be ≥
 xcrun simctl list devices available | grep iPad
 ```
 
-Build the **Swift Playground app**:
-
-```sh
-xcodebuild -workspace Omoikane.swiftpm \
-  -scheme Omoikane \
-  -destination 'platform=iOS Simulator,id=<udid>' build
-```
-
-Build the **Xcode project**:
+Build:
 
 ```sh
 xcodebuild -project Omoikane.xcodeproj \
@@ -47,8 +41,7 @@ xcodebuild -project Omoikane.xcodeproj \
 ```
 
 Notes on tooling oddities:
-- `swift package describe` does **not** work on `Omoikane.swiftpm/` because `AppleProductTypes` is only resolvable inside Xcode/Swift Playgrounds. Use `xcodebuild` instead.
-- `xcodebuild` treats a `.swiftpm` directory as a **workspace** (`-workspace`), not a project.
+- Gate commits on `set -o pipefail; xcodebuild … | grep -q 'BUILD SUCCEEDED'`; grep-filtered pipelines otherwise hide failures.
 - Specify destinations by **UDID**, not by device name — name matching of `iPad Pro (11-inch) (4th generation)` fails in current Xcode.
 - The only expected build noise is an `appintentsmetadataprocessor` warning about a missing AppIntents dependency. Anything else is new.
 
@@ -68,10 +61,10 @@ conditions*. Three reasons we went with raw `import SQLite3`:
 2. **WAL + tuned pragmas** (`Database.swift::applyPragmas`) — concurrent readers,
    single writer, mmap, page cache, 5s busy timeout. Free with SQLite, harder
    with framework wrappers.
-3. **Zero dependencies.** A `.swiftpm` package can run in iPad Swift Playgrounds
+3. **Zero dependencies.** Nothing to resolve, nothing to update; a plain
    with no Git URLs to fetch.
 
-### Schema (`Omoikane.swiftpm/Database/Schema.swift`)
+### Schema (`Omoikane/Database/Schema.swift`)
 
 `Schema.latestVersion` is **13**. Migrations are applied in order by `Schema.migrate`, each in its own transaction, tracked in `schema_version`.
 
@@ -273,15 +266,14 @@ so it stays as-is. If you add new top-level types, sanity-check against
   `nulls` list naming NULL columns (absent keys are left alone on apply).
   Push conflicts compare `updated_at` with the server copy. Home currency
   and the spending limit go through `NSUbiquitousKeyValueStore`. Needs the
-  iCloud + push entitlements (`Omoikane/Omoikane.entitlements`, Xcode
-  project only; the Playground build has no capability for it, so the
-  toggle must stay off there). `tools/sync-check/main.swift` is a macOS
+  iCloud + push entitlements (`Omoikane/Omoikane.entitlements`); the
+  toggle defaults to off. `tools/sync-check/main.swift` is a macOS
   harness that syncs two databases through an in-memory zone; run it after
   touching `SyncStore` or the V13 triggers. Adding a synced table: append
   to `SyncStore.tables` in dependency order and give it the V13 treatment
   in a new migration.
 - **Changing the importer** → `tools/moneypro-import/main.swift` is a macOS
-  dry run that compiles the app's own `Database`, `Schema` and
+  dry run that compiles the app's own `Database`, `Schema`, `SyncStore` and
   `MoneyProImport` sources and runs them against a real `.back` file; the
   compile command is in its header. Run it before and after.
 - **Adding a new tab** → add a case to `AppTab`, a `NavigationStack` branch in

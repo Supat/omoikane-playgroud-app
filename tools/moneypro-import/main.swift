@@ -2,9 +2,9 @@
 // app's own Database / Schema / MoneyProImport sources. Fails loudly if the
 // import breaks. Run from the repo root:
 //
-//   swiftc -O -o /tmp/mp-dryrun Omoikane.swiftpm/Database/Database.swift \
-//       Omoikane.swiftpm/Database/Schema.swift \
-//       Omoikane.swiftpm/Database/MoneyProImport.swift tools/moneypro-import/main.swift \
+//   swiftc -O -o /tmp/mp-dryrun Omoikane/Database/Database.swift \
+//       Omoikane/Database/Schema.swift Omoikane/Database/SyncStore.swift \
+//       Omoikane/Database/MoneyProImport.swift tools/moneypro-import/main.swift \
 //   && /tmp/mp-dryrun "<backup>.back" /tmp/omoikane-dryrun.sqlite
 import Foundation
 
