@@ -21,10 +21,10 @@
           "image-name" : "吉祥人間.png",
           "name" : "吉祥人間",
           "position" : {
-            "scale" : 0.2,
+            "scale" : 0.25,
             "translation-in-points" : [
-              -18.450000000000045,
-              168
+              -18,
+              140.33749999999998
             ]
           }
         },
@@ -33,10 +33,10 @@
           "image-name" : "Photo Out Front.png",
           "name" : "Photo Out Front",
           "position" : {
-            "scale" : 0.2,
+            "scale" : 0.25,
             "translation-in-points" : [
-              -18.450000000000045,
-              168
+              -18,
+              140.33749999999998
             ]
           }
         },
@@ -52,10 +52,10 @@
           "image-name" : "Photo Out Back.png",
           "name" : "Photo Out Back",
           "position" : {
-            "scale" : 0.2,
+            "scale" : 0.25,
             "translation-in-points" : [
-              36.44999999999993,
-              152.89999999999998
+              36.89999999999998,
+              125.23749999999995
             ]
           }
         }
@@ -79,10 +79,10 @@
           "name" : "Folder Front",
           "opacity" : 1,
           "position" : {
-            "scale" : 0.2,
+            "scale" : 0.25,
             "translation-in-points" : [
-              0,
-              15.800000000000068
+              0.4500000000000455,
+              -11.862499999999955
             ]
           }
         }
@@ -102,10 +102,10 @@
           "image-name" : "Photo In Front 2.png",
           "name" : "Photo In Front 2",
           "position" : {
-            "scale" : 0.2,
+            "scale" : 0.25,
             "translation-in-points" : [
-              162,
-              -113.29999999999995
+              162.45000000000005,
+              -140.96249999999998
             ]
           }
         },
@@ -113,10 +113,10 @@
           "image-name" : "Photo In Back 2.png",
           "name" : "Photo In Back 2",
           "position" : {
-            "scale" : 0.2,
+            "scale" : 0.25,
             "translation-in-points" : [
-              36.44999999999993,
-              -144.50000000000006
+              36.89999999999998,
+              -172.16250000000008
             ]
           }
         }
@@ -136,10 +136,10 @@
           "image-name" : "Folder Insert.png",
           "name" : "Folder Insert",
           "position" : {
-            "scale" : 0.2,
+            "scale" : 0.25,
             "translation-in-points" : [
-              0,
-              0
+              0.4500000000000455,
+              -27.662500000000023
             ]
           }
         },
@@ -147,10 +147,10 @@
           "image-name" : "Folder Back.png",
           "name" : "Folder Back",
           "position" : {
-            "scale" : 0.2,
+            "scale" : 0.25,
             "translation-in-points" : [
-              0,
-              0
+              0.4500000000000455,
+              -27.662500000000023
             ]
           }
         }
