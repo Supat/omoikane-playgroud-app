@@ -214,3 +214,19 @@ precondition(a.scalar("SELECT COUNT(*) FROM transactions WHERE uuid = '\(entry.i
 precondition(b.text("SELECT c.name || '/' || a.name || '/' || t.is_reimbursable || '/' || (t.cleared_at IS NOT NULL) FROM transactions t JOIN categories c ON c.id = t.category_id JOIN accounts a ON a.id = t.account_id WHERE t.uuid = '\(entry.id)'") == "Groceries/Bank/1/1", "watch entry fields wrong")
 precondition(a.summariesConsistent() && b.summariesConsistent())
 print("8 watch inbox ok")
+
+// --- 9. A ledger that predates sync: nothing queued until queueAll, then all of it.
+let old = try Device(name: "old", dir: dir)
+try SeedData.seedIfNeeded(db: old.db)
+try old.db.exec("DELETE FROM sync_outbox;")                 // what a pre-V13 ledger looks like after migration
+precondition(old.pending() == 0)
+try old.sync.queueAll()
+let rows = ["accounts", "categories", "payees", "currency_rates", "statements", "transactions", "schedules"].map { old.scalar("SELECT COUNT(*) FROM \($0)") }.reduce(0, +)
+precondition(old.pending() == Int(rows), "queueAll queued \(old.pending()) of \(rows)")
+try old.sync.queueAll()
+precondition(old.pending() == Int(rows), "queueAll duplicated entries")
+var oldie = old; try oldie.sync(zone); try a.sync(zone)
+precondition(oldie.pending() == 0, "queued rows did not go up")
+let us = try old.db.prepare("SELECT uuid FROM transactions;")
+while try us.step() { precondition(a.scalar("SELECT COUNT(*) FROM transactions WHERE uuid = '\(us.string(0))'") == 1, "row \(us.string(0)) missing on A") }
+print("9 queue all ok")

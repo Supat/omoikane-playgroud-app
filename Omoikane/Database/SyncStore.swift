@@ -238,6 +238,20 @@ final class SyncStore {
     /// out what is newer.
     func resetRemoteState() throws { try db.exec("DELETE FROM sync_state;") }
 
+    /// Queue every row. The V13 triggers only see changes made after the
+    /// migration, so a ledger that predates sync would otherwise never go
+    /// up: run this when sync is turned on, after a restore, and when the
+    /// zone is gone. Rows already queued keep one entry.
+    func queueAll() throws {
+        try db.transaction {
+            let seq = try scalar("SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_outbox;")
+            for t in Self.tables {
+                let s = try db.prepare("INSERT OR REPLACE INTO sync_outbox (tbl, uuid, seq) SELECT '\(t.name)', uuid, ? FROM \(t.name);")
+                s.bind(seq, at: 1); try s.step()
+            }
+        }
+    }
+
     // MARK: - Helpers
 
     private func scalar(_ sql: String) throws -> Int64 {

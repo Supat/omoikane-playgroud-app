@@ -93,7 +93,7 @@ final class CloudSync {
             status = "Up to date"
         } catch let e as CKError where [.changeTokenExpired, .zoneNotFound, .userDeletedZone].contains(e.code) {
             // Start over from an empty token; last-writer-wins sorts out the rest.
-            try? db.sync { try store.resetRemoteState() }
+            try? db.sync { try store.resetRemoteState(); try store.queueAll() }
             status = "iCloud zone reset. Sync again."
         } catch {
             status = "Sync failed: \(error.localizedDescription)"
@@ -120,7 +120,9 @@ final class CloudSync {
 
     // MARK: - Pull
 
+    @MainActor
     private func pull() async throws -> Int {
+        status = "Downloading…"
         var token = try changeToken()
         var applied = 0
         var more = true
@@ -157,6 +159,7 @@ final class CloudSync {
 
     // MARK: - Push
 
+    @MainActor
     private func push() async throws {
         let pending = try db.sync { try store.pendingUpserts() }
         let tombstones = try db.sync { try store.pendingDeletes() }
@@ -164,6 +167,7 @@ final class CloudSync {
         var saves = pending.records.map(encode)
         var deleteIDs = tombstones.deletes.map { CKRecord.ID(recordName: $0.uuid, zoneID: zoneID) }
         while !saves.isEmpty || !deleteIDs.isEmpty {
+            status = "Uploading, \(saves.count + deleteIDs.count) left…"
             let s = Array(saves.prefix(400)); saves.removeFirst(s.count)
             let d = Array(deleteIDs.prefix(400 - s.count)); deleteIDs.removeFirst(d.count)
             let r = try await database.modifyRecords(saving: s, deleting: d, savePolicy: .ifServerRecordUnchanged, atomically: false)

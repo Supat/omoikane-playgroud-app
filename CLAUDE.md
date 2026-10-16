@@ -280,7 +280,9 @@ so it stays as-is. If you add new top-level types, sanity-check against
   iCloud + push entitlements (`Omoikane/Omoikane.entitlements`); the
   toggle defaults to off. `tools/sync-check/main.swift` is a macOS
   harness that syncs two databases through an in-memory zone; run it after
-  touching `SyncStore` or the V13 triggers. Adding a synced table: append
+  touching `SyncStore` or the V13 triggers. The triggers only queue rows
+  changed after V13, so `SyncStore.queueAll()` queues the whole ledger
+  when the toggle is turned on, after a restore and on a zone reset. Adding a synced table: append
   to `SyncStore.tables` in dependency order and give it the V13 treatment
   in a new migration.
 - **Apple Watch** → `OmoikaneWatch` is watch-only (`WKWatchOnly`): no

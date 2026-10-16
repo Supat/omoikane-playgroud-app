@@ -100,7 +100,10 @@ struct SettingsView: View {
 
             Section {
                 Toggle("Sync with iCloud", isOn: Binding(get: { app.cloud.enabled }, set: { app.setCloudSyncEnabled($0) }))
-                LabeledContent("Status", value: app.cloud.status)
+                LabeledContent("Status") {
+                    if app.cloud.isSyncing { ProgressView().controlSize(.small) }
+                    Text(app.cloud.status)
+                }
                 LabeledContent("Last sync", value: app.cloud.lastSync.map { Formatters.mediumDate.string(from: $0) + " " + Formatters.shortTime.string(from: $0) } ?? "Never")
                 LabeledContent("Waiting to upload", value: "\(app.cloud.pendingCount())")
                 Button {

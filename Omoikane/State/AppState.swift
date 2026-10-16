@@ -84,6 +84,8 @@ final class AppState {
     private static let kvs = NSUbiquitousKeyValueStore.default
 
     func setCloudSyncEnabled(_ on: Bool) {
+        // Everything local goes up on the first push; what the zone already has is settled per row.
+        if on { try? db.sync { try syncStore.queueAll() } }
         cloud.enabled = on
         guard on else { return }
         Self.kvs.set(homeCurrency, forKey: Self.homeCurrencyKey)
@@ -140,6 +142,7 @@ final class AppState {
             try Schema.migrate(db)
             // The backup's change token lies about what this copy has seen.
             try syncStore.resetRemoteState()
+            try syncStore.queueAll()
         }
         try refreshRates()
         bump()
