@@ -58,22 +58,31 @@ final class CloudSync {
 
     func pendingCount() -> Int { (try? db.sync { try store.pendingCount() }) ?? 0 }
 
-    /// Debounced: edits in quick succession become one push.
+    /// Debounced: edits in quick succession become one push. Only the wait
+    /// is cancellable; a cycle already talking to CloudKit runs to the end
+    /// (cancelling its Task would fail the operation as "cancelled").
     func scheduleSync(after seconds: Double = 3) {
         guard enabled else { return }
         scheduled?.cancel()
         scheduled = Task { @MainActor in
             if seconds > 0 { try? await Task.sleep(for: .seconds(seconds)) }
             guard !Task.isCancelled else { return }
-            await syncNow()
+            Task { @MainActor in await syncNow() }
         }
     }
 
+    /// A change made while a cycle runs gets its own cycle afterwards.
+    private var runAgain = false
+
     @MainActor
     func syncNow() async {
-        guard enabled, !isSyncing else { return }
+        guard enabled else { return }
+        if isSyncing { runAgain = true; return }
         isSyncing = true
-        defer { isSyncing = false }
+        defer {
+            isSyncing = false
+            if runAgain { runAgain = false; scheduleSync(after: 1) }
+        }
         do {
             guard try await container.accountStatus() == .available else {
                 status = "Sign in to iCloud to sync."
