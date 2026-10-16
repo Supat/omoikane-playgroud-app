@@ -19,7 +19,7 @@ import UIKit
 /// the toggle defaults to off.
 @Observable
 final class CloudSync {
-    static let containerID = "iCloud.com.supatsaetia.omoikane"
+    static let containerID = "iCloud.com.supatsaetia.omoikane.app"
     static let zoneName = "Ledger"
     static let enabledKey = "omoikane.icloudSync"
     /// Set by the app delegate so a silent push can trigger a pull.

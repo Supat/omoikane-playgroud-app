@@ -18,7 +18,7 @@ final class WatchStore {
 
     /// Built on first use, not at launch: CloudKit aborts a process without
     /// the iCloud entitlement the moment a container is created.
-    private var database: CKDatabase { CKContainer(identifier: "iCloud.com.supatsaetia.omoikane").privateCloudDatabase }
+    private var database: CKDatabase { CKContainer(identifier: "iCloud.com.supatsaetia.omoikane.app").privateCloudDatabase }
     private let zoneID = CKRecordZone.ID(zoneName: "Ledger", ownerName: CKCurrentUserDefaultName)
     private var busy = false
 

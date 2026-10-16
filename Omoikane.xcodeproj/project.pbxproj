@@ -46,11 +46,11 @@
 		B100000000000000000037 /* SyncStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000037 /* SyncStore.swift */; };
 		B100000000000000000038 /* CloudSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000038 /* CloudSync.swift */; };
 		B100000000000000000041 /* WatchModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000041 /* WatchModels.swift */; };
-		B100000000000000000051 /* WatchModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000041 /* WatchModels.swift */; };
-		B100000000000000000052 /* Money.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000011 /* Money.swift */; };
 		B100000000000000000042 /* OmoikaneWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000042 /* OmoikaneWatchApp.swift */; };
 		B100000000000000000043 /* WatchStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000043 /* WatchStore.swift */; };
 		B100000000000000000044 /* CaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000044 /* CaptureView.swift */; };
+		B100000000000000000051 /* WatchModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000041 /* WatchModels.swift */; };
+		B100000000000000000052 /* Money.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000011 /* Money.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -120,12 +120,21 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		B093269A3081AE0700450681 /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				F100000000000000000037 /* SyncStore.swift */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 		G100000000000000000001 = {
 			isa = PBXGroup;
 			children = (
 				G100000000000000000002 /* Sources */,
 				G100000000000000000009 /* Resources */,
 				G100000000000000000008 /* Products */,
+				B093269A3081AE0700450681 /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -536,6 +545,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = LV4TZ9M6Q9;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
@@ -551,7 +561,7 @@
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = "-lsqlite3";
-				PRODUCT_BUNDLE_IDENTIFIER = com.supatsaetia.omoikane;
+				PRODUCT_BUNDLE_IDENTIFIER = com.supatsaetia.omoikane.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -568,6 +578,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = LV4TZ9M6Q9;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
@@ -583,7 +594,7 @@
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = "-lsqlite3";
-				PRODUCT_BUNDLE_IDENTIFIER = com.supatsaetia.omoikane;
+				PRODUCT_BUNDLE_IDENTIFIER = com.supatsaetia.omoikane.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -610,7 +621,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.supatsaetia.omoikane.watchkitapp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.supatsaetia.omoikane.app.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SKIP_INSTALL = NO;
@@ -640,7 +651,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.supatsaetia.omoikane.watchkitapp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.supatsaetia.omoikane.app.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SKIP_INSTALL = NO;
